@@ -5,6 +5,7 @@
     "version": "3.8.8"
   },
   "devDependencies": {
+    "@cocos/creator-types": "^3.8.7",
     "husky": "^9.0.11",
     "prettier": "^3.2.5",
     "pretty-quick": "^4.0.0"

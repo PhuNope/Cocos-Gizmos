@@ -54,10 +54,12 @@ export default class Example extends Component {
         Gizmos2D.endLocalPosition(this.node);
         Gizmos2D.drawCircle(this.node, new Vec3(100, 100), 100);
         Gizmos2D.drawCircle(this.node, new Vec3(100, 200), 100);
+        Gizmos3D.setDepTest(this.node, false);
         Gizmos3D.beginLocalPosition(this.node);
         Gizmos3D.drawSphere(this.node, new Vec3(2, 3), 1);
         Gizmos3D.endLocalPosition(this.node);
         Gizmos3D.drawSphere(this.node, new Vec3(2, 3), 1);
+        Gizmos3D.setDepTest(this.node, true);
     }
 
     //update mỗi frame trong editor khi object được chọn

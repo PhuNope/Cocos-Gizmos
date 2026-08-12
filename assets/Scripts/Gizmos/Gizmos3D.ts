@@ -435,6 +435,11 @@ export default class Gizmos3D {
         return debugNode;
     }
 
+    public static setDepTest(node: Node, value: boolean) {
+        let debugNode = this.getDebugNode(node);
+        debugNode?.setDepthTest(value);
+    }
+
     public static beginColor(node: Node, color: Color) {
         this.getDebugNode(node)?.setColor(color);
     }
