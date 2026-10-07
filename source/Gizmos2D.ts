@@ -380,7 +380,7 @@ class GizmosDebugDraw extends Component {
     }
 }
 
-export default class Gizmos2D {
+export class Gizmos2D {
     public static readonly DEFAULT_COLOR = Color.BLUE;
     public static readonly DEFAULT_LAYER = Layers.Enum.GIZMOS;
 
@@ -519,3 +519,4 @@ export default class Gizmos2D {
         debugNode.drawQuadraticCurve(point1, point2, point3);
     }
 }
+

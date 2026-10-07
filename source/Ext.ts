@@ -3,10 +3,10 @@ declare module 'cc' {
         /**
          * Call per frame in editor (Only use in editor)
          */
-        onDrawGizmos(): void;
+        onDrawGizmos?(): void;
         /**
          * Call per frame in editor when node selected (Only use in editor)
          */
-        onDrawGizmosSelected(): void;
+        onDrawGizmosSelected?(): void;
     }
 }

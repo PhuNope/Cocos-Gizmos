@@ -1,18 +1,29 @@
 {
-  "name": "Cocos-Gizmos",
-  "uuid": "82480c34-e791-4544-ac0c-2bd78b395de5",
-  "creator": {
-    "version": "3.8.8"
-  },
-  "devDependencies": {
-    "@cocos/creator-types": "^3.8.7",
-    "husky": "^9.0.11",
-    "prettier": "^3.2.5",
-    "pretty-quick": "^4.0.0"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "pretty-quick --staged"
-    }
+    "$schema": "./@types/schema/package/index.json",
+    "package_version": 1,
+    "name": "Cocos-Gizmos",
+    "version": "1.0.0",
+    "author": "Nope",
+    "editor": ">=3.8.2",
+    "scripts": {
+        "build": "tsc -p tsconfig.json --noEmit && node scripts/build.mjs && tsc -p tsconfig.assets.json --noEmit"
+    },
+    "dependencies": {
+        "fs-extra": "^10.0.0",
+        "vue": "^3.1.4"
+    },
+    "devDependencies": {
+        "@cocos/creator-types": "^3.8.2",
+        "@types/fs-extra": "^9.0.5",
+        "@types/node": "^18.17.1",
+        "typescript": "^6.0.3"
+    },
+    "contributions": {
+      "asset-db": {
+        "mount": {
+          "path": "./assets",
+          "readonly": true
+        }
+      }
   }
 }

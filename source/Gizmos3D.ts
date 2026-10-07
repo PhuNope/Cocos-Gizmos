@@ -419,7 +419,7 @@ class GizmosDebugDraw extends Component {
     }
 }
 
-export default class Gizmos3D {
+export class Gizmos3D {
     public static readonly DEFAULT_COLOR = Color.BLUE;
     public static readonly DEFAULT_LAYER = Layers.Enum.GIZMOS;
 
@@ -659,3 +659,4 @@ export default class Gizmos3D {
         debugNode?.drawSpline(knots, mode, knotSize, segments);
     }
 }
+

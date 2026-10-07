@@ -1,0 +1,15 @@
+{
+    /* Type-checks the generated bundle (assets/Gizmos.ts) after `node scripts/build.mjs`. */
+    "extends": "./base.tsconfig.json",
+
+    "compilerOptions": {
+        "strict": false,
+        "lib": ["ES2016", "DOM"],
+        "rootDir": ".",
+        "noEmit": true
+    },
+
+    "include": ["assets/**/*", "Types/**/*"],
+    /* Example.ts is still using the old global names — exclude until it is updated. */
+    "exclude": ["assets/Example.ts"]
+}

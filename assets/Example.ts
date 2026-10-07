@@ -1,7 +1,4 @@
 import { _decorator, Color, Component, Layers, Node, SpriteFrame, Vec2, Vec3 } from 'cc';
-import registerGizmos from './Decorator';
-import Gizmos2D from './Gizmos2D';
-import Gizmos3D from './Gizmos3D';
 
 const { ccclass, property } = _decorator;
 
