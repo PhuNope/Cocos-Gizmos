@@ -1252,7 +1252,7 @@ declare global {
     };
 }
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && EDITOR) {
     (window as any).Gizmos = {
         Gizmos2D: _Gizmos2D.Gizmos2D,
         Gizmos3D: _Gizmos3D.Gizmos3D,

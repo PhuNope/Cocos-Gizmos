@@ -188,7 +188,7 @@ parts.push(`declare global {\n    const Gizmos: {\n${globalTypeMembers}\n    };\
 parts.push('');
 
 const globalValueMembers = PUBLIC_API.map((api) => `        ${api.member}: ${api.ns}.${api.member},`).join('\n');
-parts.push(`if (typeof window !== 'undefined') {\n    (window as any).Gizmos = {\n${globalValueMembers}\n    };\n}`);
+parts.push(`if (typeof window !== 'undefined' && EDITOR) {\n    (window as any).Gizmos = {\n${globalValueMembers}\n    };\n}`);
 parts.push('');
 
 mkdirSync(path.dirname(OUT_FILE), { recursive: true });

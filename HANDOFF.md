@@ -18,6 +18,21 @@ npm run build
 
 Lưu ý môi trường: `npx` bị chặn PowerShell execution policy → dùng `npm.cmd run build`.
 
+## Type (.d.ts)
+
+```bash
+npm.cmd run type
+```
+
+Chạy đủ 3 bước build ở trên trước, rồi `scripts/type.mjs`:
+
+1. TS API emit declaration từ `assets/Gizmos.ts` (program gồm cả `Types/cocos-types.d.ts` để resolve `cc`) → 0 diagnostic mới được emit
+2. Prune AST → ghi **`dist/Gizmos.d.ts`** — public surface: import `cc` (prune theo tên đang dùng), giữ nguyên augmentation `declare module 'cc'` (hook `onDrawGizmos`/`onDrawGizmosSelected` từ `source/Ext.ts`, JSDoc đầy đủ — bắt buộc phải có), `declare class Gizmos2D`/`Gizmos3D` (bỏ member private), `declare global { const Gizmos }`, `export {}` — KHÔNG giữ namespace `_...`, code runtime. Structural checks fail-loud nếu output thiếu/thừa phần cấm
+3. Consumer type test (program tách riêng, KHÔNG kèm `assets/Gizmos.ts`):
+   - `tests/dts/positive.ts` — gọi `Gizmos.*` không import, kiểm tra param optional + return `void` + `comp.onDrawGizmos?.()` (augmentation có tác dụng thật)
+   - `tests/dts/negative.ts` — `@ts-expect-error` khẳng định `Gizmos.registerGizmos`, member private, namespace nội bộ PHẢI lỗi — nếu không lỗi thì `@ts-expect-error` dư → test fail
+
+
 ## Dùng API (consumer)
 
 ```ts
@@ -46,7 +61,7 @@ Gizmos.Gizmos3D.drawSphere(node, pos, 1);
 
 | Trạng thái | File |
 |---|---|
-| tạo mới | `scripts/build.mjs`, `tsconfig.assets.json`, `assets/Gizmos.ts` (generated — **commit vào git**, assets được mount vào project) |
+| tạo mới | `scripts/build.mjs`, `tsconfig.assets.json`, `assets/Gizmos.ts` (generated — **commit vào git**, assets được mount vào project), `scripts/type.mjs`, `dist/Gizmos.d.ts` (generated), `tests/dts/positive.ts`, `tests/dts/negative.ts` |
 | sửa | `tsconfig.json` (thêm include), `package.json` (build script), `source/ExecuteGizmos.ts` (auto-discovery), `source/Gizmos2D.ts`, `source/Gizmos3D.ts` (xóa block `declare namespace Gizmos` + import `cc/env`), `source/Ext.ts` (methods optional) |
 | xoá | `source/Decorator.ts` |
 | **chưa đụng** | `assets/Example.ts` (để đó chờ sửa — xem TODO) |
@@ -71,5 +86,6 @@ Gizmos.Gizmos3D.drawSphere(node, pos, 1);
 ## Verification hiện tại
 
 - `npm run build` → exit 0 (cả 3 bước)
+- `npm run type` → exit 0 (build + emit `dist/Gizmos.d.ts` + consumer type tests)
 - 19 structural checks: 0 top-level export, `declare global` đúng 2 member, không `registerGizmos`, không relative import leak, không trailing whitespace/CR
 - Consumer type test: `Gizmos.Gizmos2D`/`Gizmos.Gizmos3D` resolve không cần import; `Gizmos.registerGizmos` xác nhận không tồn tại
