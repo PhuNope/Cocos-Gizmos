@@ -25,6 +25,7 @@ const manifest = {
   author: pkg.author,
   editor: pkg.editor,
   types: './dist/Gizmos.d.ts',
+  main: './main.js',
   contributions: { 'asset-db': { mount: { path: './dist', readonly: true } } },
 };
 const usage = `# Cocos-Gizmos v${pkg.version}\n\nCocos Creator extension providing global Gizmos2D and Gizmos3D.\n\n## Install\n\n1. In Cocos Creator 3.8.2+, open Extensions > Extension Manager.\n2. Select the Project or Global tab, choose Import Extension (+), and select this ZIP.\n3. Enable the Cocos-Gizmos extension and allow the Asset Database to finish importing.\n\nThe extension mounts dist/ as read-only project assets. The JavaScript module must be evaluated before using the runtime globals. Use Gizmos2D and Gizmos3D inside lifecycle callbacks after startup; don't reference them in top-level initializers.\n\nTypes are in dist/Gizmos.d.ts. Cocos Creator's engine provides cc and cc/env.\n\nSource: https://github.com/PhuNope/Cocos-Gizmos\n`;
@@ -93,6 +94,7 @@ function toZip(entries) {
 const entries = [
   ['package.json', JSON.stringify(manifest, null, 2) + '\n'],
   ['README.md', usage],
+  ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
   ['dist/Gizmos.js', readFileSync(path.join(distDir, 'Gizmos.js'))],
   ['dist/Gizmos.d.ts', readFileSync(path.join(distDir, 'Gizmos.d.ts'))],
 ];

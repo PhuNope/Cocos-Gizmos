@@ -14,10 +14,15 @@ A Cocos Creator **3.8.2+ extension** providing two public classes: `Gizmos2D` an
 Cocos-Gizmos-v2.0.0.zip
 ├── package.json
 ├── README.md
+├── main.js       # Editor lifecycle: install TypeScript reference
 └── dist/
     ├── Gizmos.js
     └── Gizmos.d.ts
 ```
+
+When you enable the extension, its editor entry automatically creates `assets/cocos-gizmos.global.d.ts` in the **Cocos project**, containing a triple-slash reference to the extension's real `dist/Gizmos.d.ts`. This lets WebStorm and TypeScript see `Gizmos2D` and `Gizmos3D` without per-file imports. The generated file is safe to check into the project repository, but it contains a relative reference to the installed extension path; after moving the project or switching global/project installation, re-enable the extension to update it. Disabling the extension does not delete the bridge; remove it manually if you uninstall Gizmos.
+
+For projects whose `tsconfig.json` has an explicit `include` or `files`, ensure `assets/cocos-gizmos.global.d.ts` is included. Then restart WebStorm's TypeScript Service if completions do not refresh. Cocos extensions outside project scope are not automatically discovered by WebStorm until this bridge is included.
 
 The JS is a Cocos ES module; `cc` and `cc/env` are provided by the engine. `Gizmos.d.ts` declares both classes globally. The JS module must be evaluated for runtime globals to exist; do not call Gizmos in top-level initializers before script loading.
 
