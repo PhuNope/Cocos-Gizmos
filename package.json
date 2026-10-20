@@ -8,7 +8,8 @@
     "scripts": {
         "build": "tsc -p tsconfig.json --noEmit && node scripts/build.mjs && tsc -p tsconfig.assets.json --noEmit",
         "type": "npm run build && node scripts/type.mjs",
-        "prepublishOnly": "npm run type"
+        "prepublishOnly": "npm run type",
+        "test": "npm run type && node scripts/verify-output.mjs"
     },
     "types": "dist/Gizmos.d.ts",
     "files": [
@@ -26,11 +27,11 @@
         "vue": "^3.1.4"
     },
     "contributions": {
-      "asset-db": {
-        "mount": {
-          "path": "./assets",
-          "readonly": true
+        "asset-db": {
+            "mount": {
+                "path": "./dist",
+                "readonly": true
+            }
         }
-      }
-  }
+    }
 }

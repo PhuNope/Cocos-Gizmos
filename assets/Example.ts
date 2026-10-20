@@ -2,8 +2,7 @@ import { _decorator, Color, Component, Layers, Node, SpriteFrame, Vec2, Vec3 } f
 
 const { ccclass, property } = _decorator;
 
-//dùng registerGizmos decorator để đăng kí gọi drawGizmos trong editor
-@registerGizmos
+// Gizmos hooks are auto-discovered by the editor; no decorator or import is required.
 @ccclass('Gizmos.Example')
 export default class Example extends Component {
     @property(SpriteFrame)

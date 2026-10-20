@@ -5,7 +5,8 @@ import ts from 'typescript';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC_DIR = path.join(ROOT, 'source');
-const OUT_FILE = path.join(ROOT, 'assets', 'Gizmos.ts');
+const OUT_FILE = path.join(ROOT, '.generated', 'Gizmos.ts');
+const JS_OUT_FILE = path.join(ROOT, 'dist', 'Gizmos.js');
 
 /**
  * Files are concatenated in this order. Each file's body is wrapped in its own
@@ -23,8 +24,7 @@ const FILES = [
 ];
 
 /**
- * Public surface of the global `Gizmos` object.
- * Only these members show up on `Gizmos.` in IntelliSense.
+ * The only exported runtime values and ambient globals.
  */
 const PUBLIC_API = [
     { member: 'Gizmos2D', ns: '_Gizmos2D' },
@@ -183,15 +183,35 @@ if (hoistedStatements.length > 0) {
 parts.push(namespaceBlocks.join('\n\n'));
 parts.push('');
 
-const globalTypeMembers = PUBLIC_API.map((api) => `        ${api.member}: typeof ${api.ns}.${api.member};`).join('\n');
-parts.push(`declare global {\n    const Gizmos: {\n${globalTypeMembers}\n    };\n}`);
+for (const api of PUBLIC_API) {
+    parts.push(`export const ${api.member} = ${api.ns}.${api.member};`);
+}
 parts.push('');
 
-const globalValueMembers = PUBLIC_API.map((api) => `        ${api.member}: ${api.ns}.${api.member},`).join('\n');
-parts.push(`if (typeof window !== 'undefined' && EDITOR) {\n    (window as any).Gizmos = {\n${globalValueMembers}\n    };\n}`);
+const globalTypeMembers = PUBLIC_API.map((api) => `    const ${api.member}: typeof ${api.ns}.${api.member};`).join('\n');
+parts.push(`declare global {\n${globalTypeMembers}\n}`);
 parts.push('');
-
+parts.push('Object.assign(globalThis, { Gizmos2D, Gizmos3D });');
+parts.push('');
+const bundledTypeScript = parts.join('\n').replace(/\r\n/g, '\n');
 mkdirSync(path.dirname(OUT_FILE), { recursive: true });
-writeFileSync(OUT_FILE, parts.join('\n').replace(/\r\n/g, '\n'), 'utf8');
+writeFileSync(OUT_FILE, bundledTypeScript, 'utf8');
 
-console.log(`[build] wrote ${path.relative(ROOT, OUT_FILE)} (${FILES.length} source files)`);
+// Transpile the concatenated TypeScript into ONE native Cocos ES module.
+// 'cc' and 'cc/env' remain engine-provided imports, never vendor-bundled.
+const output = ts.transpileModule(bundledTypeScript, {
+    fileName: OUT_FILE,
+    reportDiagnostics: true,
+    compilerOptions: {
+        target: ts.ScriptTarget.ES2017,
+        module: ts.ModuleKind.ESNext,
+        experimentalDecorators: true,
+        useDefineForClassFields: false,
+        removeComments: false,
+    },
+});
+const errors = (output.diagnostics ?? []).filter((d) => d.category === ts.DiagnosticCategory.Error);
+if (errors.length > 0) fail(`JS transpilation failed: ${errors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n')).join('; ')}`);
+mkdirSync(path.dirname(JS_OUT_FILE), { recursive: true });
+writeFileSync(JS_OUT_FILE, output.outputText, 'utf8');
+console.log(`[build] generated ${path.relative(ROOT, OUT_FILE)} and ${path.relative(ROOT, JS_OUT_FILE)}`);
