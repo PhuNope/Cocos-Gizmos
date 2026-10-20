@@ -16,14 +16,20 @@ Cocos-Gizmos-v2.0.0.zip
 ├── README.md
 ├── main.js       # Editor lifecycle: install TypeScript reference
 └── dist/
-    ├── package.json    # type: module — Cocos treats Gizmos.js as ESM
-    ├── Gizmos.js
-    └── Gizmos.d.ts
+    ├── package.json    # type: module — runtime files are ESM
+    ├── Gizmos.js       # only two public globals/exports
+    ├── Gizmos.d.ts     # global types for WebStorm
+    ├── Gizmos2D.js     # one private decorated Component
+    ├── Gizmos3D.js     # one private decorated Component
+    ├── Define.js       # environment helpers
+    └── ExecuteGizmos.js # editor auto-discovery
 ```
 
 When you enable the extension, its editor entry automatically creates `assets/cocos-gizmos.global.d.ts` in the **Cocos project**, containing a triple-slash reference to the extension's real `dist/Gizmos.d.ts`. This lets WebStorm and TypeScript see `Gizmos2D` and `Gizmos3D` without per-file imports. The generated file is safe to check into the project repository, but it contains a relative reference to the installed extension path; after moving the project or switching global/project installation, re-enable the extension to update it. Disabling the extension does not delete the bridge; remove it manually if you uninstall Gizmos.
 
 For projects whose `tsconfig.json` has an explicit `include` or `files`, ensure `assets/cocos-gizmos.global.d.ts` is included. Then restart WebStorm's TypeScript Service if completions do not refresh. Cocos extensions outside project scope are not automatically discovered by WebStorm until this bridge is included.
+
+The runtime is split across internal modules because Cocos Creator 3.8 rejects multiple decorated Components in a single script ("Each script can have at most one Component"). Only `Gizmos.js` is a public entry; consumers still have just two globals and don't import internal files.
 
 The extension's root `main.js` is CommonJS for the Cocos Editor, while `dist/Gizmos.js` uses ES module imports from `cc` and `cc/env`. The nested `dist/package.json` explicitly sets `type: module` so Cocos 3.8.x does not parse `Gizmos.js` as CommonJS. The `npm run pack` build validates both module formats using Node's syntax checker. `Gizmos.d.ts` declares both classes globally. The JS module must be evaluated for runtime globals to exist; do not call Gizmos in top-level initializers before script loading.
 

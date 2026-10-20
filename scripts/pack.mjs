@@ -8,7 +8,7 @@ import { deflateRawSync } from 'node:zlib';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const distDir = path.join(ROOT, 'dist');
-const expectedDist = ['Gizmos.d.ts', 'Gizmos.js'];
+const expectedDist = ['Define.js', 'ExecuteGizmos.js', 'Gizmos.d.ts', 'Gizmos.js', 'Gizmos2D.js', 'Gizmos3D.js'].sort();
 const actualDist = readdirSync(distDir).sort();
 if (JSON.stringify(actualDist) !== JSON.stringify(expectedDist)) {
   throw new Error(`dist/ must contain only ${expectedDist.join(', ')}; found ${actualDist.join(', ')}`);
@@ -18,7 +18,7 @@ if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(pkg.version)) {
 }
 
 // This is a Cocos Creator Editor extension manifest, not the development npm package.
-// The only contributed assets are the two generated files in ./dist.
+// The extension contributes one public entry, one .d.ts, and four internal runtime modules in ./dist.
 const manifest = {
   package_version: 2,
   name: pkg.name,
@@ -104,6 +104,8 @@ const entries = [
   ['dist/package.json', JSON.stringify({ type: 'module', private: true }, null, 2) + '\n'],
   ['dist/Gizmos.js', readFileSync(path.join(distDir, 'Gizmos.js'))],
   ['dist/Gizmos.d.ts', readFileSync(path.join(distDir, 'Gizmos.d.ts'))],
+  ...['Define.js', 'ExecuteGizmos.js', 'Gizmos2D.js', 'Gizmos3D.js']
+    .map(name => ['dist/' + name, readFileSync(path.join(distDir, name))]),
 ];
 // Regression test: load the extracted directory structure in Node's own
 // module-format resolver. This catches "Unexpected import statement in CJS
@@ -119,11 +121,24 @@ function verifyModuleFormats() {
         writeFileSync(destination, data);
       }
     }
-    for (const [relative, expectedFormat] of [['main.js', 'commonjs'], ['dist/Gizmos.js', 'module']]) {
+    const jsEntries = entries.map(([name]) => name).filter(name => name.endsWith('.js'));
+    for (const relative of jsEntries) {
+      const expectedFormat = relative === 'main.js' ? 'commonjs' : 'module';
       const target = path.join(tempRoot, relative);
       const result = spawnSync(process.execPath, ['--check', target], { encoding: 'utf8' });
       if (result.error || result.status !== 0) {
         throw new Error(`[pack] ${relative} should be ${expectedFormat}, syntax check failed:\n${result.stderr || result.error}`);
+      }
+    }
+    // All ESM relative references must resolve to actual assets in this ZIP.
+    for (const [name, data] of entries) {
+      if (!name.startsWith('dist/') || !name.endsWith('.js')) continue;
+      const text = Buffer.isBuffer(data) ? data.toString('utf8') : data;
+      for (const match of text.matchAll(/(?:from\\s*|import\\s*)['"](\\.\\/[^'"]+)['"]/g)) {
+        const referenced = path.posix.normalize(path.posix.join(path.posix.dirname(name), match[1]));
+        if (!entries.some(([entry]) => entry === referenced)) {
+          throw new Error('[pack] ' + name + ' imports a missing module ' + match[1]);
+        }
       }
     }
     const nestedPackage = JSON.parse(readFileSync(path.join(tempDist, 'package.json'), 'utf8'));
