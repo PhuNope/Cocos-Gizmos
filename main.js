@@ -8,8 +8,10 @@ const BRIDGE_NAME = 'cocos-gizmos.global.d.ts';
 
 /**
  * Editor extensions live outside the Cocos project's TypeScript compilation.
- * A tiny reference file in assets/ makes the existing full declaration visible
- * to TypeScript/WebStorm without copying runtime JS or editing tsconfig.json.
+ * WebStorm can resolve symbols from a referenced external declaration but fail
+ * to offer them during prefix completion. Put concrete ambient declarations
+ * in the PROJECT's assets/ directory for its own completion index.
+ * The reference still loads all original API signatures and component hooks.
  */
 function installTypeBridge(projectRoot) {
     if (typeof projectRoot !== 'string' || !projectRoot.trim()) {
@@ -23,7 +25,18 @@ function installTypeBridge(projectRoot) {
 
     const target = path.relative(assets, declaration).split(path.sep).join('/');
     const escapedTarget = target.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
-    const text = MARKER + '/// <reference path="' + escapedTarget + '" />\n';
+    // Keep declarations at project scope (script-style .d.ts, no import/export)
+    // so WebStorm indexes the names for prefix completion, not only for
+    // property completion after the user has typed the full identifier.
+    // The import() below is a type query; it does not execute JS.
+    const moduleSpecifier = target.endsWith('.d.ts') ? target.slice(0, -5) : target;
+    const moduleLiteral = JSON.stringify(moduleSpecifier);
+    const text = MARKER +
+        '/// <reference path="' + escapedTarget + '" />\n' +
+        '/** Global Cocos-Gizmos 2D helper, available without an import. */\n' +
+        'declare const Gizmos2D: typeof import(' + moduleLiteral + ').Gizmos2D;\n' +
+        '/** Global Cocos-Gizmos 3D helper, available without an import. */\n' +
+        'declare const Gizmos3D: typeof import(' + moduleLiteral + ').Gizmos3D;\n';
 
     if (fs.existsSync(bridge)) {
         const previous = fs.readFileSync(bridge, 'utf8');
