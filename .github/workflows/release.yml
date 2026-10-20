@@ -2,9 +2,9 @@ name: Build and release Gizmos
 
 on:
   pull_request:
-    branches: [dev, main]
+    branches: [dev, master]
   push:
-    branches: [dev, main]
+    branches: [dev, master]
     tags: ['v*']
 
 permissions:
@@ -34,11 +34,14 @@ jobs:
         with:
           name: Cocos-Gizmos-extension-${{ github.sha }}
           path: release/Cocos-Gizmos-*.zip
-          if-no-files-fo      # A GITHUB_TOKEN tag push does not start another workflow run.
-      # The main push job both pushes the version tag and publishes the release.
-      - name: Resolve release tag
+          if-no-files-found: error
+
+      # GITHUB_TOKEN tag pushes do not trigger a second Actions run.
+      # After a successful master build, push the version tag and create
+      # the Release in THIS run. Manual version tags are supported too.
+      - name: Resolve version for release
         id: release
-        if: ${{ github.ref_type == 'tag' || github.ref == 'refs/heads/main' }}
+        if: ${{ github.ref_type == 'tag' || github.ref == 'refs/heads/master' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -50,17 +53,17 @@ jobs:
             }
             echo "publish=true" >> "$GITHUB_OUTPUT"
           elif git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
-            echo "Version $tag already released; skipping automatic re-release."
+            echo "Version $tag already tagged; skipping automatic release."
             echo "publish=false" >> "$GITHUB_OUTPUT"
           else
             echo "publish=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Push version tag from main
-        if: ${{ github.ref == 'refs/heads/main' && steps.release.outputs.publish == 'true' }}
+      - name: Push version tag from master
+        if: ${{ github.ref == 'refs/heads/master' && steps.release.outputs.publish == 'true' }}
+        shell: bash
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        shell: bash
         run: |
           set -euo pipefail
           git tag "$RELEASE_TAG" "$GITHUB_SHA"
@@ -77,8 +80,6 @@ jobs:
             release/Cocos-Gizmos-*.zip
             dist/Gizmos.js
             dist/Gizmos.d.ts
-
-izmos.d.ts
 
       # Create PhuNope/Cocos-Gizmos-Type with main branch before enabling.
       # Set repository variable TYPES_REPO_READY=true and repository secret
