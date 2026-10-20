@@ -24,6 +24,23 @@ jobs:
       - name: Build, type-check and verify public API
         run: npm test
 
+      # Keep a downloadable build artifact for the dev branch without publishing a release.
+      - name: Package development build
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
+        shell: bash
+        run: |
+          mkdir -p release/Cocos-Gizmos
+          cp dist/Gizmos.js dist/Gizmos.d.ts release/Cocos-Gizmos/
+          (cd release && zip -q -r "Cocos-Gizmos-v2.0.0.zip" Cocos-Gizmos)
+
+      - name: Upload development build
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cocos-Gizmos-v2.0.0
+          path: release/Cocos-Gizmos-v2.0.0.zip
+          if-no-files-found: error
+
       - name: Validate release tag
         if: ${{ github.ref_type == 'tag' }}
         shell: bash
