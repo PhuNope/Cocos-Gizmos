@@ -1,6 +1,6 @@
 {
     "$schema": "./@types/schema/package/index.json",
-    "package_version": 1,
+    "package_version": 2,
     "name": "cocos-gizmos",
     "version": "2.0.0",
     "author": "Nope",
@@ -9,7 +9,8 @@
         "build": "tsc -p tsconfig.json --noEmit && node scripts/build.mjs && tsc -p tsconfig.assets.json --noEmit",
         "type": "npm run build && node scripts/type.mjs",
         "prepublishOnly": "npm run type",
-        "test": "npm run type && node scripts/verify-output.mjs"
+        "test": "npm run type && node scripts/verify-output.mjs",
+        "pack": "npm run test && node scripts/pack.mjs"
     },
     "types": "dist/Gizmos.d.ts",
     "files": [

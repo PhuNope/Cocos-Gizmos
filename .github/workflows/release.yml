@@ -24,36 +24,26 @@ jobs:
       - name: Build, type-check and verify public API
         run: npm test
 
-      # Keep a downloadable build artifact for the dev branch without publishing a release.
-      - name: Package development build
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
-        shell: bash
-        run: |
-          mkdir -p release/Cocos-Gizmos
-          cp dist/Gizmos.js dist/Gizmos.d.ts release/Cocos-Gizmos/
-          (cd release && zip -q -r "Cocos-Gizmos-v2.0.0.zip" Cocos-Gizmos)
+      - name: Pack Cocos Creator extension ZIP
+        run: npm run pack
 
-      - name: Upload development build
+      # Upload a ZIP that Extension Manager can import directly.
+      - name: Upload development extension build
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
         uses: actions/upload-artifact@v4
         with:
-          name: Cocos-Gizmos-v2.0.0
-          path: release/Cocos-Gizmos-v2.0.0.zip
+          name: Cocos-Gizmos-extension-${{ github.sha }}
+          path: release/Cocos-Gizmos-*.zip
           if-no-files-found: error
 
-      - name: Validate release tag
+      - name: Validate release tag and package version
         if: ${{ github.ref_type == 'tag' }}
         shell: bash
         run: |
           [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "Expected vMAJOR.MINOR.PATCH"; exit 1; }
-
-      - name: Zip only JS and declarations
-        if: ${{ github.ref_type == 'tag' }}
-        shell: bash
-        run: |
-          mkdir -p release/Cocos-Gizmos
-          cp dist/Gizmos.js dist/Gizmos.d.ts release/Cocos-Gizmos/
-          (cd release && zip -q -r "Cocos-Gizmos-$GITHUB_REF_NAME.zip" Cocos-Gizmos)
+          test "$GITHUB_REF_NAME" = "v$(node -p 'require("./package.json").version')" || {
+            echo "Tag $GITHUB_REF_NAME does not match package.json version"; exit 1;
+          }
 
       - name: Publish GitHub release
         if: ${{ github.ref_type == 'tag' }}
