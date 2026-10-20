@@ -2,9 +2,9 @@ name: Build and release Gizmos
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, main]
   push:
-    branches: [dev]
+    branches: [dev, main]
     tags: ['v*']
 
 permissions:
@@ -34,32 +34,57 @@ jobs:
         with:
           name: Cocos-Gizmos-extension-${{ github.sha }}
           path: release/Cocos-Gizmos-*.zip
-          if-no-files-found: error
-
-      - name: Validate release tag and package version
-        if: ${{ github.ref_type == 'tag' }}
+          if-no-files-fo      # A GITHUB_TOKEN tag push does not start another workflow run.
+      # The main push job both pushes the version tag and publishes the release.
+      - name: Resolve release tag
+        id: release
+        if: ${{ github.ref_type == 'tag' || github.ref == 'refs/heads/main' }}
         shell: bash
         run: |
-          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "Expected vMAJOR.MINOR.PATCH"; exit 1; }
-          test "$GITHUB_REF_NAME" = "v$(node -p 'require("./package.json").version')" || {
-            echo "Tag $GITHUB_REF_NAME does not match package.json version"; exit 1;
-          }
+          set -euo pipefail
+          tag="v$(node -p 'require("./package.json").version')"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            [[ "$GITHUB_REF_NAME" == "$tag" ]] || {
+              echo "Tag $GITHUB_REF_NAME does not match package version $tag"; exit 1;
+            }
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          elif git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "Version $tag already released; skipping automatic re-release."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push version tag from main
+        if: ${{ github.ref == 'refs/heads/main' && steps.release.outputs.publish == 'true' }}
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git tag "$RELEASE_TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$RELEASE_TAG"
 
       - name: Publish GitHub release
-        if: ${{ github.ref_type == 'tag' }}
+        if: ${{ steps.release.outputs.publish == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |
             release/Cocos-Gizmos-*.zip
             dist/Gizmos.js
             dist/Gizmos.d.ts
 
+izmos.d.ts
+
       # Create PhuNope/Cocos-Gizmos-Type with main branch before enabling.
       # Set repository variable TYPES_REPO_READY=true and repository secret
       # TYPES_REPO_TOKEN: fine-grained PAT with target repo Contents read/write.
       - name: Checkout type-only repository
-        if: ${{ github.ref_type == 'tag' && vars.TYPES_REPO_READY == 'true' }}
+        if: ${{ steps.release.outputs.publish == 'true' && vars.TYPES_REPO_READY == 'true' }}
         uses: actions/checkout@v4
         with:
           repository: PhuNope/Cocos-Gizmos-Type
@@ -68,14 +93,16 @@ jobs:
           path: types-repo
 
       - name: Sync type-only package and matching version tag
-        if: ${{ github.ref_type == 'tag' && vars.TYPES_REPO_READY == 'true' }}
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        if: ${{ steps.release.outputs.publish == 'true' && vars.TYPES_REPO_READY == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
           cp dist/Gizmos.d.ts types-repo/Gizmos.d.ts
           node - <<'NODE'
           const fs = require('fs');
-          const version = process.env.GITHUB_REF_NAME.slice(1);
+          const version = process.env.RELEASE_TAG.slice(1);
           fs.writeFileSync('types-repo/package.json', JSON.stringify({
             name: '@types/cocos-gizmos',
             version,
@@ -90,10 +117,10 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add Gizmos.d.ts package.json
           if ! git diff --cached --quiet; then
-            git commit -m "chore(types): sync $GITHUB_REF_NAME"
+            git commit -m "chore(types): sync $RELEASE_TAG"
             git push origin HEAD:main
           fi
-          if ! git ls-remote --exit-code --tags origin "refs/tags/$GITHUB_REF_NAME" > /dev/null; then
-            git tag "$GITHUB_REF_NAME"
-            git push origin "refs/tags/$GITHUB_REF_NAME"
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" > /dev/null; then
+            git tag "$RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
           fi
