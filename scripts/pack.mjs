@@ -134,7 +134,7 @@ function verifyModuleFormats() {
     for (const [name, data] of entries) {
       if (!name.startsWith('dist/') || !name.endsWith('.js')) continue;
       const text = Buffer.isBuffer(data) ? data.toString('utf8') : data;
-      for (const match of text.matchAll(/(?:from\\s*|import\\s*)['"](\\.\\/[^'"]+)['"]/g)) {
+      for (const match of text.matchAll(/(?:from\s*|import\s*)['"](\.\/[^'"]+)['"]/g)) {
         const referenced = path.posix.normalize(path.posix.join(path.posix.dirname(name), match[1]));
         if (!entries.some(([entry]) => entry === referenced)) {
           throw new Error('[pack] ' + name + ' imports a missing module ' + match[1]);

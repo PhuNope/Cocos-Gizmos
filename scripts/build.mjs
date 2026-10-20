@@ -223,12 +223,14 @@ function transpileRuntimeModule(name) {
     const errors = (output.diagnostics ?? []).filter((d) => d.category === ts.DiagnosticCategory.Error);
     if (errors.length) fail(name + ' transpilation failed: ' + errors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\\n')).join('; '));
 
-    // The mounted runtime is plain JS; rewrite TS's extensionless relative
-    // imports so the Cocos ESM resolver can find the generated *.js modules.
-    const generated = output.outputText.replace(
-        /(from\\s+['"])(\\.\\/[A-Za-z0-9_./-]+)(['"])/g,
-        (_match, start, target, end) => start + (target.endsWith('.js') ? target : target + '.js') + end,
-    );
+    // Runtime source only uses ./Define; enforce a concrete generated .js
+    // extension for Cocos ESM resolution. Never rewrite 'cc' or 'cc/env'.
+    let generated = output.outputText;
+    if (name === 'ExecuteGizmos' || name === 'Gizmos3D') {
+        generated = generated.replaceAll("from './Define'", "from './Define.js'")
+                             .replaceAll('from "./Define"', 'from "./Define.js"');
+        if (!generated.includes('Define.js')) fail(name + ' missing compiled Define import');
+    }
     writeFileSync(path.join(ROOT, 'dist', name + '.js'), generated, 'utf8');
 }
 
