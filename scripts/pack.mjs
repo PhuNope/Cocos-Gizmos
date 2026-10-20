@@ -1,4 +1,6 @@
-import { readFileSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { deflateRawSync } from 'node:zlib';
@@ -95,9 +97,47 @@ const entries = [
   ['package.json', JSON.stringify(manifest, null, 2) + '\n'],
   ['README.md', usage],
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
+  // Critical for Cocos 3.8: by default, *.js is treated as CJS. Cocos
+  // detects ESM by the nearest package.json's "type": "module".
+  // Put this marker *inside dist/*, not at the extension root: main.js
+  // must remain CommonJS so the editor can call its load() hook.
+  ['dist/package.json', JSON.stringify({ type: 'module', private: true }, null, 2) + '\n'],
   ['dist/Gizmos.js', readFileSync(path.join(distDir, 'Gizmos.js'))],
   ['dist/Gizmos.d.ts', readFileSync(path.join(distDir, 'Gizmos.d.ts'))],
 ];
+// Regression test: load the extracted directory structure in Node's own
+// module-format resolver. This catches "Unexpected import statement in CJS
+// module" before publishing an extension ZIP.
+function verifyModuleFormats() {
+  const tempRoot = mkdtempSync(path.join(os.tmpdir(), 'cocos-gizmos-module-format-'));
+  try {
+    const tempDist = path.join(tempRoot, 'dist');
+    mkdirSync(tempDist);
+    for (const [name, data] of entries) {
+      if (name === 'main.js' || name === 'package.json' || name.startsWith('dist/')) {
+        const destination = path.join(tempRoot, name);
+        writeFileSync(destination, data);
+      }
+    }
+    for (const [relative, expectedFormat] of [['main.js', 'commonjs'], ['dist/Gizmos.js', 'module']]) {
+      const target = path.join(tempRoot, relative);
+      const result = spawnSync(process.execPath, ['--check', target], { encoding: 'utf8' });
+      if (result.error || result.status !== 0) {
+        throw new Error(`[pack] ${relative} should be ${expectedFormat}, syntax check failed:\n${result.stderr || result.error}`);
+      }
+    }
+    const nestedPackage = JSON.parse(readFileSync(path.join(tempDist, 'package.json'), 'utf8'));
+    const topPackage = JSON.parse(readFileSync(path.join(tempRoot, 'package.json'), 'utf8'));
+    if (nestedPackage.type !== 'module' || topPackage.type === 'module') {
+      throw new Error('[pack] Invalid ESM boundary: dist/ must be ESM, extension main.js must be CJS');
+    }
+    console.log('[pack] verified Cocos-compatible ESM boundary (dist/) and CommonJS editor entry');
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+verifyModuleFormats();
+
 const outDir = path.join(ROOT, 'release');
 mkdirSync(outDir, { recursive: true });
 const outFile = path.join(outDir, `Cocos-Gizmos-v${pkg.version}.zip`);

@@ -16,6 +16,7 @@ Cocos-Gizmos-v2.0.0.zip
 ├── README.md
 ├── main.js       # Editor lifecycle: install TypeScript reference
 └── dist/
+    ├── package.json    # type: module — Cocos treats Gizmos.js as ESM
     ├── Gizmos.js
     └── Gizmos.d.ts
 ```
@@ -24,7 +25,7 @@ When you enable the extension, its editor entry automatically creates `assets/co
 
 For projects whose `tsconfig.json` has an explicit `include` or `files`, ensure `assets/cocos-gizmos.global.d.ts` is included. Then restart WebStorm's TypeScript Service if completions do not refresh. Cocos extensions outside project scope are not automatically discovered by WebStorm until this bridge is included.
 
-The JS is a Cocos ES module; `cc` and `cc/env` are provided by the engine. `Gizmos.d.ts` declares both classes globally. The JS module must be evaluated for runtime globals to exist; do not call Gizmos in top-level initializers before script loading.
+The extension's root `main.js` is CommonJS for the Cocos Editor, while `dist/Gizmos.js` uses ES module imports from `cc` and `cc/env`. The nested `dist/package.json` explicitly sets `type: module` so Cocos 3.8.x does not parse `Gizmos.js` as CommonJS. The `npm run pack` build validates both module formats using Node's syntax checker. `Gizmos.d.ts` declares both classes globally. The JS module must be evaluated for runtime globals to exist; do not call Gizmos in top-level initializers before script loading.
 
 In scripts running after startup (no per-file import needed):
 
