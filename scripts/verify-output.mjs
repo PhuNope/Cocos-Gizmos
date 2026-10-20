@@ -56,7 +56,7 @@ for (const name of ['Gizmos2D', 'Gizmos3D', 'Define', 'ExecuteGizmos']) {
     totalDecorated += decorated;
 }
 if (totalDecorated !== 2) fail('Expected exactly two separate private Component scripts');
-if (/ccclass\\s*\\(/.test(publicEntry) || /__decorate/.test(publicEntry)) {
+if (publicEntry.includes('ccclass(') || publicEntry.includes('__decorate')) {
     fail('Public entry must not register a Cocos Component');
 }
 for (const dependency of ['Gizmos2D.js', 'Gizmos3D.js', 'ExecuteGizmos.js']) {
