@@ -2,7 +2,7 @@
     "$schema": "./@types/schema/package/index.json",
     "package_version": 1,
     "name": "cocos-gizmos",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "author": "Nope",
     "editor": ">=3.8.2",
     "scripts": {
