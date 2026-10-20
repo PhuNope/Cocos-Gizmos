@@ -1,5 +1,5 @@
 {
-    /* Type-checks the generated bundle (assets/Gizmos.ts) after `node scripts/build.mjs`. */
+    /* Type-checks the generated bundle (.generated/Gizmos.ts) and sample after `node scripts/build.mjs`. */
     "extends": "./base.tsconfig.json",
 
     "compilerOptions": {
@@ -9,7 +9,5 @@
         "noEmit": true
     },
 
-    "include": ["assets/**/*", "Types/**/*"],
-    /* Example.ts is still using the old global names — exclude until it is updated. */
-    "exclude": ["assets/Example.ts"]
+    "include": [".generated/**/*.ts", "assets/Example.ts", "Types/**/*"]
 }

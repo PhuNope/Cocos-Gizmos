@@ -1,0 +1,92 @@
+name: Build and release Gizmos
+
+on:
+  pull_request:
+    branches: [dev]
+  push:
+    branches: [dev]
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build, type-check and verify public API
+        run: npm test
+
+      - name: Validate release tag
+        if: ${{ github.ref_type == 'tag' }}
+        shell: bash
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "Expected vMAJOR.MINOR.PATCH"; exit 1; }
+
+      - name: Zip only JS and declarations
+        if: ${{ github.ref_type == 'tag' }}
+        shell: bash
+        run: |
+          mkdir -p release/Cocos-Gizmos
+          cp dist/Gizmos.js dist/Gizmos.d.ts release/Cocos-Gizmos/
+          (cd release && zip -q -r "Cocos-Gizmos-$GITHUB_REF_NAME.zip" Cocos-Gizmos)
+
+      - name: Publish GitHub release
+        if: ${{ github.ref_type == 'tag' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release/Cocos-Gizmos-*.zip
+            dist/Gizmos.js
+            dist/Gizmos.d.ts
+
+      # Create PhuNope/Cocos-Gizmos-Type with main branch before enabling.
+      # Set repository variable TYPES_REPO_READY=true and repository secret
+      # TYPES_REPO_TOKEN: fine-grained PAT with target repo Contents read/write.
+      - name: Checkout type-only repository
+        if: ${{ github.ref_type == 'tag' && vars.TYPES_REPO_READY == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          repository: PhuNope/Cocos-Gizmos-Type
+          ref: main
+          token: ${{ secrets.TYPES_REPO_TOKEN }}
+          path: types-repo
+
+      - name: Sync type-only package and matching version tag
+        if: ${{ github.ref_type == 'tag' && vars.TYPES_REPO_READY == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp dist/Gizmos.d.ts types-repo/Gizmos.d.ts
+          node - <<'NODE'
+          const fs = require('fs');
+          const version = process.env.GITHUB_REF_NAME.slice(1);
+          fs.writeFileSync('types-repo/package.json', JSON.stringify({
+            name: '@types/cocos-gizmos',
+            version,
+            types: 'Gizmos.d.ts',
+            files: ['Gizmos.d.ts'],
+            description: 'Global-only type declarations for Cocos-Gizmos',
+            license: 'MIT'
+          }, null, 2) + '\n');
+          NODE
+          cd types-repo
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Gizmos.d.ts package.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(types): sync $GITHUB_REF_NAME"
+            git push origin HEAD:main
+          fi
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$GITHUB_REF_NAME" > /dev/null; then
+            git tag "$GITHUB_REF_NAME"
+            git push origin "refs/tags/$GITHUB_REF_NAME"
+          fi
