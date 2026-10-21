@@ -27,10 +27,79 @@ function parse(source, name) {
 function functionLike(node) {
     return ts.isFunctionExpression(node) || ts.isArrowFunction(node);
 }
+function isCallbackAssignment(node) {
+    if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return false;
+    const left = node.left;
+    const named = ts.isPropertyAccessExpression(left) ? left.name.text :
+        ts.isElementAccessExpression(left) && ts.isStringLiteral(left.argumentExpression)
+            ? left.argumentExpression.text : null;
+    return CALLBACKS.has(named) && functionLike(node.right);
+}
+function isComma(node) {
+    return ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.CommaToken;
+}
+function flattenComma(node, expressions, commas) {
+    if (isComma(node)) {
+        flattenComma(node.left, expressions, commas);
+        commas.push(node.operatorToken);
+        flattenComma(node.right, expressions, commas);
+    } else {
+        expressions.push(node);
+    }
+}
 function detectAndStrip(source, fileName) {
     const ast = parse(source, fileName);
-    const spans = [];
+    const edits = [];
+    let removed = 0;
+    const blank = (start, end) => edits.push({start, end, replacement: ''});
     const visit = node => {
+        if (isComma(node)) {
+            const expressions = [], commas = [];
+            flattenComma(node, expressions, commas);
+            const keep = [];
+            for (let i = 0; i < expressions.length; i++) {
+                if (isCallbackAssignment(expressions[i])) {
+                    removed++;
+                } else {
+                    keep.push(i);
+                }
+            }
+            if (keep.length !== expressions.length) {
+                if (keep.length === 0) {
+                    // The whole comma expression consisted of debug callbacks.
+                    edits.push({start:node.getStart(ast), end:node.end, replacement:'void 0'});
+                    return;
+                }
+                // Keep one ORIGINAL comma between each pair of retained
+                // expressions; blank all removed assignments and extra commas.
+                // In particular handle Cocos/Rollup's:
+                //   return t.start=fn,t.onDrawGizmos=fn,t.onDrawGizmosSelected=fn,n
+                const keepCommas = new Set();
+                for (let i = 0; i + 1 < keep.length; i++) keepCommas.add(keep[i]);
+                for (let i = 0; i < commas.length; i++) {
+                    if (!keepCommas.has(i)) blank(commas[i].getStart(ast), commas[i].end);
+                }
+                for (let i = 0; i < expressions.length; i++) {
+                    if (isCallbackAssignment(expressions[i])) {
+                        blank(expressions[i].getStart(ast), expressions[i].end);
+                    } else {
+                        visit(expressions[i]);
+                    }
+                }
+                return;
+            }
+            for (const expression of expressions) visit(expression);
+            return;
+        }
+        if (isCallbackAssignment(node)) {
+            removed++;
+            if (ts.isExpressionStatement(node.parent) && node.parent.expression === node) {
+                blank(node.parent.getStart(ast), node.parent.end);
+            } else {
+                edits.push({start:node.getStart(ast), end:node.end, replacement:'void 0'});
+            }
+            return;
+        }
         const isClassOrObjectMethod = ts.isMethodDeclaration(node);
         const isFunctionProperty = (ts.isPropertyAssignment(node) ||
             ts.isPropertyDeclaration(node)) && node.initializer && functionLike(node.initializer);
@@ -43,31 +112,32 @@ function detectAndStrip(source, fileName) {
                 if (following) end += following[0].length;
                 else if (preceding) start -= preceding[0].length;
             }
-            spans.push({start, end});
-            return;
-        }
-        if (ts.isExpressionStatement(node) && ts.isBinaryExpression(node.expression) &&
-            node.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-            ts.isPropertyAccessExpression(node.expression.left) &&
-            CALLBACKS.has(node.expression.left.name.text) &&
-            functionLike(node.expression.right)) {
-            spans.push({start: node.getStart(ast), end: node.end});
+            blank(start, end);
+            removed++;
             return;
         }
         ts.forEachChild(node, visit);
     };
     visit(ast);
-    const ordered = spans.sort((a, b) => a.start - b.start);
-    for (let i = 1; i < ordered.length; i++) {
-        if (ordered[i].start < ordered[i-1].end) throw new Error('Overlapping AST callback edits');
+    edits.sort((a, b) => a.start - b.start);
+    for (let i = 1; i < edits.length; i++) {
+        if (edits[i].start < edits[i - 1].end) {
+            throw new Error('[cocos-gizmos] Overlapping callback edits in ' + fileName);
+        }
     }
+    // Keep original byte offsets/newlines for the rest of the System.register
+    // chunk: compiled game code and nearby source locations remain untouched.
     let output = source;
-    for (const {start, end} of ordered.reverse()) {
-        output = output.slice(0, start) +
-            output.slice(start, end).replace(/[^\n\r]/g, ' ') +
-            output.slice(end);
+    for (let i = edits.length - 1; i >= 0; i--) {
+        const {start, end, replacement} = edits[i];
+        const original = source.slice(start, end);
+        const padding = original.slice(replacement.length).replace(/[^\r\n]/g, ' ');
+        output = output.slice(0, start) + replacement + padding + output.slice(end);
     }
-    return {text: output, removed: spans.length};
+    if (removed && parse(output, fileName).parseDiagnostics.length) {
+        throw new Error('[cocos-gizmos] Stripped output has invalid syntax in ' + fileName);
+    }
+    return {text: output, removed};
 }
 function isStandaloneRuntime(relative) {
     // Optional cleanup for legacy bundles; modern Gizmos is Scene-only.

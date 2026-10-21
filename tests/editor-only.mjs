@@ -71,8 +71,39 @@ try {
     assert.equal(mixedStats.removedMethods, 1);
     assert.match(readFileSync(mixed, 'utf8'), /class GizmosDebugDraw/);
     assert.match(readFileSync(mixed, 'utf8'), /a\(\)\{ Gizmos2D\.drawLine\(\)/);
+    // Regression: exact Cocos Creator 3.8.8 / Web Mobile System.register
+    // output reported by the user. Callbacks are prototype assignments in a
+    // comma/return expression, not class or object method declarations.
+    const cocosCompiled = 'System.register("chunks:///_virtual/Gizmos2DComp.ts",["./rollupPluginModLoBabelHelpers.js","cc"],(function(o){var i,n,t,e,s,r;return{setters:[function(o){i=o.inheritsLoose},function(o){n=o.cclegacy,t=o._decorator,e=o.Color,s=o.Vec2,r=o.Component}],execute:function(){var c;n._RF.push({},"8e3e3OWl1BNLJdp3LdVsqk1","Gizmos2DComp",void 0);var l=t.ccclass;t.property,o("Gizmos2DComp",l("Gizmos2DComp")(c=function(o){function n(){return o.apply(this,arguments)||this}i(n,o);var t=n.prototype;return t.start=function(){console.log("Gizmos2DComp started")},t.onDrawGizmos=function(){Gizmos2D.beginColor(this.node,e.RED),Gizmos2D.beginLocalPosition(this.node),Gizmos2D.drawSolidCircle(this.node,s.ZERO,50),Gizmos2D.endLocalPosition(this.node)},t.onDrawGizmosSelected=function(){},n}(r))||c);n._RF.pop()}}}));';
+    const webIndex = put('assets/main/index.js', cocosCompiled);
+    const cocosStats = stripBuild(scratch);
+    assert.equal(cocosStats.removedMethods, 2, 'remove both compiled prototype assignments');
+    assert.equal(cocosStats.changedFiles, 1);
+    const webOutput = readFileSync(webIndex, 'utf8');
+    assert.equal(webOutput.length, cocosCompiled.length, 'retain bundle offsets');
+    assert.match(webOutput, /t\.start=function\(\)\{console\.log\("Gizmos2DComp started"\)\}/);
+    assert.match(webOutput, /,n\}\(r\)/, 'preserve the returned Component class');
+    assert.doesNotMatch(webOutput, /\.onDrawGizmos(?:Selected)?=/, 'no Gizmos method assignments remain');
+    assert.doesNotMatch(webOutput, /Gizmos2D\.beginColor/, 'the debug body was removed');
+    assert.doesNotThrow(() => new Function(webOutput), 'the rewritten System.register is still valid JavaScript');
+    assert.equal(stripBuild(scratch).removedMethods, 0, 'Web Mobile output can be reprocessed safely');
+
+    // Comma expressions with no retained assignment must not become invalid.
+    const onlyAssignments = detectAndStrip(
+        'var x=function(){return t.onDrawGizmos=function(){},t.onDrawGizmosSelected=function(){}}',
+        'only.js',
+    );
+    assert.equal(onlyAssignments.removed, 2);
+    assert.doesNotThrow(() => new Function(onlyAssignments.text));
+    const standaloneAssignment = detectAndStrip(
+        't.onDrawGizmos=function(){Gizmos2D.drawCircle()}; const keep=42;',
+        'standalone.js',
+    );
+    assert.equal(standaloneAssignment.removed, 1);
+    assert.match(standaloneAssignment.text, /const keep=42/);
+    assert.doesNotThrow(() => new Function(standaloneAssignment.text));
     await hooks.onAfterBuild({dest: scratch}, {dest: scratch});
-    console.log('[editor-only] only two callbacks stripped; helpers retained; residual Gizmos calls do not block build; runtime is Scene-only');
+    console.log('[editor-only] compiled System.register prototype callbacks stripped; ordinary helpers retained; runtime is Scene-only');
 } finally {
     rmSync(scratch, {recursive:true, force:true});
 }
