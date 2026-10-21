@@ -77,3 +77,14 @@ npm install -D github:PhuNope/Cocos-Gizmos-Type#v2.0.0
 That package does **not** install runtime behavior; use the extension ZIP for that.
 
 See [Cocos Creator extension installation guide](https://docs.cocos.com/creator/3.8/manual/en/editor/extension/install.html).
+
+
+## Editor-only build stripping (experimental, dev branch)
+
+The installed extension registers a Cocos Creator 3.8 universal builder hook (`contributions.builder`) via `builder.js` and `build/hooks.js`. Gizmos globals are installed only when `EDITOR_NOT_IN_PREVIEW` is true. The `onAfterBuild` hook uses TypeScript's AST parser to strip `onDrawGizmos`, `onDrawGizmosSelected`, and legacy aliases from compiled game JavaScript, **not** from the project's original `assets/*.ts` files.
+
+When a Gizmos runtime script remains as a **separate file** under a build output path ending in `cocos-gizmos/dist/<Gizmos file>.js`, the hook deletes it. If Cocos merges Gizmos into a shared chunk or leaves active references outside debug callbacks, the hook **fails the build** rather than removing unrelated code or shipping a broken game. This is deliberately fail-closed while validating real Cocos Creator 3.8.8 output across targets. The builder never edits project sources.
+
+The generated extension ZIP vendors the TypeScript parser for AST processing, so it can run in the isolated Cocos build worker. CI verifies sample post-build JavaScript, isolated Gizmos deletion, unsupported shared chunks, and source preservation; CI is not an actual Cocos editor build.
+
+To validate on dev: install the ZIP from the latest successful `dev` Actions run, build a disposable Cocos 3.8.8 Web project, inspect the output, and check the build log for `[cocos-gizmos] Editor-only release verified`. If a merged chunk triggers the safety error, capture the generated build output structure for a targeted adaptor before a production release.

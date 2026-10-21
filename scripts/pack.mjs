@@ -1,6 +1,7 @@
 import { readFileSync, mkdirSync, writeFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { deflateRawSync } from 'node:zlib';
@@ -28,9 +29,9 @@ const manifest = {
   editor: pkg.editor,
   types: './dist/Gizmos.d.ts',
   main: './main.js',
-  contributions: { 'asset-db': { mount: { path: './dist', readonly: true } } },
+  contributions: { 'asset-db': { mount: { path: './dist', readonly: true } }, builder: './builder.js' },
 };
-const usage = `# Cocos-Gizmos v${pkg.version}\n\nCocos Creator extension providing global Gizmos2D and Gizmos3D.\n\n## Install\n\n1. In Cocos Creator 3.8.2+, open Extensions > Extension Manager.\n2. Select the Project or Global tab, choose Import Extension (+), and select this ZIP.\n3. Enable the Cocos-Gizmos extension and allow the Asset Database to finish importing.\n\nThe extension mounts dist/ as read-only project assets. The JavaScript module must be evaluated before using the runtime globals. Use Gizmos2D and Gizmos3D inside lifecycle callbacks after startup; don't reference them in top-level initializers.\n\nTypes are in dist/Gizmos.d.ts. Cocos Creator's engine provides cc and cc/env.\n\nSource: https://github.com/PhuNope/Cocos-Gizmos\n`;
+const usage = `# Cocos-Gizmos v${pkg.version}\n\nCocos Creator extension providing global Gizmos2D and Gizmos3D.\n\n## Install\n\n1. In Cocos Creator 3.8.2+, open Extensions > Extension Manager.\n2. Select the Project or Global tab, choose Import Extension (+), and select this ZIP.\n3. Enable the Cocos-Gizmos extension and allow the Asset Database to finish importing.\n\nThe extension mounts dist/ as read-only editor assets and registers a build hook that strips Gizmos from supported standalone output scripts and removes Gizmos callbacks from game JavaScript. Builds fail safely on unsupported merged chunks. The JavaScript module must be evaluated before using the runtime globals. Use Gizmos2D and Gizmos3D inside lifecycle callbacks after startup; don't reference them in top-level initializers.\n\nTypes are in dist/Gizmos.d.ts. Cocos Creator's engine provides cc and cc/env.\n\nSource: https://github.com/PhuNope/Cocos-Gizmos\n`;
 
 // Standards-compliant ZIP using only Node built-ins; no extra zip executable
 // and no dependency required on Windows, macOS or Linux.
@@ -97,6 +98,12 @@ const entries = [
   ['package.json', JSON.stringify(manifest, null, 2) + '\n'],
   ['README.md', usage],
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
+  ['builder.js', readFileSync(path.join(ROOT, 'builder.js'))],
+  ['build/hooks.js', readFileSync(path.join(ROOT, 'build', 'hooks.js'))],
+  ['build/strip.js', readFileSync(path.join(ROOT, 'build', 'strip.js'))],
+  // TypeScript AST parser is bundled into the extension ZIP because Cocos
+  // installations may not expose require('typescript') to build workers.
+  ['build/vendor/typescript.js', readFileSync(createRequire(import.meta.url).resolve('typescript'))],
   // Critical for Cocos 3.8: by default, *.js is treated as CJS. Cocos
   // detects ESM by the nearest package.json's "type": "module".
   // Put this marker *inside dist/*, not at the extension root: main.js
@@ -121,7 +128,7 @@ function verifyModuleFormats() {
         writeFileSync(destination, data);
       }
     }
-    const jsEntries = entries.map(([name]) => name).filter(name => name.endsWith('.js'));
+    const jsEntries = entries.map(([name]) => name).filter(name => name.endsWith('.js') && !name.includes('/vendor/'));
     for (const relative of jsEntries) {
       const expectedFormat = relative === 'main.js' ? 'commonjs' : 'module';
       const target = path.join(tempRoot, relative);

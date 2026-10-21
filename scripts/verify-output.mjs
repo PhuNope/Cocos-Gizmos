@@ -30,7 +30,7 @@ for (const statement of ast.statements) {
 if (JSON.stringify(exported.sort()) !== JSON.stringify(['Gizmos2D', 'Gizmos3D'])) {
     fail('Only Gizmos2D and Gizmos3D may be publicly exported: ' + exported);
 }
-if (!publicEntry.includes('Object.assign(globalThis, { Gizmos2D, Gizmos3D })')) {
+if (!publicEntry.includes('if (EDITOR_NOT_IN_PREVIEW) Object.assign(globalThis, { Gizmos2D, Gizmos3D })')) {
     fail('Missing runtime global registration');
 }
 // Cocos 3.8.x: Each script can have at most one Component. The old single-file
