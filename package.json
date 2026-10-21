@@ -28,11 +28,8 @@
         "vue": "^3.1.4"
     },
     "contributions": {
-        "asset-db": {
-            "mount": {
-                "path": "./dist",
-                "readonly": true
-            }
+        "scene": {
+            "script": "./scene.js"
         },
         "builder": "./builder.js"
     },

@@ -29,9 +29,11 @@ const manifest = {
   editor: pkg.editor,
   types: './dist/Gizmos.d.ts',
   main: './main.js',
-  contributions: { 'asset-db': { mount: { path: './dist', readonly: true } }, builder: './builder.js' },
+  // The Scene Script is Editor-only: unlike asset-db mounts, it is never
+  // included in the Cocos game script graph.
+  contributions: { scene: { script: './scene.js' }, builder: './builder.js' },
 };
-const usage = `# Cocos-Gizmos v${pkg.version}\n\nCocos Creator extension providing global Gizmos2D and Gizmos3D.\n\n## Install\n\n1. In Cocos Creator 3.8.2+, open Extensions > Extension Manager.\n2. Select the Project or Global tab, choose Import Extension (+), and select this ZIP.\n3. Enable the Cocos-Gizmos extension and allow the Asset Database to finish importing.\n\nThe extension mounts dist/ as read-only editor assets and registers a build hook that strips Gizmos from supported standalone output scripts and removes Gizmos callbacks from game JavaScript. Builds fail safely on unsupported merged chunks. The JavaScript module must be evaluated before using the runtime globals. Use Gizmos2D and Gizmos3D inside lifecycle callbacks after startup; don't reference them in top-level initializers.\n\nTypes are in dist/Gizmos.d.ts. Cocos Creator's engine provides cc and cc/env.\n\nSource: https://github.com/PhuNope/Cocos-Gizmos\n`;
+const usage = `# Cocos-Gizmos v${pkg.version}\n\nCocos Creator extension providing global Gizmos2D and Gizmos3D.\n\n## Install\n\n1. In Cocos Creator 3.8.2+, open Extensions > Extension Manager.\n2. Select the Project or Global tab, choose Import Extension (+), and select this ZIP.\n3. Enable the Cocos-Gizmos extension and allow the Asset Database to finish importing.\n\nEditor-only Scene Script runs Gizmos outside the game Asset Database, so runtime JS is not imported into game builds. The build hook removes only onDrawGizmos and onDrawGizmosSelected from compiled game JS. Other calls are not checked or modified. The JavaScript module must be evaluated before using the runtime globals. Use Gizmos2D and Gizmos3D inside lifecycle callbacks after startup; don't reference them in top-level initializers.\n\nTypes are in dist/Gizmos.d.ts. Cocos Creator's engine provides cc and cc/env.\n\nSource: https://github.com/PhuNope/Cocos-Gizmos\n`;
 
 // Standards-compliant ZIP using only Node built-ins; no extra zip executable
 // and no dependency required on Windows, macOS or Linux.
@@ -98,6 +100,9 @@ const entries = [
   ['package.json', JSON.stringify(manifest, null, 2) + '\n'],
   ['README.md', usage],
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
+  ['scene.js', readFileSync(path.join(ROOT, 'scene.js'))],
+  ...['Define.js', 'ExecuteGizmos.js', 'Gizmos2D.js', 'Gizmos3D.js']
+    .map(name => ['editor-runtime/' + name, readFileSync(path.join(ROOT, 'editor-runtime', name))]),
   ['builder.js', readFileSync(path.join(ROOT, 'builder.js'))],
   ['build/hooks.js', readFileSync(path.join(ROOT, 'build', 'hooks.js'))],
   ['build/strip.js', readFileSync(path.join(ROOT, 'build', 'strip.js'))],
@@ -123,7 +128,8 @@ function verifyModuleFormats() {
     const tempDist = path.join(tempRoot, 'dist');
     mkdirSync(tempDist);
     for (const [name, data] of entries) {
-      if (name === 'main.js' || name === 'builder.js' || name === 'package.json' ||
+      if (name === 'main.js' || name === 'builder.js' || name === 'scene.js' || name === 'package.json' ||
+          name.startsWith('editor-runtime/') ||
           name.startsWith('dist/') || (name.startsWith('build/') && !name.includes('/vendor/'))) {
         const destination = path.join(tempRoot, name);
         mkdirSync(path.dirname(destination), { recursive: true });
@@ -132,7 +138,7 @@ function verifyModuleFormats() {
     }
     const jsEntries = entries.map(([name]) => name).filter(name => name.endsWith('.js') && !name.includes('/vendor/'));
     for (const relative of jsEntries) {
-      const expectedFormat = (relative === 'main.js' || relative === 'builder.js' || relative.startsWith('build/')) ? 'commonjs' : 'module';
+      const expectedFormat = (relative === 'main.js' || relative === 'builder.js' || relative === 'scene.js' || relative.startsWith('editor-runtime/') || relative.startsWith('build/')) ? 'commonjs' : 'module';
       const target = path.join(tempRoot, relative);
       const result = spawnSync(process.execPath, ['--check', target], { encoding: 'utf8' });
       if (result.error || result.status !== 0) {

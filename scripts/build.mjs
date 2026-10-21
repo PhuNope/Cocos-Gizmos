@@ -249,3 +249,35 @@ export { Gizmos2D, Gizmos3D };
 `;
 writeFileSync(JS_OUT_FILE, entry, 'utf8');
 console.log('[build] wrote runtime modules separately (one Component per script) and ' + path.relative(ROOT, JS_OUT_FILE));
+
+// The Editor scene extension is NOT mounted in the game's asset database.
+// Compile the same sources as separate CommonJS modules for Cocos Scene process.
+// Each decorated Cocos Component must live in its own JS module.
+const editorRuntimeRoot = path.join(ROOT, 'editor-runtime');
+mkdirSync(editorRuntimeRoot, { recursive: true });
+const nodeSearchPath = `'use strict';
+if (globalThis.Editor && globalThis.Editor.App && globalThis.Editor.App.path) {
+    module.paths.push(require('node:path').join(globalThis.Editor.App.path, 'node_modules'));
+}
+`;
+for (const name of ['Gizmos2D', 'Gizmos3D', 'ExecuteGizmos']) {
+    const fileName = path.join(SRC_DIR, name + '.ts');
+    const result = ts.transpileModule(readFileSync(fileName, 'utf8'), {
+        fileName,
+        reportDiagnostics: true,
+        compilerOptions: {
+            ...compilerOptions,
+            module: ts.ModuleKind.CommonJS,
+        },
+    });
+    const errors = (result.diagnostics ?? []).filter(d => d.category === ts.DiagnosticCategory.Error);
+    if (errors.length) fail('Scene runtime ' + name + ': ' + errors.map(d => ts.flattenDiagnosticMessageText(d.messageText, '\n')).join('; '));
+    writeFileSync(path.join(editorRuntimeRoot, name + '.js'), nodeSearchPath + result.outputText, 'utf8');
+}
+// Scene process has Editor globals; do not import cc/env in Node/CommonJS.
+writeFileSync(path.join(editorRuntimeRoot, 'Define.js'), String.raw`'use strict';
+exports.cce = (globalThis.window && globalThis.window.cce) || globalThis.cce;
+exports.Editor = globalThis.Editor || (globalThis.window && globalThis.window.Editor);
+`, 'utf8');
+console.log('[build] wrote separate CommonJS Scene runtime modules (outside asset-db)');
+

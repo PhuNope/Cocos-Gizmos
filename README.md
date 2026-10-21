@@ -6,7 +6,7 @@ A Cocos Creator **3.8.2+ extension** providing two public classes: `Gizmos2D` an
 
 1. Download `Cocos-Gizmos-v2.0.0.zip` from GitHub Releases (or the CI artifact).
 2. In Cocos Creator, open **Extensions → Extension Manager**, choose **Project** (or **Global**), click **Import Extension (+)** and select the ZIP.
-3. Enable `cocos-gizmos`. The extension mounts its `dist/` folder as read-only project assets.
+3. Enable `cocos-gizmos`. The extension's Scene Script initializes Gizmos in the Scene Editor; it does not mount JS runtime into the game asset database.
 
 **Important:** The ZIP contains `package.json` **at its root**, plus `README.md` and `dist/`. Do not extract and import the two generated files separately. Do not add another enclosing directory inside the ZIP.
 
@@ -15,6 +15,10 @@ Cocos-Gizmos-v2.0.0.zip
 ├── package.json
 ├── README.md
 ├── main.js       # Editor lifecycle: install TypeScript reference
+├── scene.js      # Editor-only scene loader
+├── editor-runtime/ # CommonJS runtime, never added to game asset-db
+├── builder.js
+├── build/         # Build-time callback stripper
 └── dist/
     ├── package.json    # type: module — runtime files are ESM
     ├── Gizmos.js       # only two public globals/exports
@@ -79,12 +83,10 @@ That package does **not** install runtime behavior; use the extension ZIP for th
 See [Cocos Creator extension installation guide](https://docs.cocos.com/creator/3.8/manual/en/editor/extension/install.html).
 
 
-## Editor-only build stripping (experimental, dev branch)
+## Editor-only build handling (experimental, dev branch)
 
-The installed extension registers a Cocos Creator 3.8 universal builder hook (`contributions.builder`) via `builder.js` and `build/hooks.js`. Gizmos globals are installed only when `EDITOR_NOT_IN_PREVIEW` is true. The `onAfterBuild` hook uses TypeScript's AST parser to strip `onDrawGizmos`, `onDrawGizmosSelected`, and legacy aliases from compiled game JavaScript, **not** from the project's original `assets/*.ts` files.
+The extension now registers `contributions.scene.script` instead of `contributions.asset-db.mount`. Cocos runs `scene.js` in the Editor Scene process; it loads separate CommonJS modules from `editor-runtime/`. These files are **not project assets**, so Cocos does not import the Gizmos runtime into the built game. The existing `dist/Gizmos.d.ts` remains available to WebStorm via the project's generated `assets/cocos-gizmos.global.d.ts`.
 
-When a Gizmos runtime script remains as a **separate file** under a build output path ending in `cocos-gizmos/dist/<Gizmos file>.js`, the hook deletes it. If Cocos merges Gizmos into a shared chunk or leaves active references outside debug callbacks, the hook **fails the build** rather than removing unrelated code or shipping a broken game. This is deliberately fail-closed while validating real Cocos Creator 3.8.8 output across targets. The builder never edits project sources.
+The `onAfterBuild` hook strips **only** `onDrawGizmos()` and `onDrawGizmosSelected()` method definitions from compiled JavaScript. It does **not** remove helper methods, `if (EDITOR)` blocks, or unrelated method names. It does **not** validate remaining calls to `Gizmos2D` or `Gizmos3D`; if application code executes such a call in the built game, `ReferenceError` is possible by design. Your project TypeScript files are never modified.
 
-The generated extension ZIP vendors the TypeScript parser for AST processing, so it can run in the isolated Cocos build worker. CI verifies sample post-build JavaScript, isolated Gizmos deletion, unsupported shared chunks, and source preservation; CI is not an actual Cocos editor build.
-
-To validate on dev: install the ZIP from the latest successful `dev` Actions run, build a disposable Cocos 3.8.8 Web project, inspect the output, and check the build log for `[cocos-gizmos] Editor-only release verified`. If a merged chunk triggers the safety error, capture the generated build output structure for a targeted adaptor before a production release.
+CI tests simulate the builder output and check the Scene Script manifest and callback stripping. The Scene Script must still be smoke-tested in Cocos Creator 3.8.8 itself before merging to `master`. No new release is created from dev.

@@ -5,11 +5,10 @@ const ts = (() => {
     try { return require('./vendor/typescript.js'); }
     catch (error) {
         if (error.code !== 'MODULE_NOT_FOUND' || !String(error.message).includes('vendor/typescript.js')) throw error;
-        return require('typescript'); // Local npm tests; parser is vendored in release ZIP
+        return require('typescript'); // Local npm tests; release ZIP bundles this parser.
     }
 })();
-const CALLBACKS = new Set(['onDrawGizmos', 'onDrawGizmosSelected', 'onSelectedGizmos', 'onSelectedGizmsos']);
-const RUNTIME = new Set(['Gizmos2D', 'Gizmos3D', 'GizmosDebugDraw', 'gizmosUpdate']);
+const CALLBACKS = new Set(['onDrawGizmos', 'onDrawGizmosSelected']);
 const STANDALONE = new Set(['Define.js', 'ExecuteGizmos.js', 'Gizmos.js', 'Gizmos2D.js', 'Gizmos3D.js']);
 
 function propertyName(name) {
@@ -21,17 +20,22 @@ function propertyName(name) {
 function parse(source, name) {
     const ast = ts.createSourceFile(name, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
     const errors = ast.parseDiagnostics.filter(d => d.category === ts.DiagnosticCategory.Error);
-    if (errors.length) throw new Error('[cocos-gizmos] Unsupported JS syntax in ' + name + ': ' +
+    if (errors.length) throw new Error('[cocos-gizmos] Unable to parse ' + name + ': ' +
         ts.flattenDiagnosticMessageText(errors[0].messageText, '\n'));
     return ast;
+}
+function functionLike(node) {
+    return ts.isFunctionExpression(node) || ts.isArrowFunction(node);
 }
 function detectAndStrip(source, fileName) {
     const ast = parse(source, fileName);
     const spans = [];
     const visit = node => {
-        const member = ts.isMethodDeclaration(node) || ts.isPropertyDeclaration(node) ||
-            ts.isPropertyAssignment(node);
-        if (member && CALLBACKS.has(propertyName(node.name))) {
+        const isClassOrObjectMethod = ts.isMethodDeclaration(node);
+        const isFunctionProperty = (ts.isPropertyAssignment(node) ||
+            ts.isPropertyDeclaration(node)) && node.initializer && functionLike(node.initializer);
+        if ((isClassOrObjectMethod || isFunctionProperty) &&
+            CALLBACKS.has(propertyName(node.name))) {
             let start = node.getStart(ast), end = node.end;
             if (ts.isObjectLiteralExpression(node.parent)) {
                 const following = source.slice(end).match(/^\s*,/);
@@ -39,14 +43,15 @@ function detectAndStrip(source, fileName) {
                 if (following) end += following[0].length;
                 else if (preceding) start -= preceding[0].length;
             }
-            spans.push({ start, end });
+            spans.push({start, end});
             return;
         }
         if (ts.isExpressionStatement(node) && ts.isBinaryExpression(node.expression) &&
             node.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
             ts.isPropertyAccessExpression(node.expression.left) &&
-            CALLBACKS.has(node.expression.left.name.text)) {
-            spans.push({ start: node.getStart(ast), end: node.end });
+            CALLBACKS.has(node.expression.left.name.text) &&
+            functionLike(node.expression.right)) {
+            spans.push({start: node.getStart(ast), end: node.end});
             return;
         }
         ts.forEachChild(node, visit);
@@ -54,7 +59,7 @@ function detectAndStrip(source, fileName) {
     visit(ast);
     const ordered = spans.sort((a, b) => a.start - b.start);
     for (let i = 1; i < ordered.length; i++) {
-        if (ordered[i].start < ordered[i-1].end) throw new Error('Overlapping AST method edits');
+        if (ordered[i].start < ordered[i-1].end) throw new Error('Overlapping AST callback edits');
     }
     let output = source;
     for (const {start, end} of ordered.reverse()) {
@@ -64,25 +69,12 @@ function detectAndStrip(source, fileName) {
     }
     return {text: output, removed: spans.length};
 }
-function findForbiddenCode(source, fileName) {
-    const found = new Set();
-    const visit = node => {
-        if (ts.isIdentifier(node) && (RUNTIME.has(node.text) || CALLBACKS.has(node.text))) found.add(node.text);
-        if (ts.isStringLiteral(node) &&
-            /(?:Gizmos[23]D\.GizmosDebugDraw|gizmosUpdating|extensions[/\\]cocos-gizmos[/\\]dist)/.test(node.text)) {
-            found.add(node.text);
-        }
-        ts.forEachChild(node, visit);
-    };
-    visit(parse(source, fileName));
-    return [...found];
-}
 function isStandaloneRuntime(relative) {
-    // NEVER delete shared compiled chunks based on a substring match.
+    // Optional cleanup for legacy bundles; modern Gizmos is Scene-only.
     const parts = relative.split('/');
-    const at = parts.findIndex(p => p === 'cocos-gizmos');
-    return at >= 0 && parts[at+1] === 'dist' && parts.length === at+3 &&
-        STANDALONE.has(parts[parts.length - 1]);
+    const at = parts.findIndex(part => part === 'cocos-gizmos');
+    return at >= 0 && parts[at+1] === 'dist' &&
+        parts.length === at+3 && STANDALONE.has(parts[parts.length-1]);
 }
 function stripBuild(root) {
     const dest = fs.realpathSync(root);
@@ -103,23 +95,18 @@ function stripBuild(root) {
         const relative = path.relative(dest, file).split(path.sep).join('/');
         if (isStandaloneRuntime(relative)) { deletes.push(file); continue; }
         const source = fs.readFileSync(file, 'utf8');
-        if (!/(Gizmos|gizmos)/.test(source)) continue;
+        if (!/onDrawGizmos/.test(source)) continue;
         const transformed = detectAndStrip(source, relative);
-        const remaining = findForbiddenCode(transformed.text, relative);
-        if (remaining.length) {
-            throw new Error('[cocos-gizmos] ' + relative +
-                ' still contains editor-only symbols (' + remaining.slice(0,6).join(', ') +
-                '). Gizmos is bundled in a shared chunk or used in game code. ' +
-                'Cannot remove safely; build refused and output left unchanged.');
-        }
+        // Intentionally DO NOT inspect remaining Gizmos calls, helper methods,
+        // if (EDITOR), or other user code. This is the requested behavior.
         if (transformed.removed) {
             writes.push([file, transformed.text]);
             removedMethods += transformed.removed;
         }
     }
-    // Atomic planning: never alter a build until ALL candidates are verified.
+    // Do not touch user's original assets/, only finished build output.
     for (const [file, content] of writes) fs.writeFileSync(file, content, 'utf8');
     for (const file of deletes) fs.unlinkSync(file);
     return {removedFiles:deletes.length, removedMethods, changedFiles:writes.length};
 }
-module.exports = {stripBuild, detectAndStrip, findForbiddenCode, isStandaloneRuntime};
+module.exports = {stripBuild, detectAndStrip, isStandaloneRuntime};
