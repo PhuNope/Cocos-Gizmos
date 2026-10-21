@@ -82,7 +82,7 @@ try {
     const webOutput = readFileSync(webIndex, 'utf8');
     assert.equal(webOutput.length, cocosCompiled.length, 'retain bundle offsets');
     assert.match(webOutput, /t\.start=function\(\)\{console\.log\("Gizmos2DComp started"\)\}/);
-    assert.match(webOutput, /,n\}\(r\)/, 'preserve the returned Component class');
+    assert.match(webOutput, /,\s*n\}\(r\)/, 'preserve the returned Component class');
     assert.doesNotMatch(webOutput, /\.onDrawGizmos(?:Selected)?=/, 'no Gizmos method assignments remain');
     assert.doesNotMatch(webOutput, /Gizmos2D\.beginColor/, 'the debug body was removed');
     assert.doesNotThrow(() => new Function(webOutput), 'the rewritten System.register is still valid JavaScript');
