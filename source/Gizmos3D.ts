@@ -10,7 +10,9 @@ import {
     Label,
     Layers,
     Mat4,
+    Mesh,
     Node,
+    Quat,
     RenderRoot2D,
     Sprite,
     SpriteFrame,
@@ -22,6 +24,39 @@ import { cce } from './Define';
 
 const { ccclass, executeInEditMode } = _decorator;
 
+
+type GizmosMeshInput = Mesh | { vertices: Vec3[]; indices?: number[] };
+type GizmosMeshPart = { vertices: Vec3[]; indices: number[] | null };
+const _meshPartsCache = new WeakMap<object, GizmosMeshPart[]>();
+const _meshWarned = new WeakSet<object>();
+
+function getGizmosMeshParts(mesh: GizmosMeshInput): GizmosMeshPart[] {
+    if (!mesh) return [];
+    const obj = mesh as any;
+    if (Array.isArray(obj.vertices)) return [{ vertices: obj.vertices, indices: obj.indices || null }];
+    if (typeof obj.readAttribute !== 'function' || typeof obj.readIndices !== 'function') return [];
+    const cached = _meshPartsCache.get(mesh);
+    if (cached) return cached;
+    const result: GizmosMeshPart[] = [];
+    const count = obj.struct?.primitives?.length || obj.renderingSubMeshes?.length || 0;
+    for (let i = 0; i < count; i++) {
+        const positions = obj.readAttribute(i, 'a_position');
+        if (!(positions instanceof Float32Array) || positions.length % 3 !== 0) {
+            if (!_meshWarned.has(mesh)) {
+                _meshWarned.add(mesh);
+                console.warn('[cocos-gizmos/drawMesh] Mesh position data unavailable or not Float32 xyz; check allowDataAccess.');
+            }
+            continue;
+        }
+        const vertices: Vec3[] = [];
+        for (let j = 0; j < positions.length; j += 3) vertices.push(new Vec3(positions[j], positions[j + 1], positions[j + 2]));
+        const indicesData = obj.readIndices(i) as ArrayLike<number> | null;
+        result.push({ vertices, indices: indicesData ? Array.from(indicesData) : null });
+    }
+    if (result.length) _meshPartsCache.set(mesh, result);
+    return result;
+}
+
 @ccclass('Gizmos3D.GizmosDebugDraw')
 @executeInEditMode
 class GizmosDebugDraw extends Component {
@@ -30,6 +65,7 @@ class GizmosDebugDraw extends Component {
     private _depthTest: boolean = true;
     private _useLocalPosition: boolean = false;
     private _camera: Node;
+    private _warnedNoCamera: boolean = false;
     private _labelMap: Map<string, Label> = new Map();
     private _spriteMap: Map<string, Sprite> = new Map();
     private _root2D: Node;
@@ -39,33 +75,48 @@ class GizmosDebugDraw extends Component {
         this._root2D = new Node('Root2D');
         this._root2D.addComponent(RenderRoot2D);
         this._root2D.setParent(this.node);
-        if (cce) {
-            this._camera = cce.Camera._camera.camera.node;
-            cce.Camera._camera.camera.initGeometryRenderer();
-            this._renderer = cce.Camera._camera.camera.geometryRenderer;
-        } else {
-            const camera = director.getScene().getComponentInChildren(Camera).camera;
-            this._camera = camera.node;
-            camera.initGeometryRenderer();
-            this._renderer = camera.geometryRenderer;
-        }
+        this.ensureGeometryRenderer();
+    }
 
-        if (!this._renderer) {
-            console.warn(
-                'Unable to initialize geometryRenderer for Gizmos3D, please ensure the Geometry Renderer feature is enabled in project settings if you want to use Gizmos3D in play mode',
-            );
+    private ensureGeometryRenderer(): boolean {
+        if (this._renderer) return true;
+        const editorCce = (globalThis as any).window?.cce || (globalThis as any).cce || cce;
+        const editorCamera = editorCce?.Camera?._camera?.camera;
+        let camera = editorCamera;
+        if (!camera) {
+            const root = director.getScene();
+            camera = root?.getComponentInChildren(Camera)?.camera;
         }
+        if (!camera) {
+            if (!this._warnedNoCamera) {
+                this._warnedNoCamera = true;
+                console.warn('[cocos-gizmos/drawMesh] Scene camera unavailable. Open a 3D Scene with an Editor camera.');
+            }
+            return false;
+        }
+        try {
+            if (typeof camera.initGeometryRenderer === 'function') camera.initGeometryRenderer();
+            this._camera = camera.node || null;
+            this._renderer = camera.geometryRenderer || null;
+        } catch (error) {
+            if (!this._warnedNoCamera) {
+                this._warnedNoCamera = true;
+                console.warn('[cocos-gizmos/drawMesh] Geometry Renderer initialization failed:', error);
+            }
+        }
+        if (this._renderer) this._warnedNoCamera = false;
+        return !!this._renderer;
     }
 
     protected lateUpdate(dt: number): void {
         this._labelMap.forEach((label) => {
             label.string = '';
-            label.node.setRotationFromEuler(this._camera.eulerAngles);
+            if (this._camera) label.node.setRotationFromEuler(this._camera.eulerAngles);
         });
 
         this._spriteMap.forEach((sprite) => {
             sprite.spriteFrame = null;
-            sprite.node.setRotationFromEuler(this._camera.eulerAngles);
+            if (this._camera) sprite.node.setRotationFromEuler(this._camera.eulerAngles);
         });
 
         this._drawCalls2D.forEach((drawCall) => drawCall());
@@ -342,6 +393,48 @@ class GizmosDebugDraw extends Component {
         );
     }
 
+    /** Draw imported cc.Mesh or raw triangle vertices as wireframe/solid Gizmos. */
+    public drawMesh(
+        mesh: Mesh | { vertices: Vec3[]; indices?: number[] },
+        position: Vec3 = this._useLocalPosition ? Vec3.ZERO : this.node.worldPosition,
+        rotation: Vec3 = Vec3.ZERO,
+        scale: Vec3 = Vec3.ONE,
+        wireFrame: boolean = true,
+    ): void {
+        if (!mesh || !this.ensureGeometryRenderer()) return;
+        const color = this._color.clone();
+        const quat = new Quat();
+        Quat.fromEuler(quat, rotation.x, rotation.y, rotation.z);
+        const transform = new Mat4();
+        Mat4.fromRTS(transform, quat, position, scale);
+        if (this._useLocalPosition) Mat4.multiply(transform, this.node.worldMatrix, transform);
+        for (const part of getGizmosMeshParts(mesh)) {
+            const { vertices, indices } = part;
+            if (vertices.length < 3) continue;
+            if (wireFrame) {
+                if (indices && indices.length >= 3) {
+                    this._renderer.addIndexedMesh(Vec3.ZERO, vertices, indices, color, this._depthTest, true, transform);
+                } else {
+                    this._renderer.addMesh(Vec3.ZERO, vertices, color, this._depthTest, true, transform);
+                }
+            } else {
+                const count = indices ? indices.length : vertices.length;
+                for (let i = 0; i + 2 < count; i += 3) {
+                    const a = vertices[indices ? indices[i] : i];
+                    const b = vertices[indices ? indices[i + 1] : i + 1];
+                    const c = vertices[indices ? indices[i + 2] : i + 2];
+                    if (!a || !b || !c) continue;
+                    this._renderer.addTriangle(
+                        Vec3.transformMat4(new Vec3(), a, transform),
+                        Vec3.transformMat4(new Vec3(), b, transform),
+                        Vec3.transformMat4(new Vec3(), c, transform),
+                        color, false, this._depthTest, true,
+                    );
+                }
+            }
+        }
+    }
+
     public drawBox(position: Vec3, size: Vec3, rot: Vec3 = Vec3.ZERO, wireFrame: boolean = false) {
         const color = this._color.clone();
         const p = this._useLocalPosition ? this.worldToLocal(position) : position;
@@ -602,6 +695,18 @@ export class Gizmos3D {
     ) {
         const debugNode = this.getDebugNode(node);
         debugNode?.drawCapsule(position, radius, height, rot, wireFrame, segmentsX, segmentsY);
+    }
+
+    /** Draw Mesh assets or raw triangles in Editor Scene; wireFrame defaults to true. */
+    public static drawMesh(
+        node: Node,
+        mesh: Mesh | { vertices: Vec3[]; indices?: number[] },
+        position?: Vec3,
+        rotation: Vec3 = Vec3.ZERO,
+        scale: Vec3 = Vec3.ONE,
+        wireFrame: boolean = true,
+    ): void {
+        this.getDebugNode(node)?.drawMesh(mesh, position, rotation, scale, wireFrame);
     }
 
     public static drawBox(node: Node, center: Vec3, size: Vec3, rot?: Vec3, wireFrame?: boolean) {

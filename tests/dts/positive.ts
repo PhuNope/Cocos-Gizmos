@@ -1,8 +1,9 @@
-import type { Color, Component, Node, Vec3 } from 'cc';
+import type { Color, Component, Mesh, Node, Vec3 } from 'cc';
 
 declare const node: Node;
 declare const color: Color;
 declare const pos: Vec3;
+declare const mesh: Mesh;
 declare const comp: Component;
 
 comp.onDrawGizmos?.();
@@ -17,6 +18,8 @@ const defaultColor: Readonly<Color> = Gizmos2D.DEFAULT_COLOR;
 Gizmos3D.drawSphere(node, pos, 1);
 Gizmos3D.drawCircle(node, pos, 10);
 Gizmos3D.drawSpline(node, [pos]);
+Gizmos3D.drawMesh(node, mesh, pos);
+Gizmos3D.drawMesh(node, {vertices: [pos, pos, pos], indices: [0, 1, 2]}, pos, pos, pos, false);
 const void3D: void = Gizmos3D.drawBox(node, pos, pos);
 
 // Named imports are also available for module consumers.

@@ -85,3 +85,24 @@ The `onAfterBuild` hook strips **only** `onDrawGizmos()` and `onDrawGizmosSelect
 CI tests simulate the builder output, validate the Scene Script manifest and run the callback stripper against a captured Cocos Creator 3.8.8 Web Mobile `System.register` example. A user also confirmed that the stripped output removes both callbacks and excludes the Gizmos runtime from a Cocos 3.8.8 Web Mobile build. Other build targets still require testing.
 
 Web Mobile builds transpile component methods into comma-separated assignments such as `t.onDrawGizmos=function(){...}` inside `assets/main/index.js` (`System.register`). The stripper recognizes these assignments using TypeScript AST and deletes only the two callback assignments, preserving the surrounding comma expression, remaining functions, and JavaScript syntax. This is covered by a regression fixture copied from Cocos Creator 3.8.8 output.
+
+
+## drawMesh() and Editor Scene updater (dev)
+
+`Gizmos3D.drawMesh(node, mesh, position?, rotation?, scale?, wireFrame?)` renders
+an imported readable `cc.Mesh` asset or a raw `{vertices: Vec3[], indices?: number[]}`.
+Wireframe is the default; `wireFrame=false` draws filled triangles. See
+`assets/GizmosDrawMeshTest.ts` for a 3D Scene example.
+
+The Scene dispatcher is started/stopped with the editor extension, scans the
+current Scene, and uses a 120ms idle fallback if Director updates stop.
+Diagnostics from Editor DevTools:
+
+```js
+Editor.Message.request('scene', 'execute-scene-script', {
+    name: 'cocos-gizmos', method: 'gizmosStatus', args: []
+}).then(console.log);
+```
+
+The build stripper still removes only the two Gizmos callbacks, not arbitrary
+helper methods. The extension runtime remains Editor-only.
