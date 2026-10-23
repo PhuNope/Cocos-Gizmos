@@ -12,10 +12,12 @@ const end = source.indexOf('// END MESH POSITION READER TEST SURFACE');
 assert.ok(begin >= 0 && end > begin, 'mesh reader test surface exists');
 const snippet = source.slice(begin, end);
 const compiled = ts.transpileModule(snippet, {
-    compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None },
+    compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ESNext },
     reportDiagnostics: true,
 });
-assert.equal((compiled.diagnostics || []).filter(d => d.category === ts.DiagnosticCategory.Error).length, 0);
+const syntaxErrors = (compiled.diagnostics || []).filter(d => d.category === ts.DiagnosticCategory.Error);
+assert.equal(syntaxErrors.length, 0,
+    syntaxErrors.map(d => ts.flattenDiagnosticMessageText(d.messageText, '\\n')).join('\\n'));
 
 const Format = {
     RGB16F: 1,
