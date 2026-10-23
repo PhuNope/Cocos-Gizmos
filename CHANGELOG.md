@@ -2,13 +2,20 @@
 
 All notable changes to Cocos-Gizmos are documented here.
 
-## [Unreleased]
+## [2.0.3] - 2026-10-23
 
 ### Fixed
 - `Gizmos3D.drawMesh()` now decodes RGB16F vertex POSITION values from half-float bits and accepts RGB32F, RGB16I and RGB16UI position formats using the Mesh attribute format.
 - Resolve POSITION attributes through each primitive's `vertexBundelIndices` instead of assuming submesh index equals vertex-bundle index.
 - Give actionable warnings naming the affected submesh and unsupported format, and invalidate cached positions when `Mesh.data` is replaced.
 - Add regression tests for half floats, indices, submesh mapping, other position formats and cache invalidation.
+
+### Compatibility and Notes
+- Confirmed working by the project maintainer on Cocos Creator **3.8.8**. Editor-only runtime behavior is unchanged.
+- When using `Gizmos3D.beginLocalPosition(node)`, pass `Vec3.ONE` for the mesh's additional local scale unless extra scaling is intended; `node.worldMatrix` already includes Node scale. Passing `node.worldScale` multiplies scale a second time.
+- Wireframe rendering remains the default; pass `wireFrame: false` for solid triangles.
+
+**Full Changelog:** https://github.com/PhuNope/Cocos-Gizmos/compare/v2.0.2...v2.0.3
 
 ## [2.0.2] - 2026-10-23
 

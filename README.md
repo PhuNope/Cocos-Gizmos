@@ -6,14 +6,14 @@ A Cocos Creator **3.8.2+ extension** providing two public classes: `Gizmos2D` an
 
 ## Install the extension
 
-1. Download `Cocos-Gizmos-v2.0.2.zip` from GitHub Releases (or the CI artifact).
+1. Download `Cocos-Gizmos-v2.0.3.zip` from GitHub Releases (or the CI artifact).
 2. In Cocos Creator, open **Extensions → Extension Manager**, choose **Project** (or **Global**), click **Import Extension (+)** and select the ZIP.
 3. Enable `cocos-gizmos`. The extension's Scene Script initializes Gizmos in the Scene Editor; it does not mount JS runtime into the game asset database.
 
 **Important:** The ZIP contains `package.json` **at its root**, plus `README.md` and `dist/`. Do not extract and import the two generated files separately. Do not add another enclosing directory inside the ZIP.
 
 ```text
-Cocos-Gizmos-v2.0.2.zip
+Cocos-Gizmos-v2.0.3.zip
 ├── package.json
 ├── README.md
 ├── main.js       # Editor lifecycle: install TypeScript reference
@@ -55,7 +55,7 @@ npm ci
 npm run pack
 ```
 
-`npm run pack` type-checks the source, produces exactly `dist/Gizmos.js` and `dist/Gizmos.d.ts`, runs public-API tests and packages the **complete extension** into `release/Cocos-Gizmos-v2.0.2.zip`. Packaging is cross-platform and needs no extra zip tool.
+`npm run pack` type-checks the source, produces exactly `dist/Gizmos.js` and `dist/Gizmos.d.ts`, runs public-API tests and packages the **complete extension** into `release/Cocos-Gizmos-v2.0.3.zip`. Packaging is cross-platform and needs no extra zip tool.
 
 The generated `.generated/Gizmos.ts` is an internal intermediate and is **not** shipped.
 
@@ -110,15 +110,15 @@ The build stripper still removes only the two Gizmos callbacks, not arbitrary
 helper methods. The extension runtime remains Editor-only.
 
 
-## Development fix (after v2.0.2): Mesh POSITION formats
+## Mesh POSITION format compatibility (v2.0.3)
 
-The development branch reads imported Mesh POSITION attributes in RGB32F,
+Cocos-Gizmos v2.0.3 reads imported Mesh POSITION attributes in RGB32F,
 RGB16F (half-precision), RGB16I and RGB16UI formats. It uses the submesh's
 `vertexBundelIndices` to find the actual position attribute; submesh index
 is not necessarily the vertex-bundle index. Unsupported formats now log
 which submesh and attribute format could not be processed. Static imported
 mesh data is cached and invalidated when the underlying `Mesh.data` buffer
-is replaced. This update is **dev-only**, not part of the v2.0.2 release.
+is replaced. This fix is included in release **v2.0.3**.
 
 When using `beginLocalPosition(node)`, pass `Vec3.ONE` as the Gizmos mesh
 scale unless additional local scaling is intended, since `node.worldMatrix`

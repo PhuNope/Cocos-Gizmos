@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const tag = process.argv[2];
 if (!/^v\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(tag || '')) {
-    throw new Error('Usage: node scripts/release-notes.mjs v2.0.2');
+    throw new Error('Usage: node scripts/release-notes.mjs v2.0.3');
 }
 const version = tag.slice(1);
 const lines = readFileSync('CHANGELOG.md', 'utf8').split(/\r?\n/);
