@@ -229,7 +229,9 @@ function transpileRuntimeModule(name) {
     if (name === 'ExecuteGizmos' || name === 'Gizmos3D') {
         generated = generated.replaceAll("from './Define'", "from './Define.js'")
                              .replaceAll('from "./Define"', 'from "./Define.js"');
-        if (!generated.includes('Define.js')) fail(name + ' missing compiled Define import');
+        if (/from\s+['\"]\.\/Define['\"]/.test(text) && !generated.includes('Define.js')) {
+            fail(name + ' missing compiled Define import');
+        }
     }
     writeFileSync(path.join(ROOT, 'dist', name + '.js'), generated, 'utf8');
 }
