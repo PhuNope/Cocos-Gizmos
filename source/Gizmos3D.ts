@@ -7,6 +7,7 @@ import {
     director,
     geometry,
     GeometryRenderer,
+    gfx,
     Label,
     Layers,
     Mat4,
@@ -25,37 +26,114 @@ import { cce } from './Define';
 const { ccclass, executeInEditMode } = _decorator;
 
 
+// BEGIN MESH POSITION READER TEST SURFACE
 type GizmosMeshInput = Mesh | { vertices: Vec3[]; indices?: number[] };
 type GizmosMeshPart = { vertices: Vec3[]; indices: number[] | null };
-const _meshPartsCache = new WeakMap<object, GizmosMeshPart[]>();
-const _meshWarned = new WeakSet<object>();
+type GizmosMeshCacheEntry = {
+    meshData: Uint8Array;
+    primitiveCount: number;
+    parts: GizmosMeshPart[];
+};
+
+// Static imported meshes are cached across Scene updates. Replacing mesh.data
+// invalidates the cache. Raw vertex arrays are intentionally not cached.
+const _meshPartsCache = new WeakMap<object, GizmosMeshCacheEntry>();
+const _meshWarnedParts = new WeakMap<object, Set<number>>();
+
+/** Convert IEEE 754 half-precision POSITION data into Float32 numbers. */
+function gizmosHalfToFloat(value: number): number {
+    const sign = (value & 0x8000) ? -1 : 1;
+    const exponent = (value >> 10) & 0x1f;
+    const fraction = value & 0x03ff;
+    if (exponent === 0) {
+        return fraction === 0 ? sign * 0 : sign * Math.pow(2, -14) * (fraction / 1024);
+    }
+    if (exponent === 0x1f) {
+        return fraction === 0 ? sign * Infinity : NaN;
+    }
+    return sign * Math.pow(2, exponent - 15) * (1 + fraction / 1024);
+}
+
+function warnGizmosMeshPart(mesh: Mesh, index: number, reason: string): void {
+    let warned = _meshWarnedParts.get(mesh);
+    if (!warned) {
+        warned = new Set<number>();
+        _meshWarnedParts.set(mesh, warned);
+    }
+    if (warned.has(index)) return;
+    warned.add(index);
+    console.warn('[cocos-gizmos/drawMesh] ' + (mesh.name || 'Mesh') +
+        ' submesh ' + index + ': ' + reason);
+}
 
 function getGizmosMeshParts(mesh: GizmosMeshInput): GizmosMeshPart[] {
     if (!mesh) return [];
-    const obj = mesh as any;
-    if (Array.isArray(obj.vertices)) return [{ vertices: obj.vertices, indices: obj.indices || null }];
-    if (typeof obj.readAttribute !== 'function' || typeof obj.readIndices !== 'function') return [];
-    const cached = _meshPartsCache.get(mesh);
-    if (cached) return cached;
-    const result: GizmosMeshPart[] = [];
-    const count = obj.struct?.primitives?.length || obj.renderingSubMeshes?.length || 0;
-    for (let i = 0; i < count; i++) {
-        const positions = obj.readAttribute(i, 'a_position');
-        if (!(positions instanceof Float32Array) || positions.length % 3 !== 0) {
-            if (!_meshWarned.has(mesh)) {
-                _meshWarned.add(mesh);
-                console.warn('[cocos-gizmos/drawMesh] Mesh position data unavailable or not Float32 xyz; check allowDataAccess.');
-            }
+    const object = mesh as any;
+    if (Array.isArray(object.vertices)) {
+        return [{ vertices: object.vertices, indices: object.indices || null }];
+    }
+    if (typeof object.readAttribute !== 'function' || typeof object.readIndices !== 'function') {
+        return [];
+    }
+    const importedMesh = mesh as Mesh;
+    const primitives = importedMesh.struct?.primitives || [];
+    const primitiveCount = primitives.length;
+    const meshData = importedMesh.data;
+    const cached = _meshPartsCache.get(importedMesh);
+    if (cached && cached.meshData === meshData && cached.primitiveCount === primitiveCount) {
+        return cached.parts;
+    }
+
+    const parts: GizmosMeshPart[] = [];
+    for (let index = 0; index < primitiveCount; index++) {
+        // A primitive can reference any vertex bundle. It is NOT necessarily
+        // vertexBundles[index] (multi-submesh imported assets can differ).
+        const primitive = primitives[index];
+        const positionAttribute = primitive.vertexBundelIndices
+            .map((bundleIndex) => importedMesh.struct.vertexBundles[bundleIndex]?.attributes
+                ?.find((attribute) => attribute.name === gfx.AttributeName.ATTR_POSITION))
+            .find((attribute) => !!attribute);
+
+        if (!positionAttribute) {
+            warnGizmosMeshPart(importedMesh, index, 'POSITION attribute not found');
             continue;
         }
+        const format = positionAttribute.format;
+        const values = importedMesh.readAttribute(index, gfx.AttributeName.ATTR_POSITION);
+        if (!values || values.length < 9 || values.length % 3 !== 0) {
+            warnGizmosMeshPart(importedMesh, index,
+                'POSITION data unavailable or malformed; check Mesh.allowDataAccess');
+            continue;
+        }
+
+        // Cocos 3.8 readAttribute() returns Uint16Array containing *half
+        // bits* for RGB16F, NOT decoded Float32 values.
+        const isHalf = format === gfx.Format.RGB16F;
+        if (!isHalf &&
+            format !== gfx.Format.RGB32F &&
+            format !== gfx.Format.RGB16I &&
+            format !== gfx.Format.RGB16UI) {
+            warnGizmosMeshPart(importedMesh, index,
+                'unsupported POSITION format ' + (gfx.Format[format] || format));
+            continue;
+        }
+
         const vertices: Vec3[] = [];
-        for (let j = 0; j < positions.length; j += 3) vertices.push(new Vec3(positions[j], positions[j + 1], positions[j + 2]));
-        const indicesData = obj.readIndices(i) as ArrayLike<number> | null;
-        result.push({ vertices, indices: indicesData ? Array.from(indicesData) : null });
+        for (let offset = 0; offset < values.length; offset += 3) {
+            const x = isHalf ? gizmosHalfToFloat(values[offset]) : Number(values[offset]);
+            const y = isHalf ? gizmosHalfToFloat(values[offset + 1]) : Number(values[offset + 1]);
+            const z = isHalf ? gizmosHalfToFloat(values[offset + 2]) : Number(values[offset + 2]);
+            vertices.push(new Vec3(x, y, z));
+        }
+        const rawIndices = importedMesh.readIndices(index);
+        parts.push({ vertices, indices: rawIndices ? Array.from(rawIndices) : null });
     }
-    if (result.length) _meshPartsCache.set(mesh, result);
-    return result;
+    if (parts.length) {
+        _meshPartsCache.set(importedMesh, { meshData, primitiveCount, parts });
+    }
+    return parts;
 }
+// END MESH POSITION READER TEST SURFACE
 
 @ccclass('Gizmos3D.GizmosDebugDraw')
 @executeInEditMode

@@ -108,3 +108,18 @@ Editor.Message.request('scene', 'execute-scene-script', {
 
 The build stripper still removes only the two Gizmos callbacks, not arbitrary
 helper methods. The extension runtime remains Editor-only.
+
+
+## Development fix (after v2.0.2): Mesh POSITION formats
+
+The development branch reads imported Mesh POSITION attributes in RGB32F,
+RGB16F (half-precision), RGB16I and RGB16UI formats. It uses the submesh's
+`vertexBundelIndices` to find the actual position attribute; submesh index
+is not necessarily the vertex-bundle index. Unsupported formats now log
+which submesh and attribute format could not be processed. Static imported
+mesh data is cached and invalidated when the underlying `Mesh.data` buffer
+is replaced. This update is **dev-only**, not part of the v2.0.2 release.
+
+When using `beginLocalPosition(node)`, pass `Vec3.ONE` as the Gizmos mesh
+scale unless additional local scaling is intended, since `node.worldMatrix`
+will be applied by the renderer.

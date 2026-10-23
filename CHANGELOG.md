@@ -2,6 +2,14 @@
 
 All notable changes to Cocos-Gizmos are documented here.
 
+## [Unreleased]
+
+### Fixed
+- `Gizmos3D.drawMesh()` now decodes RGB16F vertex POSITION values from half-float bits and accepts RGB32F, RGB16I and RGB16UI position formats using the Mesh attribute format.
+- Resolve POSITION attributes through each primitive's `vertexBundelIndices` instead of assuming submesh index equals vertex-bundle index.
+- Give actionable warnings naming the affected submesh and unsupported format, and invalidate cached positions when `Mesh.data` is replaced.
+- Add regression tests for half floats, indices, submesh mapping, other position formats and cache invalidation.
+
 ## [2.0.2] - 2026-10-23
 
 ### Added
