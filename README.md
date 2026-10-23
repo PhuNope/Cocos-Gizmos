@@ -1,17 +1,19 @@
 # Cocos-Gizmos
 
+See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
+
 A Cocos Creator **3.8.2+ extension** providing two public classes: `Gizmos2D` and `Gizmos3D`.
 
 ## Install the extension
 
-1. Download `Cocos-Gizmos-v2.0.1.zip` from GitHub Releases (or the CI artifact).
+1. Download `Cocos-Gizmos-v2.0.2.zip` from GitHub Releases (or the CI artifact).
 2. In Cocos Creator, open **Extensions → Extension Manager**, choose **Project** (or **Global**), click **Import Extension (+)** and select the ZIP.
 3. Enable `cocos-gizmos`. The extension's Scene Script initializes Gizmos in the Scene Editor; it does not mount JS runtime into the game asset database.
 
 **Important:** The ZIP contains `package.json` **at its root**, plus `README.md` and `dist/`. Do not extract and import the two generated files separately. Do not add another enclosing directory inside the ZIP.
 
 ```text
-Cocos-Gizmos-v2.0.1.zip
+Cocos-Gizmos-v2.0.2.zip
 ├── package.json
 ├── README.md
 ├── main.js       # Editor lifecycle: install TypeScript reference
@@ -53,7 +55,7 @@ npm ci
 npm run pack
 ```
 
-`npm run pack` type-checks the source, produces exactly `dist/Gizmos.js` and `dist/Gizmos.d.ts`, runs public-API tests and packages the **complete extension** into `release/Cocos-Gizmos-v2.0.1.zip`. Packaging is cross-platform and needs no extra zip tool.
+`npm run pack` type-checks the source, produces exactly `dist/Gizmos.js` and `dist/Gizmos.d.ts`, runs public-API tests and packages the **complete extension** into `release/Cocos-Gizmos-v2.0.2.zip`. Packaging is cross-platform and needs no extra zip tool.
 
 The generated `.generated/Gizmos.ts` is an internal intermediate and is **not** shipped.
 
@@ -87,7 +89,7 @@ CI tests simulate the builder output, validate the Scene Script manifest and run
 Web Mobile builds transpile component methods into comma-separated assignments such as `t.onDrawGizmos=function(){...}` inside `assets/main/index.js` (`System.register`). The stripper recognizes these assignments using TypeScript AST and deletes only the two callback assignments, preserving the surrounding comma expression, remaining functions, and JavaScript syntax. This is covered by a regression fixture copied from Cocos Creator 3.8.8 output.
 
 
-## drawMesh() and Editor Scene updater (dev)
+## drawMesh() and Editor Scene updater (v2.0.2)
 
 `Gizmos3D.drawMesh(node, mesh, position?, rotation?, scale?, wireFrame?)` renders
 an imported readable `cc.Mesh` asset or a raw `{vertices: Vec3[], indices?: number[]}`.

@@ -69,13 +69,17 @@ jobs:
           git tag "$RELEASE_TAG" "$GITHUB_SHA"
           git push origin "refs/tags/$RELEASE_TAG"
 
+      - name: Prepare release notes from CHANGELOG
+        if: ${{ steps.release.outputs.publish == 'true' }}
+        run: node scripts/release-notes.mjs "${{ steps.release.outputs.tag }}"
+
       - name: Publish GitHub release
         if: ${{ steps.release.outputs.publish == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          generate_release_notes: true
+          body_path: release-notes.md
           files: |
             release/Cocos-Gizmos-*.zip
             dist/Gizmos.js
