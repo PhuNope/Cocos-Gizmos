@@ -116,6 +116,8 @@ const entries = [
   ['README.md', usage],
   ['editor-assets/GizmosGlobal.ts', readFileSync(globalTypesAsset)],
   ['examples/GizmoSmokeProbe.ts', readFileSync(path.join(ROOT, 'assets', 'GizmoSmokeProbe.ts'))],
+  ['examples/Gizmos2DApiTest.ts', readFileSync(path.join(ROOT, 'assets', 'Gizmos2DApiTest.ts'))],
+  ['examples/Gizmos3DApiTest.ts', readFileSync(path.join(ROOT, 'assets', 'Gizmos3DApiTest.ts'))],
   ['docs/EDITOR_SMOKE_TEST.md', readFileSync(path.join(ROOT, 'docs', 'EDITOR_SMOKE_TEST.md'))],
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
   ['scene.js', readFileSync(path.join(ROOT, 'scene.js'))],
