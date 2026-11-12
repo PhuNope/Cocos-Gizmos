@@ -9,5 +9,5 @@
         "noEmit": true
     },
 
-    "include": [".generated/**/*.ts", "assets/Example.ts", "Types/**/*"]
+    "include": [".generated/**/*.ts", "assets/Example.ts", "assets/GizmoSmokeProbe.ts", "Types/**/*"]
 }
