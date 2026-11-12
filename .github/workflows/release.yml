@@ -2,9 +2,9 @@ name: Build and release Gizmos
 
 on:
   pull_request:
-    branches: [dev, master]
+    branches: [dev, master, v2]
   push:
-    branches: [dev, master]
+    branches: [dev, master, v2]
     tags: ['v*']
 
 permissions:
@@ -29,45 +29,26 @@ jobs:
 
       # Upload a ZIP that Extension Manager can import directly.
       - name: Upload development extension build
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
+        if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/v2') }}
         uses: actions/upload-artifact@v4
         with:
           name: Cocos-Gizmos-extension-${{ github.sha }}
           path: release/Cocos-Gizmos-*.zip
           if-no-files-found: error
 
-      # GITHUB_TOKEN tag pushes do not trigger a second Actions run.
-      # After a successful master build, push the version tag and create
-      # the Release in THIS run. Manual version tags are supported too.
-      - name: Resolve version for release
+      # A version tag is the only trigger for publishing a release.
+      - name: Validate release tag
         id: release
-        if: ${{ github.ref_type == 'tag' || github.ref == 'refs/heads/master' }}
+        if: ${{ github.ref_type == 'tag' }}
         shell: bash
         run: |
           set -euo pipefail
           tag="v$(node -p 'require("./package.json").version')"
+          [[ "$GITHUB_REF_NAME" == "$tag" ]] || {
+            echo "Tag $GITHUB_REF_NAME does not match package version $tag"; exit 1;
+          }
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            [[ "$GITHUB_REF_NAME" == "$tag" ]] || {
-              echo "Tag $GITHUB_REF_NAME does not match package version $tag"; exit 1;
-            }
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          elif git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
-            echo "Version $tag already tagged; skipping automatic release."
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Push version tag from master
-        if: ${{ github.ref == 'refs/heads/master' && steps.release.outputs.publish == 'true' }}
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        run: |
-          set -euo pipefail
-          git tag "$RELEASE_TAG" "$GITHUB_SHA"
-          git push origin "refs/tags/$RELEASE_TAG"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
 
       - name: Prepare release notes from CHANGELOG
         if: ${{ steps.release.outputs.publish == 'true' }}
