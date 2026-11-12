@@ -11,7 +11,7 @@ type UpdateStats = {
 };
 let running: {
     stats: UpdateStats;
-    scheduler: SceneUpdateScheduler;
+    scheduler: { stop(): void; tickOnce(): void };
     dispose: () => void;
 } | null = null;
 
