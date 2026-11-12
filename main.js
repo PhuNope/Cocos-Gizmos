@@ -38,6 +38,13 @@ exports.methods = {
     openSettings() {
         return globalThis.Editor?.Panel?.open?.('cocos-gizmos.settings');
     },
+    async getDiagnostics() {
+        return globalThis.Editor.Message.request('scene', 'execute-scene-script', {
+            name: 'cocos-gizmos',
+            method: 'gizmosSmokeReport',
+            args: [],
+        });
+    },
     getSettings() {
         return { ...viewSettings };
     },
