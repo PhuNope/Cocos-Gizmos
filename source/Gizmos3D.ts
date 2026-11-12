@@ -666,7 +666,7 @@ export class Gizmos3D {
 
     public static drawDashLineList(node: Node, points: Vec3[], close: boolean = false) {
         const debugNode = this.getDebugNode(node);
-        debugNode?.drawLineList(points, close);
+        debugNode?.drawDashLineList(points, close);
     }
 
     public static drawCircle(node: Node, center: Vec3, radius: number, rot: Vec3 = Vec3.ZERO, segments: number = 32) {
