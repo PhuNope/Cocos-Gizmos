@@ -16,6 +16,9 @@ interface PositionHandleAdapter {
 interface PresentationAdapter {
     evaluate(component: Component, selected: boolean): { draw: boolean; hud: boolean };
     renderHud(component: Component): number;
+    planFrame?(components: readonly Component[], selected: ReadonlySet<string>,
+        onError?: (component: Component, hook: string, error: unknown) => void): void;
+    clearFrame?(): void;
 }
 
 let positionHandles: PositionHandleAdapter | null = null;
@@ -136,10 +139,12 @@ export function start(): UpdateStats {
             selectionCache.clear();
             try { positionHandles?.clear?.(); }
             catch (error) { warnOnce('Position handles cleanup failed', error); }
+            presentation?.clearFrame?.();
         }
         if (!root) {
             registry.clear();
             stats.components = 0;
+            presentation?.clearFrame?.();
             if (!positionHandles?.clear) {
                 try { positionHandles?.refresh([], new Set<string>(), now); }
                 catch (error) { warnOnce('Position handles cleanup failed', error); }
@@ -150,6 +155,7 @@ export function start(): UpdateStats {
         try { components = registry.get(root, now); }
         catch (error) {
             warnOnce('Scene traversal failed', error);
+            presentation?.clearFrame?.();
             try {
                 if (positionHandles?.clear) positionHandles.clear();
                 else positionHandles?.refresh([], new Set<string>(), now);
@@ -163,6 +169,14 @@ export function start(): UpdateStats {
         }
         const selection = selectionCache.get(now);
         stats.selectionApi = selection.available;
+        try {
+            presentation?.planFrame?.(components, selection.ids,
+                (component, hook, error) => warnOnce(hook + ' (' +
+                    (component.constructor?.name || 'Component') + ')', error));
+        } catch (error) {
+            warnOnce('HUD layout planning failed', error);
+            presentation?.clearFrame?.();
+        }
         try {
             positionHandles?.refresh(components, selection.ids, now);
         } catch (error) {
@@ -210,6 +224,7 @@ export function start(): UpdateStats {
         dispose: () => {
             registry.clear();
             selectionCache.clear();
+            presentation?.clearFrame?.();
         },
     };
     try {
