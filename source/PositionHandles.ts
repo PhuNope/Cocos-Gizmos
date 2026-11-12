@@ -190,7 +190,7 @@ function createEditorGizmo(base: any): any {
                     if (controller._cubeNode) {
                         controller._cubeNode.active = true;
                         if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
-                        controller.removeHandle?.(key);
+                        if (controller._handleDataMap?.[key]) controller.removeHandle?.(key);
                         controller.initHandle?.(controller._cubeNode, key);
                     }
                     const down = (event: any) => this.begin(entry, event);
