@@ -98,10 +98,13 @@ class Sprite {
     set spriteFrame(value) { this._frame = value; this.frameWrites++; }
 }
 class RenderRoot2D {}
-const calls = { lines: [], triangles: [] };
+const calls = { lines: [], dashed: [], triangles: [] };
 const geometryRenderer = {
     addLine(a, b, color, depth) {
         calls.lines.push({ a: { ...a }, b: { ...b }, color, depth });
+    },
+    addDashedLine(a, b, color, depth) {
+        calls.dashed.push({ a: { ...a }, b: { ...b }, color, depth });
     },
     addTriangle(...args) { calls.triangles.push(args); },
 };
@@ -150,6 +153,13 @@ assert.equal(Color.clones, 1, 'Changing the color makes one snapshot, not one pe
 assert.equal(calls.lines.length, 200);
 assert.ok(calls.lines.every(call => call.color === calls.lines[0].color));
 assert.equal(calls.lines[0].color.a, 80);
+Gizmos3D.drawDashLineList(node, [
+    new Vec3(0, 0, 0), new Vec3(1, 0, 0), new Vec3(1, 1, 0),
+], true);
+assert.equal(calls.dashed.length, 3, 'Closed dash polyline must draw three dashed segments');
+assert.equal(calls.lines.length, 200, 'drawDashLineList must not call the solid line renderer');
+Gizmos3D.drawDashLine(node, new Vec3(0, 0, 0), new Vec3(1, 1, 0));
+assert.equal(calls.dashed.length, 4);
 color.a = 200;
 assert.equal(calls.lines[0].color.a, 80, 'User mutations must not change the current draw state');
 
