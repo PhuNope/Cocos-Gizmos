@@ -116,6 +116,29 @@ Gizmos3D.drawSphere(this.node, this.node.worldPosition, 1);
 
 Components may implement `onDrawGizmos()` and `onDrawGizmosSelected()` for editor rendering, without a registration decorator. A smoke test in the actual Cocos editor/preview is recommended.
 
+## 2D Gizmos rendering
+
+`Gizmos2D` records each shape as a drawing command and combines compatible
+stroke paths using the same RGBA color and render layer. Filled shapes remain
+separate so overlapping fills retain their drawing behavior. The renderer
+reuses Graphics components and skips geometry updates when the recorded
+commands are unchanged from the previous Scene frame.
+
+Use `beginColor()` and `beginLayer()` to group compatible shapes without
+creating separate drawing components:
+
+```ts
+onDrawGizmos(): void {
+    Gizmos2D.beginColor(this.node, Color.GREEN);
+    Gizmos2D.drawCircle(this.node, { x: 0, y: 0 }, 100);
+    Gizmos2D.drawCircle(this.node, { x: 0, y: 0 }, 200);
+    Gizmos2D.drawLine(this.node, { x: -100, y: 0 }, { x: 100, y: 0 });
+}
+```
+
+Drawing callbacks remain available without a registration decorator.
+`Gizmos3D` uses the Scene geometry renderer to draw 3D primitives.
+
 ## Build locally
 
 ```bash
