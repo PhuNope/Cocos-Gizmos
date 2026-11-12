@@ -155,4 +155,76 @@ assert.equal(componentPool.typeDefs.ProbePosition, undefined,
 assert.equal(componentPool.typeDefs['cc.ProbePosition'], undefined,
     'Unloading the extension must restore the prefixed Gizmo registration');
 
+
+node.worldPosition = new Vec3(0, 0, 0);
+component.visible = false;
+component.grid = true;
+component.radius = 20;
+let buttonClicks = 0;
+const hudEvents = [];
+component.onGizmoHud = () => [];
+component.onGizmoHudControls = () => [
+    { type: 'toggle', id: 'visibility', text: 'Visible', property: 'visible' },
+    { type: 'checkbox', id: 'grid', text: 'Grid', property: 'grid' },
+    { type: 'slider', id: 'radius', text: 'Radius', property: 'radius', min: 0, max: 100, step: 5 },
+    { type: 'button', id: 'reset', text: 'Reset' },
+];
+component.onGizmoHudAction = id => {
+    assert.equal(id, 'reset');
+    buttonClicks++;
+};
+component.onGizmoHudChanged = (property, phase, value) =>
+    hudEvents.push(property + ':' + phase + ':' + String(value));
+
+const hudAdapter = sandbox.exports.createPositionHandleAdapter();
+hudAdapter.refresh([component], selected, 2000);
+const hudGizmo = component.gizmo;
+assert.equal(hudAdapter.status().active, 1);
+assert.equal(hudGizmo.controllers.length, 5, 'One position handle and four HUD controls');
+const toggle = hudGizmo.controllers[1];
+const checkbox = hudGizmo.controllers[2];
+const slider = hudGizmo.controllers[3];
+const button = hudGizmo.controllers[4];
+
+toggle.onMouseDown({ handleName: 'hud:visibility', x: 10, y: 10 });
+assert.equal(component.visible, false, 'Toggle changes on pointer release');
+toggle.onMouseUp();
+assert.equal(component.visible, true);
+assert.ok(hudEvents.includes('visible:begin:false'));
+assert.ok(hudEvents.includes('visible:update:true'));
+assert.ok(hudEvents.includes('visible:end:true'));
+
+checkbox.onMouseDown({ handleName: 'hud:grid', x: 10, y: 10 });
+checkbox.onMouseUp();
+assert.equal(component.grid, false);
+checkbox.onMouseDown({ handleName: 'hud:grid', x: 10, y: 10 });
+hudGizmo.onKeyDown({ key: 'Escape' });
+assert.equal(component.grid, false, 'Cancelled click leaves checkbox unchanged');
+
+slider.onMouseDown({ handleName: 'hud:radius', x: 30, y: 10 });
+slider.onMouseMove({ handleName: 'hud:radius', x: 90, y: 10 });
+assert.equal(component.radius, 70);
+slider.onMouseUp();
+assert.ok(hudEvents.includes('radius:update:70'));
+slider.onMouseDown({ handleName: 'hud:radius', x: 30, y: 10 });
+slider.onMouseMove({ handleName: 'hud:radius', x: 90, y: 10 });
+hudGizmo.onKeyDown({ key: 'Escape' });
+assert.equal(component.radius, 70, 'Escape restores the slider value');
+
+button.onMouseDown({ handleName: 'hud:reset', x: 10, y: 10 });
+assert.equal(buttonClicks, 0);
+button.onMouseUp();
+assert.equal(buttonClicks, 1);
+button.onMouseDown({ handleName: 'hud:reset', x: 10, y: 10 });
+hudGizmo.onKeyDown({ key: 'Escape' });
+assert.equal(buttonClicks, 1, 'Cancelled button click is not dispatched');
+
+toggle.onMouseDown({ handleName: 'hud:visibility', x: 10, y: 10 });
+hudAdapter.refresh([component], new Set(), 2300);
+assert.equal(component.visible, true, 'Hiding a HUD cancels a pending toggle');
+assert.equal(hudAdapter.status().active, 0);
+hudAdapter.dispose();
+assert.equal(componentPool.typeDefs.ProbePosition, undefined);
+console.log('[hud-adapter] toggle/checkbox clicks, slider drag and cancel, button dispatch and cleanup OK');
+
 console.log('[position-adapter] selected handle, XY dragging, undo hooks, Escape and cleanup OK');
