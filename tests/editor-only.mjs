@@ -14,7 +14,9 @@ const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 assert.equal(builder.configs['*'].hooks, './build/hooks.js');
 assert.equal(hooks.throwError, true);
 assert.equal(pkg.contributions.scene.script, './scene.js');
-assert.equal(pkg.contributions['asset-db'], undefined, 'runtime assets must not be mounted into the project');
+assert.equal(pkg.contributions['asset-db'].mount.path, './editor-assets');
+assert.equal(pkg.contributions['asset-db'].mount.readonly, true, 'type assets are read-only');
+assert.doesNotMatch(readFileSync(path.join(root, 'editor-assets', 'GizmosGlobal.ts'), 'utf8'), /class GizmosDebugDraw/);
 
 const scene = readFileSync(path.join(root, 'scene.js'), 'utf8');
 assert.match(scene, /exports\.load\s*=\s*function/);
