@@ -306,8 +306,13 @@ class GizmosDebugDraw extends Component {
 export class Gizmos2D {
     public static readonly DEFAULT_COLOR = Color.BLUE;
     public static readonly DEFAULT_LAYER = Layers.Enum.GIZMOS;
+    private static readonly _debugNodes = new WeakMap<Node, GizmosDebugDraw>();
 
     private static getDebugNode(node: Node) {
+        const cached = this._debugNodes.get(node);
+        if (cached && cached.isValid !== false && cached.node?.isValid !== false && cached.node?.parent === node) {
+            return cached;
+        }
         let debugNode = node.getComponentInChildren(GizmosDebugDraw);
         if (!debugNode) {
             debugNode = new Node('DEBUG_DRAW2D_NODE').addComponent(GizmosDebugDraw);
@@ -316,6 +321,7 @@ export class Gizmos2D {
             debugNode.node.parent = node;
             debugNode.node.setPosition(Vec3.ZERO);
         }
+        this._debugNodes.set(node, debugNode);
         return debugNode;
     }
 
