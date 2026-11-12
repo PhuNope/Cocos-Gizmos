@@ -61,7 +61,7 @@ code still require a runtime guard. The type-only package does not provide
 
 1. Download `Cocos-Gizmos-v2.0.3.zip` from GitHub Releases (or the CI artifact).
 2. In Cocos Creator, open **Extensions → Extension Manager**, choose **Project** (or **Global**), click **Import Extension (+)** and select the ZIP.
-3. Enable `cocos-gizmos`. The extension's Scene Script initializes Gizmos in the Scene Editor; it does not mount JS runtime into the game asset database.
+3. Enable `cocos-gizmos`. The Scene Script handles Editor drawing, and the read-only `cocos-gizmos` asset package supplies global TypeScript declarations.
 
 **Important:** The ZIP contains `package.json` **at its root**, plus `README.md` and `dist/`. Do not extract and import the two generated files separately. Do not add another enclosing directory inside the ZIP.
 
@@ -69,24 +69,33 @@ code still require a runtime guard. The type-only package does not provide
 Cocos-Gizmos-v2.0.3.zip
 ├── package.json
 ├── README.md
-├── main.js       # Editor lifecycle: install TypeScript reference
+├── main.js       # Editor extension lifecycle
 ├── scene.js      # Editor-only scene loader
+├── editor-assets/
+│   └── GizmosGlobal.ts  # Type-only global definitions
 ├── editor-runtime/ # CommonJS runtime, never added to game asset-db
 ├── builder.js
 ├── build/         # Build-time callback stripper
 └── dist/
     ├── package.json    # type: module — runtime files are ESM
     ├── Gizmos.js       # type/public API reference entry; not game-mounted
-    ├── Gizmos.d.ts     # global types for WebStorm
+    ├── Gizmos.d.ts     # declarations for type-only consumers
     ├── Gizmos2D.js     # ESM reference module (not game-mounted)
     ├── Gizmos3D.js     # ESM reference module (not game-mounted)
     ├── Define.js       # environment helpers
     └── ExecuteGizmos.js # editor auto-discovery
 ```
 
-When you enable the extension, its editor entry automatically creates `assets/cocos-gizmos.global.d.ts` in the **Cocos project**, containing a triple-slash reference **and direct ambient declarations for both `Gizmos2D` and `Gizmos3D`**. The direct declarations are inside the consuming project so WebStorm can index the names for completion when typing `Gizmo`, not only resolve properties after a complete identifier. The declarations point to the extension's real `dist/Gizmos.d.ts`. This lets WebStorm and TypeScript see `Gizmos2D` and `Gizmos3D` without per-file imports. The generated file is safe to check into the project repository, but it contains a relative reference to the installed extension path; after moving the project or switching global/project installation, re-enable the extension to update it. Disabling the extension does not delete the bridge; remove it manually if you uninstall Gizmos.
+When enabled, the extension mounts `editor-assets/GizmosGlobal.ts` through the
+Asset Database at `db://cocos-gizmos/GizmosGlobal.ts`. The file contains
+TypeScript declarations only and does not generate files in the game's
+`assets/` directory or install any game runtime code.
 
-For projects whose `tsconfig.json` has an explicit `include` or `files`, ensure `assets/cocos-gizmos.global.d.ts` is included. With the extension enabled, this is normally covered by `assets/**/*`. Then restart WebStorm's TypeScript Service and reindex if completions do not refresh. GitHub CI exercises TypeScript Language Service prefix completion; WebStorm's private completion engine must still be checked in the actual IDE. Cocos extensions outside project scope are not automatically discovered by WebStorm until this bridge is included.
+The Editor can index scripts in the mounted package. Global names are available
+without per-component imports when the mounted asset belongs to its TypeScript
+program. For external IDEs, ensure the TypeScript project includes the mounted
+declaration. IDE discovery in Cocos Creator 3.8.8 should be verified using the
+installed extension.
 
 The runtime is split across internal modules because Cocos Creator 3.8 rejects multiple decorated Components in a single script ("Each script can have at most one Component"). Only `Gizmos.js` is a public entry; consumers still have just two globals and don't import internal files.
 
@@ -108,13 +117,13 @@ npm ci
 npm run pack
 ```
 
-`npm run pack` type-checks the source, produces exactly `dist/Gizmos.js` and `dist/Gizmos.d.ts`, runs public-API tests and packages the **complete extension** into `release/Cocos-Gizmos-v2.0.3.zip`. Packaging is cross-platform and needs no extra zip tool.
+`npm run pack` type-checks source, generates `dist/Gizmos.d.ts` and the type-only `editor-assets/GizmosGlobal.ts`, runs API tests, and packages the complete extension into `release/Cocos-Gizmos-v2.0.3.zip`.
 
 The generated `.generated/Gizmos.ts` is an internal intermediate and is **not** shipped.
 
 ## Release workflow
 
-Push a version bump to `dev` and wait for CI to pass, then merge `dev` into `master`. The `master` workflow validates and packages the plugin, creates the `v2.0.1` tag for this version, publishes the extension ZIP and standalone `Gizmos.js` / `Gizmos.d.ts`, and syncs the Types companion repository when configured. Tags and releases are not created on `dev`.
+Pushes to `v2`, `dev`, and `master` run build and tests without publishing. To publish, create and push a version tag matching `v<package.json version>`. The tag workflow then publishes the extension ZIP and declarations. Type-only repository synchronization runs only when configured.
 
 ## Type-only companion repo
 
@@ -123,7 +132,7 @@ When `PhuNope/Cocos-Gizmos-Type` exists with a `main` branch and the main reposi
 Another project can install only its types:
 
 ```bash
-npm install -D github:PhuNope/Cocos-Gizmos-Type#v2.0.1
+npm install -D github:PhuNope/Cocos-Gizmos-Type#v2.0.3
 ```
 
 That package does **not** install runtime behavior; use the extension ZIP for that.
@@ -133,7 +142,7 @@ See [Cocos Creator extension installation guide](https://docs.cocos.com/creator/
 
 ## Editor-only build handling
 
-The extension now registers `contributions.scene.script` instead of `contributions.asset-db.mount`. Cocos runs `scene.js` in the Editor Scene process; it loads separate CommonJS modules from `editor-runtime/`. These files are **not project assets**, so Cocos does not import the Gizmos runtime into the built game. The existing `dist/Gizmos.d.ts` remains available to WebStorm via the project's generated `assets/cocos-gizmos.global.d.ts`.
+The extension registers `contributions.scene.script` for Editor runtime and `contributions.asset-db.mount` for type-only scripts. The Scene Script loads CommonJS modules from `editor-runtime/`. Only `editor-assets/GizmosGlobal.ts` is mounted into the Asset Database; the runtime modules are not game assets. `dist/Gizmos.d.ts` is generated for separately installed type packages.
 
 The `onAfterBuild` hook strips **only** `onDrawGizmos()` and `onDrawGizmosSelected()` method definitions from compiled JavaScript. It does **not** remove helper methods, `if (EDITOR)` blocks, or unrelated method names. It does **not** validate remaining calls to `Gizmos2D` or `Gizmos3D`; if application code executes such a call in the built game, `ReferenceError` is possible by design. Your project TypeScript files are never modified.
 
