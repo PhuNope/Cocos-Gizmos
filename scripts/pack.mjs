@@ -30,12 +30,21 @@ const manifest = {
   editor: pkg.editor,
   types: './dist/Gizmos.d.ts',
   main: './main.js',
+  panels: {
+    settings: { title: 'Gizmos Settings', type: 'dockable', main: './panels/settings/index.js' },
+  },
   // The Scene Script is Editor-only: unlike asset-db mounts, it is never
   // included in the Cocos game script graph.
   contributions: {
     scene: { script: './scene.js' },
     builder: './builder.js',
     'asset-db': { mount: { path: './editor-assets', readonly: true } },
+    menu: [{ path: 'i18n:menu.extension/Gizmos Settings', label: 'Gizmos Settings', message: 'open-settings' }],
+    messages: {
+      'open-settings': { methods: ['openSettings'] },
+      'get-settings': { methods: ['getSettings'] },
+      'set-settings': { methods: ['setSettings'] },
+    },
   },
 };
 const usage = `# Cocos-Gizmos v${pkg.version}\n\nCocos Creator extension providing global Gizmos2D and Gizmos3D.\n\n## Install\n\n1. In Cocos Creator 3.8.2+, open Extensions > Extension Manager.\n2. Select the Project or Global tab, choose Import Extension (+), and select this ZIP.\n3. Enable the Cocos-Gizmos extension and allow the Asset Database to finish importing.\n\nEditor-only Scene Script runs Gizmos outside the game Asset Database, so runtime JS is not imported into game builds. The build hook removes only onDrawGizmos and onDrawGizmosSelected from compiled game JS. Other calls are not checked or modified. The JavaScript module must be evaluated before using the runtime globals. Use Gizmos2D and Gizmos3D inside lifecycle callbacks after startup; don't reference them in top-level initializers.\n\nTypes are in dist/Gizmos.d.ts. Cocos Creator's engine provides cc and cc/env.\n\nSource: https://github.com/PhuNope/Cocos-Gizmos\n`;
@@ -107,7 +116,8 @@ const entries = [
   ['editor-assets/GizmosGlobal.ts', readFileSync(globalTypesAsset)],
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
   ['scene.js', readFileSync(path.join(ROOT, 'scene.js'))],
-  ...['Define.js', 'PositionDragSolver.js', 'PositionHandles.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos2D.js', 'Gizmos3D.js']
+  ['panels/settings/index.js', readFileSync(path.join(ROOT, 'panels/settings/index.js'))],
+  ...['Define.js', 'GizmoPresentation.js', 'GizmoHudOverlay.js', 'GizmoPresentationService.js', 'PositionDragSolver.js', 'PositionHandles.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos2D.js', 'Gizmos3D.js']
     .map(name => ['editor-runtime/' + name, readFileSync(path.join(ROOT, 'editor-runtime', name))]),
   ['builder.js', readFileSync(path.join(ROOT, 'builder.js'))],
   ['build/hooks.js', readFileSync(path.join(ROOT, 'build', 'hooks.js'))],
@@ -144,7 +154,7 @@ function verifyModuleFormats() {
     }
     const jsEntries = entries.map(([name]) => name).filter(name => name.endsWith('.js') && !name.includes('/vendor/'));
     for (const relative of jsEntries) {
-      const expectedFormat = (relative === 'main.js' || relative === 'builder.js' || relative === 'scene.js' || relative.startsWith('editor-runtime/') || relative.startsWith('build/')) ? 'commonjs' : 'module';
+      const expectedFormat = (relative === 'main.js' || relative === 'builder.js' || relative === 'scene.js' || relative.startsWith('panels/') || relative.startsWith('editor-runtime/') || relative.startsWith('build/')) ? 'commonjs' : 'module';
       const target = path.join(tempRoot, relative);
       const result = spawnSync(process.execPath, ['--check', target], { encoding: 'utf8' });
       if (result.error || result.status !== 0) {
