@@ -2,6 +2,7 @@ import { Component } from 'cc';
 import { Gizmos3D } from './Gizmos3D';
 import { GizmoHudOverlay } from './GizmoHudOverlay';
 import { formatHudControl, normalizeHudControls } from './GizmoHudControls';
+import { GizmoHudLayout } from './GizmoHudLayout';
 import {
     GizmoViewConfig,
     normalizeHudItems,
@@ -19,6 +20,29 @@ export interface GizmoComponentVisibility {
 export class GizmoPresentationService {
     private readonly overlay = new GizmoHudOverlay();
     private defaults: GizmoViewConfig = normalizeViewConfig(undefined);
+    private readonly layout = new GizmoHudLayout();
+    private planned = false;
+
+    public getLayout(): GizmoHudLayout { return this.layout; }
+
+    public planFrame(
+        components: readonly Component[],
+        selected: ReadonlySet<string>,
+        onError?: (component: Component, hook: string, error: unknown) => void,
+    ): void {
+        this.planned = true;
+        this.layout.beginFrame(
+            components,
+            (component) => this.evaluate(component, selected.has(component.node.uuid)).hud,
+            onError,
+        );
+    }
+
+    public clearFrame(): void {
+        this.planned = false;
+        this.layout.clear();
+    }
+
 
     public configure(value: unknown): GizmoViewConfig {
         this.defaults = normalizeViewConfig(value);
@@ -40,6 +64,14 @@ export class GizmoPresentationService {
     }
 
     public renderHud(component: Component): number {
+        const plannedPlacement = this.layout.get(component);
+        if (plannedPlacement) {
+            const count = this.overlay.render(component, plannedPlacement.items, plannedPlacement);
+            if (count) Gizmos3D.beginColor(component.node, Gizmos3D.DEFAULT_COLOR);
+            return count;
+        }
+        if (this.planned) return 0;
+        // Fallback for direct callers outside the Scene updater.
         const textCallback = component.onGizmoHud;
         const controlsCallback = component.onGizmoHudControls;
         const entries = typeof textCallback === 'function' ?
@@ -66,5 +98,5 @@ export class GizmoPresentationService {
         return { hudLabels: this.overlay.totalDrawn, defaults: this.getSettings() };
     }
 
-    public dispose(): void { this.overlay.dispose(); }
+    public dispose(): void { this.clearFrame(); this.overlay.dispose(); }
 }
