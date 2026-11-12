@@ -115,6 +115,8 @@ const entries = [
   ['package.json', JSON.stringify(manifest, null, 2) + '\n'],
   ['README.md', usage],
   ['editor-assets/GizmosGlobal.ts', readFileSync(globalTypesAsset)],
+  ['examples/GizmoSmokeProbe.ts', readFileSync(path.join(ROOT, 'assets', 'GizmoSmokeProbe.ts'))],
+  ['docs/EDITOR_SMOKE_TEST.md', readFileSync(path.join(ROOT, 'docs', 'EDITOR_SMOKE_TEST.md'))],
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
   ['scene.js', readFileSync(path.join(ROOT, 'scene.js'))],
   ['panels/settings/index.js', readFileSync(path.join(ROOT, 'panels/settings/index.js'))],
