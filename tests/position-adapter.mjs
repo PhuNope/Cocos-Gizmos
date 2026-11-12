@@ -34,7 +34,6 @@ vm.runInNewContext(compile('GizmoHudProjection'), {
     require(name) {
         if (name === 'cc') return { Vec3 };
         if (name === './PositionDragSolver') return math.exports;
-        if (name === './GizmoEditSession') return edits.exports;
         throw new Error('Unknown projection import ' + name);
     },
 });
@@ -114,6 +113,7 @@ const sandbox = {
     require(name) {
         if (name === 'cc') return { Color, Vec3, Quat, Layers: { Enum: { GIZMOS: 4 } }, Component: class {} };
         if (name === './PositionDragSolver') return math.exports;
+        if (name === './GizmoEditSession') return edits.exports;
         if (name === './GizmoHudControls') return hud.exports;
         if (name === './GizmoPresentation') return presentation.exports;
         if (name === './GizmoHudProjection') return projection.exports;
