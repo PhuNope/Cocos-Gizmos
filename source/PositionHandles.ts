@@ -4,7 +4,8 @@ import {
     intersectHandlePlane,
     PositionDragSolver,
 } from './PositionDragSolver';
-import { HudControl, HudSliderDrag, hudRowScreenPosition, normalizeHudControls } from './GizmoHudControls';
+import { HudControl, HudSliderDrag, hudRowScreenPosition, normalizeHudControls, hudControlLayoutSignature } from './GizmoHudControls';
+import { createSceneHudProjection } from './GizmoHudProjection';
 import { normalizeHudItems } from './GizmoPresentation';
 
 type Point = { x: number; y: number; z: number };
@@ -178,7 +179,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                     field.space || 'local', field.axis, field.snap,
                     field.color, field.bounds,
                 ]),
-                controls,
+                controls: hudControlLayoutSignature(controls),
             });
         }
 
@@ -308,25 +309,19 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             }
             if (!this.hudEntries.length) return;
             const view = camera();
-            if (typeof view?.worldToScreen !== 'function') return;
-            const anchor = new Vec3();
-            try { view.worldToScreen(component.node.worldPosition, anchor); }
-            catch { return; }
-            if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return;
+            if (typeof view?.worldToScreen !== 'function' ||
+                typeof view?.screenPointToRay !== 'function') return;
+            const projection = createSceneHudProjection(view, component.node.worldPosition);
+            if (!projection) {
+                for (const entry of this.hudEntries) entry.controller.hide?.();
+                return;
+            }
             const texts = normalizeHudItems(component.onGizmoHud?.());
+            const size = Math.max(0.01, Math.min(1000, projection.pixelSize * 10)) * 14;
             for (const entry of this.hudEntries) {
-                const row = hudRowScreenPosition(anchor, texts.length + entry.index);
-                const pointer = sceneRay({ x: row.x - 14, y: row.y });
-                const normal = view.node?.forward || pointer?.d;
-                const point = pointer && normal ?
-                    intersectHandlePlane(pointer, component.node.worldPosition, normal) : null;
-                if (!point) {
-                    entry.controller.hide?.();
-                    continue;
-                }
-                const world = new Vec3(point.x, point.y, point.z);
+                const row = hudRowScreenPosition(projection.screen, texts.length + entry.index);
+                const world = projection.worldAt(row.x - 14, row.y);
                 entry.controller.setPosition?.(world);
-                const size = markerSize(world) * 14;
                 entry.controller.updateSize?.(Vec3.ZERO, new Vec3(size, size, size));
             }
         }
