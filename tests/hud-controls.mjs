@@ -13,7 +13,8 @@ const code = ts.transpileModule(readFileSync(file, 'utf8'), {
 }).outputText;
 const scope = { exports: {} };
 vm.runInNewContext(code, scope, { filename: 'GizmoHudControls.js' });
-const { normalizeHudControls, formatHudControl, HudSliderDrag, hudRowScreenPosition } = scope.exports;
+const { normalizeHudControls, formatHudControl, HudSliderDrag, hudRowScreenPosition,
+    hudControlLayoutSignature } = scope.exports;
 
 const controls = normalizeHudControls([
     { type: 'button', id: 'reset', text: 'Reset' },
@@ -31,6 +32,16 @@ assert.deepEqual(Array.from(controls, (control) => control.type),
 assert.equal(controls[2].property, 'visible');
 assert.equal(controls[2].color, '#22aa88');
 assert.equal(controls[3].color, '#ffffff');
+const layout = hudControlLayoutSignature(controls);
+const relabeled = controls.map(control => ({ ...control, text: control.text + ' updated' }));
+assert.equal(hudControlLayoutSignature(relabeled), layout,
+    'Dynamic text changes must not recreate HUD controllers');
+assert.notEqual(hudControlLayoutSignature(controls.slice(0, 3)), layout,
+    'Changing the control list must invalidate the picking layout');
+const recolored = controls.map(control => ({ ...control }));
+recolored[2].color = '#ffffff';
+assert.notEqual(hudControlLayoutSignature(recolored), layout,
+    'Changing control marker color must update its controller');
 assert.equal(formatHudControl(controls[0]), '[Reset]');
 assert.match(formatHudControl(controls[1], 50), /Radius: \[/);
 assert.equal(formatHudControl(controls[2], true), 'Visible: [ON]');
