@@ -174,10 +174,10 @@ export class LineHandles extends Component {
     @property(Vec3)
     endPoint = new Vec3(150, 0, 0);
 
-    onGizmoHandles() {
+    onGizmoHandles(): GizmoHandleList {
         return [
-            { property: 'startPoint', plane: 'xy' as const, space: 'local' as const, snap: 5 },
-            { property: 'endPoint', plane: 'xy' as const, space: 'local' as const, snap: 5 },
+            { property: 'startPoint', plane: 'xy', space: 'local', snap: 5 },
+            { property: 'endPoint', plane: 'xy', space: 'local', snap: 5 },
         ];
     }
 
@@ -187,7 +187,7 @@ export class LineHandles extends Component {
         Gizmos2D.endLocalPosition(this.node);
     }
 
-    onGizmoChanged(property: string, phase: 'begin' | 'update' | 'end' | 'cancel'): void {
+    onGizmoChanged(property: string, phase: GizmoHandlePhase): void {
         // Respond to handle edits when dependent component values need refreshing.
     }
 }
@@ -202,6 +202,18 @@ export class LineHandles extends Component {
 - `bounds`: optional `min` and `max` per coordinate axis.
 - `index`: use when the property is an array of `Vec3` positions.
 - `color`: optional hex color for the handle marker.
+
+All handle definitions have named **global TypeScript types**. Type
+`onGizmoHandles(): GizmoHandleList` to enable field completion in the
+returned objects. The available names are `GizmoHandleDescriptor`,
+`GizmoHandleList`, `GizmoHandlePlane`, `GizmoHandleSpace`,
+`GizmoHandleAxis`, and `GizmoHandlePhase`. They require no runtime import.
+For standalone handle objects, annotate `const handle: GizmoHandleDescriptor`.
+
+The callback name is exactly `onGizmoHandles()` (singular `Gizmo`,
+plural `Handles`). The editor includes this optional method in the
+`Component` type. To receive property completion inside a method,
+keep the explicit `: GizmoHandleList` return type.
 
 Dragging invokes `onGizmoChanged(property, phase, index?)` for the
 `begin`, `update`, and `end` phases. Escape cancels an active drag,
