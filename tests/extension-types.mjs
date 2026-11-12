@@ -39,6 +39,10 @@ try {
     const asset = readFileSync(globalAsset, 'utf8');
     assert.match(asset, /declare global\s*\{/);
     assert.match(asset, /onDrawGizmos\?\(\): void/);
+    assert.match(asset, /onGizmoHandles\?\(\): GizmoHandleList/);
+    assert.match(asset, /interface GizmoHandleDescriptor/);
+    assert.match(asset, /type GizmoHandlePlane/);
+    assert.match(asset, /type GizmoHandlePhase/);
     assert.match(asset, /const Gizmos2D: typeof import\('\.\/GizmosGlobal'\)\.Gizmos2D/);
     assert.match(asset, /const Gizmos3D: typeof import\('\.\/GizmosGlobal'\)\.Gizmos3D/);
     assert.doesNotMatch(asset, /registerGizmos/);
@@ -94,7 +98,27 @@ try {
 
     const completionFile = path.join(assets, 'Completion.ts');
     writeFileSync(completionFile, 'Gizmo', 'utf8');
-    const scripts = [...rootFiles, completionFile];
+    const memberFile = path.join(assets, 'MemberCompletion.ts');
+    const memberSource = [
+        "import { Component } from 'cc';",
+        'export class MemberCompletion extends Component {',
+        '    onGiz',
+        '}',
+        '',
+    ].join('\n');
+    writeFileSync(memberFile, memberSource, 'utf8');
+    const propertyFile = path.join(assets, 'PropertyCompletion.ts');
+    const propertySource = [
+        "import { Component } from 'cc';",
+        'export class PropertyCompletion extends Component {',
+        '    onGizmoHandles(): GizmoHandleList {',
+        '        return [{  }];',
+        '    }',
+        '}',
+        '',
+    ].join('\n');
+    writeFileSync(propertyFile, propertySource, 'utf8');
+    const scripts = [...rootFiles, completionFile, memberFile, propertyFile];
     const host = {
         getScriptFileNames: () => scripts,
         getScriptVersion: () => '0',
@@ -115,6 +139,19 @@ try {
         const names = new Set(completion?.entries.map((entry) => entry.name));
         assert.ok(names.has('Gizmos2D'), 'Global completion is missing Gizmos2D');
         assert.ok(names.has('Gizmos3D'), 'Global completion is missing Gizmos3D');
+
+        const memberOffset = memberSource.indexOf('onGiz') + 'onGiz'.length;
+        const methodNames = new Set(service.getCompletionsAtPosition(memberFile, memberOffset, {})
+            ?.entries.map(entry => entry.name));
+        assert.ok(methodNames.has('onGizmoHandles'), 'Component method completion is missing onGizmoHandles');
+        assert.ok(methodNames.has('onGizmoChanged'), 'Component method completion is missing onGizmoChanged');
+
+        const propertyOffset = propertySource.indexOf('return [{  }];') + 'return [{ '.length;
+        const fieldNames = new Set(service.getCompletionsAtPosition(propertyFile, propertyOffset, {})
+            ?.entries.map(entry => entry.name));
+        for (const field of ['property', 'index', 'plane', 'space', 'axis', 'snap', 'bounds', 'color']) {
+            assert.ok(fieldNames.has(field), 'Position handle property completion is missing ' + field);
+        }
     } finally {
         service.dispose();
     }
