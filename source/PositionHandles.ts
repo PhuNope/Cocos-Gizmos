@@ -139,7 +139,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         private hudEntries: HudEntry[] = [];
         private drag: DragState | null = null;
         private hudDrag: HudDrag | null = null;
-        private pendingButton: HudEntry | null = null;
+        private pendingClick: HudEntry | null = null;
         private shown = false;
         private layout = '';
 
@@ -165,8 +165,10 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             const raw = component.onGizmoHudControls?.();
             return normalizeHudControls(raw).filter((control) =>
                 control.type === 'button' ||
-                (typeof (component as any)[control.property] === 'number' &&
-                 Number.isFinite((component as any)[control.property])));
+                (control.type === 'slider' ?
+                    typeof (component as any)[control.property] === 'number' &&
+                    Number.isFinite((component as any)[control.property]) :
+                    typeof (component as any)[control.property] === 'boolean'));
         }
 
         private signature(fields: Field[], controls: HudControl[]): string {
@@ -282,7 +284,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         public refreshHandles(): void {
             const fields = this.descriptors();
             const controls = this.hudDescriptors();
-            if (this.signature(fields, controls) !== this.layout && !this.drag && !this.hudDrag && !this.pendingButton) {
+            if (this.signature(fields, controls) !== this.layout && !this.drag && !this.hudDrag && !this.pendingClick) {
                 this.rebuild();
             } else this.updateMarkers();
         }
@@ -330,11 +332,11 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         }
 
         private beginHud(entry: HudEntry, event: any): void {
-            if (!this.shown || this.drag || this.hudDrag || this.pendingButton) return;
+            if (!this.shown || this.drag || this.hudDrag || this.pendingClick) return;
             if (event?.handleName && event.handleName !== entry.key && event.handleName !== 'y') return;
             const component = this.target as Component;
-            if (entry.control.type === 'button') {
-                this.pendingButton = entry;
+            if (entry.control.type !== 'slider') {
+                this.pendingClick = entry;
                 return;
             }
             const current = (component as any)[entry.control.property];
@@ -369,17 +371,38 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         }
 
         private finishHud(cancelled: boolean): void {
-            const button = this.pendingButton;
-            this.pendingButton = null;
+            const click = this.pendingClick;
+            this.pendingClick = null;
             const component = this.target as Component;
-            if (button && !cancelled) {
-                this.onControlBegin?.(button.key);
-                try {
-                    component.onGizmoHudAction?.(button.control.id);
-                    this.onComponentChanged?.(component.node);
-                } finally {
-                    this.onControlEnd?.(button.key);
+            if (click && !cancelled) {
+                const control = click.control;
+                if (control.type === 'button') {
+                    this.onControlBegin?.(click.key);
+                    try {
+                        component.onGizmoHudAction?.(control.id);
+                        this.onComponentChanged?.(component.node);
+                    } finally {
+                        this.onControlEnd?.(click.key);
+                    }
+                } else if (control.type === 'toggle' || control.type === 'checkbox') {
+                    const value = (component as any)[control.property];
+                    if (typeof value === 'boolean') {
+                        this.onControlBegin?.(control.property);
+                        try {
+                            component.onGizmoHudChanged?.(control.property, 'begin', value);
+                            const next = !value;
+                            (component as any)[control.property] = next;
+                            component.onGizmoHudChanged?.(control.property, 'update', next);
+                            this.onControlUpdate?.(control.property);
+                            this.onComponentChanged?.(component.node);
+                            component.onGizmoHudChanged?.(control.property, 'end', next);
+                            cceNamespace()?.Engine?.repaintInEditMode?.();
+                        } finally {
+                            this.onControlEnd?.(control.property);
+                        }
+                    }
                 }
+                this.updateMarkers();
             }
             const drag = this.hudDrag;
             this.hudDrag = null;
