@@ -72,8 +72,18 @@ vm.runInNewContext(compiled, sandbox, { filename: 'ExecuteGizmos.js' });
 const { start, stop } = sandbox.exports;
 const handleRefreshes = [];
 let clearedHandles = 0;
+let plannedFrames = 0;
+let clearedHudFrames = 0;
+sandbox.exports.setPresentationAdapter({
+    evaluate(_component, selected) { return { draw: true, hud: selected }; },
+    renderHud() { return 0; },
+    planFrame() { plannedFrames++; },
+    clearFrame() { clearedHudFrames++; },
+});
 sandbox.exports.setPositionHandleAdapter({
     refresh(components, selected, at) {
+        assert.ok(plannedFrames > handleRefreshes.length,
+            'HUD frame layout must be planned before refreshing picking controllers');
         handleRefreshes.push({ count: components.length, selectedCount: selected.size, at });
     },
     clear() { clearedHandles++; },
@@ -120,6 +130,8 @@ try {
     assert.equal(sandbox.exports.status().components, 0);
     assert.ok(clearedHandles >= 3,
         'Closing the Scene must clear active handles regardless of the 250ms discovery throttle');
+    assert.ok(clearedHudFrames >= 2,
+        'Scene switching and closing must invalidate the previous component HUD layout');
     assert.equal(handleRefreshes.at(-1).count, 0,
         'The replacement Scene must have refreshed the component registry before closure');
 
