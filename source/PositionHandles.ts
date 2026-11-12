@@ -352,7 +352,10 @@ function createEditorGizmo(
                 return;
             }
             const texts = normalizeHudItems(component.onGizmoHud?.());
-            const size = Math.max(0.01, Math.min(1000, projection.pixelSize * 10)) * 14;
+            // A HUD row is 22 screen pixels tall. Keep its picking cube about
+            // 14 pixels wide; multiplying a 10px world size by 14 creates a
+            // ~140px hit box overlapping adjacent buttons and sliders.
+            const size = Math.min(1000, projection.pixelSize * 14);
             for (const entry of this.hudEntries) {
                 const row = hudRowScreenPosition(projection.screen, texts.length + entry.index);
                 const world = projection.worldAt(row.x - 14, row.y);
