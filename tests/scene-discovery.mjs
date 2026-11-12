@@ -19,6 +19,7 @@ let selected = [];
 let beforeUpdate = null;
 let timer = null;
 let scanCount = 0;
+let selectionLookups = 0;
 const calls = { first: 0, second: 0, selected: 0 };
 const firstComponent = {
     isValid: true, enabled: true,
@@ -47,6 +48,7 @@ const sandbox = {
     exports: {},
     Editor: { Selection: { getSelected: (type) => {
         assert.equal(type, 'node');
+        selectionLookups++;
         return selected;
     } } },
     Date: class extends Date { static now() { return now; } },
@@ -70,6 +72,8 @@ try {
     }
     assert.equal(scanCount, 1, 'No full scene traversal for each engine frame');
     assert.equal(calls.first, 11, 'Registered callbacks still draw each frame');
+    assert.ok(selectionLookups <= 6, 'Selection must not be queried for every render frame');
+    assert.ok(selectionLookups >= 2, 'Selection should refresh promptly during editor updates');
 
     // New components are discovered through the bounded fallback scan.
     const secondNode = createNode('child', [secondComponent]);
