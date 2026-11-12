@@ -7,7 +7,7 @@ import {
 
 type Point = { x: number; y: number; z: number };
 type Pointer = { x: number; y: number };
-type Field = NonNullable<ReturnType<NonNullable<Component['onGizmoHandles']>>>[number];
+type Field = GizmoHandleDescriptor;
 type Entry = { field: Field; controller: any; key: string };
 type DragState = { entry: Entry; solver: PositionDragSolver; original: Point; changed: boolean };
 
