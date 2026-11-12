@@ -280,7 +280,7 @@ function runConsumerTests() {
 }
 
 function buildEditorAssetDeclarations(output) {
-    const expectedImports = /import\\s*\\{([\\s\\S]*?)\\}\\s*from 'cc';/;
+    const expectedImports = /import\s*\{([\s\S]*?)\}\s*from 'cc';/;
     if (!expectedImports.test(output)) fail('editor declarations must import Cocos API types');
     let asset = output.replace(expectedImports, "import type {$1} from 'cc';");
     for (const name of PUBLIC_CLASSES) {
