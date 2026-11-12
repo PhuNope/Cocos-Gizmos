@@ -7,14 +7,15 @@ import {
 import { HudControl, HudSliderDrag, hudRowScreenPosition, normalizeHudControls, hudControlLayoutSignature } from './GizmoHudControls';
 import { createSceneHudProjection } from './GizmoHudProjection';
 import { normalizeHudItems } from './GizmoPresentation';
+import { GizmoEditSession } from './GizmoEditSession';
 
 type Point = { x: number; y: number; z: number };
 type Pointer = { x: number; y: number };
 type Field = GizmoHandleDescriptor;
 type Entry = { field: Field; controller: any; key: string };
-type DragState = { entry: Entry; solver: PositionDragSolver; original: Point; changed: boolean };
+type DragState = { entry: Entry; solver: PositionDragSolver; session: GizmoEditSession<Point> };
 type HudEntry = { control: HudControl; controller: any; key: string; index: number };
-type HudDrag = { entry: HudEntry; solver: HudSliderDrag; changed: boolean };
+type HudDrag = { entry: HudEntry; solver: HudSliderDrag; session: GizmoEditSession<number> };
 
 function cceNamespace(): any {
     return (globalThis as any).cce || (globalThis as any).window?.cce || null;
@@ -339,9 +340,35 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             if (!at || !Number.isFinite(current)) return;
             try {
                 const solver = new HudSliderDrag(entry.control, current, at.x);
-                this.hudDrag = { entry, solver, changed: false };
-                this.onControlBegin?.(entry.control.property);
-                component.onGizmoHudChanged?.(entry.control.property, 'begin', current);
+                const property = entry.control.property;
+                const session = new GizmoEditSession<number>(
+                    () => (component as any)[property],
+                    (value) => { (component as any)[property] = value; },
+                    {
+                        begin: (value) => {
+                            this.onControlBegin?.(property);
+                            component.onGizmoHudChanged?.(property, 'begin', value);
+                        },
+                        update: (value) => {
+                            component.onGizmoHudChanged?.(property, 'update', value);
+                            this.onControlUpdate?.(property);
+                            this.onComponentChanged?.(component.node);
+                            cceNamespace()?.Engine?.repaintInEditMode?.();
+                        },
+                        rollback: () => {
+                            this.onComponentChanged?.(component.node);
+                            cceNamespace()?.Engine?.repaintInEditMode?.();
+                        },
+                        end: (value, cancelled) => {
+                            component.onGizmoHudChanged?.(
+                                property, cancelled ? 'cancel' : 'end', value);
+                            this.onControlEnd?.(property);
+                            this.updateMarkers();
+                        },
+                    },
+                );
+                session.begin();
+                this.hudDrag = { entry, solver, session };
             } catch (error) {
                 console.warn('[cocos-gizmos/hud] Cannot begin slider drag:', error);
             }
@@ -354,15 +381,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             if (!at) return;
             const next = drag.solver.move(at.x);
             if (next === null) return;
-            const component = this.target as Component;
-            const property = drag.entry.control.property;
-            if ((component as any)[property] === next) return;
-            (component as any)[property] = next;
-            drag.changed = true;
-            component.onGizmoHudChanged?.(property, 'update', next);
-            this.onControlUpdate?.(property);
-            this.onComponentChanged?.(component.node);
-            cceNamespace()?.Engine?.repaintInEditMode?.();
+            drag.session.apply(next);
         }
 
         private finishHud(cancelled: boolean): void {
@@ -382,18 +401,36 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                 } else if (control.type === 'toggle' || control.type === 'checkbox') {
                     const value = (component as any)[control.property];
                     if (typeof value === 'boolean') {
-                        this.onControlBegin?.(control.property);
+                        const property = control.property;
+                        const session = new GizmoEditSession<boolean>(
+                            () => (component as any)[property],
+                            (next) => { (component as any)[property] = next; },
+                            {
+                                begin: (initial) => {
+                                    this.onControlBegin?.(property);
+                                    component.onGizmoHudChanged?.(property, 'begin', initial);
+                                },
+                                update: (next) => {
+                                    component.onGizmoHudChanged?.(property, 'update', next);
+                                    this.onControlUpdate?.(property);
+                                    this.onComponentChanged?.(component.node);
+                                    cceNamespace()?.Engine?.repaintInEditMode?.();
+                                },
+                                rollback: () => this.onComponentChanged?.(component.node),
+                                end: (next, cancelled) => {
+                                    component.onGizmoHudChanged?.(
+                                        property, cancelled ? 'cancel' : 'end', next);
+                                    this.onControlEnd?.(property);
+                                },
+                            },
+                        );
+                        session.begin();
                         try {
-                            component.onGizmoHudChanged?.(control.property, 'begin', value);
-                            const next = !value;
-                            (component as any)[control.property] = next;
-                            component.onGizmoHudChanged?.(control.property, 'update', next);
-                            this.onControlUpdate?.(control.property);
-                            this.onComponentChanged?.(component.node);
-                            component.onGizmoHudChanged?.(control.property, 'end', next);
-                            cceNamespace()?.Engine?.repaintInEditMode?.();
-                        } finally {
-                            this.onControlEnd?.(control.property);
+                            session.apply(!value);
+                            session.finish();
+                        } catch (error) {
+                            session.finish(true);
+                            throw error;
                         }
                     }
                 }
@@ -402,20 +439,11 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             const drag = this.hudDrag;
             this.hudDrag = null;
             if (!drag || drag.entry.control.type !== 'slider') return;
-            const property = drag.entry.control.property;
-            if (cancelled && drag.changed) {
-                (component as any)[property] = drag.solver.cancel();
-                this.onComponentChanged?.(component.node);
-            }
-            component.onGizmoHudChanged?.(
-                property, cancelled ? 'cancel' : 'end', (component as any)[property],
-            );
-            this.onControlEnd?.(property);
-            this.updateMarkers();
+            drag.session.finish(cancelled);
         }
 
         private begin(entry: Entry, event: any): void {
-            if (!this.shown || this.drag) return;
+            if (!this.shown || this.drag || this.hudDrag || this.pendingClick) return;
             if (event?.handleName && event.handleName !== 'y' && event.handleName !== entry.key) return;
             const view = pointer(event);
             const ray = view && sceneRay(view);
@@ -430,9 +458,41 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             try {
                 const solver = new PositionDragSolver(original, transform, normal, entry.field);
                 if (!solver.begin(ray)) return;
-                this.drag = { entry, solver, original, changed: false };
-                this.onControlBegin?.(entry.field.property, entry.field.index);
-                target.onGizmoChanged?.(entry.field.property, 'begin', entry.field.index);
+                const property = entry.field.property;
+                const index = entry.field.index;
+                const session = new GizmoEditSession<Point>(
+                    () => readField(target, entry.field) as Point,
+                    (value) => {
+                        if (!writeField(target, entry.field, value)) {
+                            throw new Error('Position handle property is no longer editable');
+                        }
+                    },
+                    {
+                        begin: () => {
+                            this.onControlBegin?.(property, index);
+                            target.onGizmoChanged?.(property, 'begin', index);
+                        },
+                        update: () => {
+                            target.onGizmoChanged?.(property, 'update', index);
+                            this.onControlUpdate?.(property, index);
+                            this.onComponentChanged?.(target.node);
+                            this.updateMarkers();
+                            cceNamespace()?.Engine?.repaintInEditMode?.();
+                        },
+                        rollback: () => {
+                            this.onComponentChanged?.(target.node);
+                            cceNamespace()?.Engine?.repaintInEditMode?.();
+                        },
+                        end: (_value, cancelled) => {
+                            target.onGizmoChanged?.(
+                                property, cancelled ? 'cancel' : 'end', index);
+                            this.onControlEnd?.(property, index);
+                            this.updateMarkers();
+                        },
+                    },
+                );
+                session.begin();
+                this.drag = { entry, solver, session };
             } catch (error) {
                 console.warn('[cocos-gizmos/handles] Unable to start position drag:', error);
             }
@@ -446,30 +506,14 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             if (!ray) return;
             const next = drag.solver.move(ray);
             if (!next) return;
-            const target = this.target as Component;
-            if (!writeField(target, entry.field, next)) return;
-            drag.changed = true;
-            target.onGizmoChanged?.(entry.field.property, 'update', entry.field.index);
-            this.onControlUpdate?.(entry.field.property, entry.field.index);
-            this.onComponentChanged?.(target.node);
-            this.updateMarkers();
-            cceNamespace()?.Engine?.repaintInEditMode?.();
+            drag.session.apply(next);
         }
 
         private finish(cancelled: boolean): void {
             const drag = this.drag;
             if (!drag) return;
             this.drag = null;
-            const target = this.target as Component;
-            if (cancelled && drag.changed) {
-                writeField(target, drag.entry.field, drag.solver.cancel());
-                this.onComponentChanged?.(target.node);
-            }
-            target?.onGizmoChanged?.(
-                drag.entry.field.property, cancelled ? 'cancel' : 'end', drag.entry.field.index,
-            );
-            this.onControlEnd?.(drag.entry.field.property, drag.entry.field.index);
-            this.updateMarkers();
+            drag.session.finish(cancelled);
         }
 
         public onGizmoMouseDown(event: any): void {
@@ -510,7 +554,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         }
 
         public onHide(): void {
-            this.finish(false);
+            this.finish(true);
             this.finishHud(true);
             this.shown = false;
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
@@ -536,7 +580,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         }
 
         public onDestroy(): void {
-            this.finish(false);
+            this.finish(true);
             this.finishHud(true);
             this.shown = false;
             this.clearEntries();
