@@ -139,6 +139,23 @@ onDrawGizmos(): void {
 Drawing callbacks remain available without a registration decorator.
 `Gizmos3D` uses the Scene geometry renderer to draw 3D primitives.
 
+## 3D Gizmos rendering
+
+`Gizmos3D` submits primitives to the Scene geometry renderer. Color state is
+snapshotted when `beginColor()` is called and shared by subsequent primitives
+until the color changes. Local-space coordinates passed between
+`beginLocalPosition()` and `endLocalPosition()` follow the Node world
+transform, including rotation and scale.
+
+`drawMesh()` supports readable Mesh assets and vertex/index arrays. For
+filled indexed meshes, shared vertices are transformed once per draw. Labels
+and sprites are updated when drawn and automatically hidden when omitted from
+the following Scene update, without resetting unchanged content every frame.
+
+The Scene callback scheduler refreshes the selection snapshot regularly while
+keeping component discovery separate from every-frame drawing. Draw callbacks
+remain active every Scene frame so animated Gizmos still update.
+
 ## Build locally
 
 ```bash
