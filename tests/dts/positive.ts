@@ -41,6 +41,18 @@ void [plane, axis, space, phase, callback, handleChanged];
 comp.onGizmoHandles?.();
 comp.onGizmoChanged?.('target', 'update', 0);
 
+const sceneSettings: GizmoViewSettings = { display: 'selected', hud: 'off' };
+const displayMode: GizmoDisplayMode = 'always';
+const hudLabels: GizmoHudItem[] = [
+    { id: 'speed', text: 'Speed: 10', order: 0, fontSize: 14, color: '#00ff00' },
+];
+const getSettings: NonNullable<Component['onGizmoSettings']> = () => sceneSettings;
+const getHud: NonNullable<Component['onGizmoHud']> = () => hudLabels;
+comp.onGizmoSettings?.();
+comp.onGizmoHud?.();
+void [displayMode, getSettings, getHud];
+
+
 Gizmos2D.beginColor(node, color);
 const circleResult: void = Gizmos2D.drawCircle(node, { x: 0, y: 0 }, 100);
 Gizmos2D.drawLabel(node, 'id', 'text', { x: 0, y: 0 });
