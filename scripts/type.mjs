@@ -210,6 +210,7 @@ function collectGlobalHandleDeclarations(emittedText, sourceFile) {
     const expected = [
         'GizmoHandlePlane', 'GizmoHandleSpace', 'GizmoHandleAxis',
         'GizmoHandlePhase', 'GizmoHandleDescriptor', 'GizmoHandleList',
+        'GizmoDisplayMode', 'GizmoViewSettings', 'GizmoHudItem',
     ];
     const found = new Set(declarations.map((entry) => entry.name));
     for (const name of expected) {
@@ -290,6 +291,9 @@ function checkOutput(output) {
         'onDrawGizmos?(): void;',
         'onDrawGizmosSelected?(): void;',
         'onGizmoHandles?(): GizmoHandleList;',
+        'onGizmoSettings?(): GizmoViewSettings;',
+        'onGizmoHud?(): GizmoHudItem[];',
+
         'interface GizmoHandleDescriptor {',
         'type GizmoHandlePlane =',
         'type GizmoHandleList =',
