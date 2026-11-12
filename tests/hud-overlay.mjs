@@ -87,6 +87,23 @@ assert.equal(camera.rays, 9, '24 labels must share three rays, not 48');
 assert.equal(labels.length, 26);
 assert.equal(Color.created, 1);
 
+// Same Node + duplicate user-facing label ID must not share a cached Label.
+const ownerTwo = { node: component.node };
+const sharedLabel = [{ id: 'text:title', text: 'Owner A', fontSize: 14, color: '#ff0000' }];
+const rowCountBefore = labels.length;
+overlay.render(component, sharedLabel, { namespace: 'owner-a', startRow: 0 });
+overlay.render(ownerTwo, [{ ...sharedLabel[0], text: 'Owner B' }],
+    { namespace: 'owner-b', startRow: 3 });
+assert.equal(labels.length, rowCountBefore + 2);
+const ownerLabelA = labels.at(-2);
+const ownerLabelB = labels.at(-1);
+assert.notEqual(ownerLabelA.id, ownerLabelB.id,
+    'Labels with duplicate IDs on one Node must have different namespaces');
+assert.ok(ownerLabelA.id.includes('owner-a'));
+assert.ok(ownerLabelB.id.includes('owner-b'));
+assert.equal(ownerLabelA.position.y - ownerLabelB.position.y, 66,
+    'HUD rows share one screen-space layout and leave a blank row between owners');
+
 component.node.isValid = false;
 assert.equal(overlay.render(component, entries), 0);
 overlay.dispose();
