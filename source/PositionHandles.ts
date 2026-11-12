@@ -157,6 +157,21 @@ function createEditorGizmo(
         private shown = false;
         private layout = '';
         private readonly registeredControllers = new WeakSet<object>();
+        private readonly unavailableMarkers = new WeakSet<object>();
+
+        private hideUnavailableMarker(controller: any): void {
+            if (!controller || this.unavailableMarkers.has(controller)) return;
+            this.unregisterController(controller);
+            controller.hide?.();
+            this.unavailableMarkers.add(controller);
+        }
+
+        private restoreMarker(controller: any): void {
+            if (!this.shown || !controller || !this.unavailableMarkers.has(controller)) return;
+            this.unavailableMarkers.delete(controller);
+            controller.show?.();
+            this.registerController(controller);
+        }
 
         private registerController(controller: any): void {
             if (!this.shown || !controller || this.registeredControllers.has(controller)) return;
@@ -332,11 +347,15 @@ function createEditorGizmo(
             for (const entry of this.entries) {
                 const local = readField(component, entry.field);
                 if (!local) {
-                    entry.controller.hide?.();
+                    this.hideUnavailableMarker(entry.controller);
                     continue;
                 }
                 const world = spaceFor(component, entry.field).toWorld(local);
-                if (!validPoint(world)) continue;
+                if (!validPoint(world)) {
+                    this.hideUnavailableMarker(entry.controller);
+                    continue;
+                }
+                this.restoreMarker(entry.controller);
                 entry.controller.setPosition?.(new Vec3(world.x, world.y, world.z));
                 entry.controller.setRotation?.(new Quat());
                 const size = markerSize(world);
@@ -345,10 +364,13 @@ function createEditorGizmo(
             if (!this.hudEntries.length) return;
             const view = camera();
             if (typeof view?.worldToScreen !== 'function' ||
-                typeof view?.screenPointToRay !== 'function') return;
+                typeof view?.screenPointToRay !== 'function') {
+                for (const entry of this.hudEntries) this.hideUnavailableMarker(entry.controller);
+                return;
+            }
             const projection = createSceneHudProjection(view, component.node.worldPosition);
             if (!projection) {
-                for (const entry of this.hudEntries) entry.controller.hide?.();
+                for (const entry of this.hudEntries) this.hideUnavailableMarker(entry.controller);
                 return;
             }
             const texts = normalizeHudItems(component.onGizmoHud?.());
@@ -357,6 +379,7 @@ function createEditorGizmo(
             // ~140px hit box overlapping adjacent buttons and sliders.
             const size = Math.min(1000, projection.pixelSize * 14);
             for (const entry of this.hudEntries) {
+                this.restoreMarker(entry.controller);
                 const row = hudRowScreenPosition(projection.screen, texts.length + entry.index);
                 const world = projection.worldAt(row.x - 14, row.y);
                 entry.controller.setPosition?.(world);
@@ -647,8 +670,10 @@ function createEditorGizmo(
             this.shown = true;
             this.refreshHandles();
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
-                controller.show?.();
-                this.registerController(controller);
+                if (!this.unavailableMarkers.has(controller)) {
+                    controller.show?.();
+                    this.registerController(controller);
+                }
             }
         }
 
