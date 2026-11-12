@@ -43,6 +43,21 @@ export class DrawCommandBuffer2D {
         return this.stream.length;
     }
 
+    public equals(previous: readonly number[]): boolean {
+        if (previous.length !== this.stream.length) return false;
+        for (let i = 0; i < this.stream.length; i++) {
+            if (this.stream[i] !== previous[i]) return false;
+        }
+        return true;
+    }
+
+    public copyTo(target: number[]): void {
+        target.length = this.stream.length;
+        for (let i = 0; i < this.stream.length; i++) {
+            target[i] = this.stream[i];
+        }
+    }
+
     public moveTo(x: number, y: number): void {
         this.stream.push(PathOperation2D.MoveTo, x, y);
         this.hasPath = true;
