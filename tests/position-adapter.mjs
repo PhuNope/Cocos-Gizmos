@@ -46,16 +46,22 @@ class Base {
     constructor() { this.controllers = []; }
     createController() {
         const c = {
-            _cubeNode: { name: 'marker', active: false },
+            _cubeNode: { name: 'marker', active: false,
+                setScale(scale) { this.scale = scale; } },
             _cubeNodeMR: { enabled: false },
             _editHandlesShape: { children: [{ name: 'x', active: true }, { name: 'y', active: true }] },
             _wireFrameBoxNode: { active: true },
             _wireFrameBoxMeshRenderer: { enabled: true },
             setColor() {}, setEditHandlesColor() {}, setHandleColor() {}, setOpacity() {},
-            initEditHandles() {}, showEditHandles() {}, initHandle() {},
-            registerEvents() {}, unregisterEvents() {}, hideEditHandles() {},
+            initEditHandles() { throw new Error('topNode: unsafe initEditHandles'); },
+            showEditHandles() { throw new Error('topNode: unsafe showEditHandles'); },
+            initHandle() {},
+            registerEvents() {}, unregisterEvents() {},
+            hideEditHandles() { throw new Error('topNode: unsafe hideEditHandles'); },
             hide() {}, show() {}, setPosition(v) { this.position = v; },
-            setRotation() {}, updateSize() {}, removeHandle() {},
+            setRotation() {},
+            updateSize() { throw new Error('topNode: unsafe BoxController.updateSize'); },
+            removeHandle() {},
         };
         this._controller = c;
         this.controllers.push(c);
@@ -132,23 +138,30 @@ assert.ok(componentPool.typeDefs['cc.ProbePosition']);
 const gizmo = component.gizmo;
 assert.ok(gizmo);
 assert.equal(gizmo.controllers.length, 1);
-assert.equal(gizmo.controllers[0]._editHandlesShape.children[1].active, true);
-assert.equal(gizmo.controllers[0]._editHandlesShape.children[0].active, false);
+assert.equal(gizmo.controllers[0]._editHandlesShape.active, false,
+    'Editable BoxController face handles are never initialized or displayed');
 assert.equal(gizmo.controllers[0]._cubeNode.active, true, 'The rendered point remains visible');
 assert.equal(gizmo.controllers[0]._cubeNodeMR.enabled, true, 'Point mesh rendering is enabled');
 assert.equal(gizmo.controllers[0]._cubeNode.layer, 4, 'Point marker uses the Gizmos render layer');
-assert.equal(gizmo.controllers[0]._editHandlesShape.children[1].layer, 4,
-    'Picking proxy uses the Gizmos layer');
+assert.equal(gizmo.controllers[0]._cubeNode.layer, 4,
+    'Standalone cube is the only picking marker');
 assert.equal(gizmo.controllers[0]._wireFrameBoxMeshRenderer.enabled, false, 'Collider wireframe is hidden');
-assert.equal(gizmo.controllers[0].editable, true, 'Controller accepts editor interaction');
+assert.ok(gizmo.controllers[0]._cubeNode.scale.x > 0,
+    'Picking marker is resized directly, without BoxController.updateSize');
+assert.equal(typeof gizmo.onNotGizmoMouseDown, 'function');
+assert.equal(typeof gizmo.onNotGizmoMouseMove, 'function');
+assert.equal(typeof gizmo.onNotGizmoMouseUp, 'function');
+assert.equal(gizmo.shouldRegisterGizmoOperationEvent, true);
 const ctrl = gizmo.controllers[0];
-ctrl.onMouseDown({ handleName: 'y', x: 150, y: 0 });
+ctrl.onMouseDown({ handleName: 'position:target:single', x: 150, y: 0 });
 for (const [x, y] of [[0, 150], [-150, 0], [0, -150], [150, 0]]) {
-    ctrl.onMouseMove({ handleName: 'y', x, y });
+    ctrl.onMouseMove({ handleName: 'position:target:single', x, y });
     assert.deepEqual([component.target.x, component.target.y, component.target.z], [x, y, 0],
         'Dragging must cover 360 degrees around a 2D node');
 }
-ctrl.onMouseUp();
+// Creator's global mouse operation must be able to release without a hit.
+gizmo.onNotGizmoMouseMove();
+gizmo.onNotGizmoMouseUp();
 assert.ok(events.includes('begin:target'));
 assert.ok(events.includes('update:target'));
 assert.ok(events.includes('end:target'));
@@ -158,16 +171,16 @@ assert.equal(events.filter(value => value === 'native-begin:target').length, 1,
 assert.equal(events.filter(value => value === 'native-cancel:target').length, 1,
     'A complete circle returning to its origin is a no-op and cancels its undo entry');
 
-ctrl.onMouseDown({ handleName: 'y', x: 150, y: 0 });
-ctrl.onMouseMove({ handleName: 'y', x: 180, y: 0 });
+ctrl.onMouseDown({ handleName: 'position:target:single', x: 150, y: 0 });
+ctrl.onMouseMove({ handleName: 'position:target:single', x: 180, y: 0 });
 ctrl.onMouseUp();
 assert.equal(component.target.x, 180);
 assert.equal(events.filter(value => value === 'native-end:target').length, 1,
     'A meaningful position drag closes a single native transaction');
 component.target = new Vec3(150, 0, 0);
 
-ctrl.onMouseDown({ handleName: 'y', x: 150, y: 0 });
-ctrl.onMouseMove({ handleName: 'y', x: -300, y: 250 });
+ctrl.onMouseDown({ handleName: 'position:target:single', x: 150, y: 0 });
+ctrl.onMouseMove({ handleName: 'position:target:single', x: -300, y: 250 });
 gizmo.onKeyDown({ key: 'Escape' });
 assert.deepEqual([component.target.x, component.target.y, component.target.z], [150, 0, 0],
     'Escape must cancel and restore serialized coordinates');
@@ -177,14 +190,14 @@ assert.ok(events.includes('native-cancel:target'),
     'Escape cancels the native controller transaction when supported');
 
 const baselineWrites = events.filter(value => value === 'component-changed').length;
-ctrl.onMouseDown({ handleName: 'y', x: 150, y: 0 });
-ctrl.onMouseMove({ handleName: 'y', x: 150, y: 0 });
+ctrl.onMouseDown({ handleName: 'position:target:single', x: 150, y: 0 });
+ctrl.onMouseMove({ handleName: 'position:target:single', x: 150, y: 0 });
 ctrl.onMouseUp();
 assert.equal(events.filter(value => value === 'component-changed').length, baselineWrites,
     'No-op drag must not refresh Inspector or write component data');
 
-ctrl.onMouseDown({ handleName: 'y', x: 150, y: 0 });
-ctrl.onMouseMove({ handleName: 'y', x: -400, y: 180 });
+ctrl.onMouseDown({ handleName: 'position:target:single', x: 150, y: 0 });
+ctrl.onMouseMove({ handleName: 'position:target:single', x: -400, y: 180 });
 assert.notEqual(component.target.x, 150);
 adapter.refresh([component], new Set(), 1300);
 assert.deepEqual([component.target.x, component.target.y, component.target.z], [150, 0, 0],
@@ -223,6 +236,8 @@ hudAdapter.refresh([component], selected, 2000);
 const hudGizmo = component.gizmo;
 assert.equal(hudAdapter.status().active, 1);
 assert.equal(hudGizmo.controllers.length, 5, 'One position handle and four HUD controls');
+assert.ok(hudGizmo.controllers.every(c => c._cubeNode.scale?.x > 0),
+    'Both position and HUD markers must avoid unsafe BoxController sizing');
 const toggle = hudGizmo.controllers[1];
 const checkbox = hudGizmo.controllers[2];
 const slider = hudGizmo.controllers[3];
@@ -274,6 +289,19 @@ assert.equal(buttonClicks, 1);
 button.onMouseDown({ handleName: 'hud:reset', x: 10, y: 10 });
 hudGizmo.onKeyDown({ key: 'Escape' });
 assert.equal(buttonClicks, 1, 'Cancelled button click is not dispatched');
+button.onMouseDown({ handleName: 'hud:reset', x: 10, y: 10 });
+hudGizmo.onNotGizmoMouseUp();
+assert.equal(buttonClicks, 1, 'Releasing outside the handle must not click a button');
+slider.onMouseDown({ handleName: 'hud:radius', x: 30, y: 10 });
+slider.onMouseMove({ handleName: 'hud:radius', x: 42, y: 10 });
+hudGizmo.onNotGizmoMouseUp();
+assert.equal(component.radius, 80, 'Releasing a slider outside its handle commits the drag');
+assert.ok(hudEvents.includes('radius:end:80'));
+slider.onMouseDown({ handleName: 'hud:radius', x: 30, y: 10 });
+slider.onMouseMove({ handleName: 'hud:radius', x: 50, y: 10 });
+hudGizmo.onNotGizmoMouseDown();
+assert.equal(component.radius, 80, 'Clicking outside cancels unfinished slider drag');
+
 
 toggle.onMouseDown({ handleName: 'hud:visibility', x: 10, y: 10 });
 const registeredBeforeClear = hudAdapter.status().registered;
