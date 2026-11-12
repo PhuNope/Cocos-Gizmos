@@ -25,11 +25,17 @@ function validPoint(value: any): value is Point {
 
 function selectedKeys(component: Component): string[] {
     const value: any = component;
-    return [...new Set([
+    const names = [
         value.__classname__,
         value.constructor?.__classname__,
         value.constructor?.name,
-    ].filter((key) => typeof key === 'string' && !!key))] as string[];
+    ].filter((key) => typeof key === 'string' && !!key) as string[];
+    const keys = new Set<string>();
+    for (const name of names) {
+        keys.add(name);
+        if (!name.includes('.')) keys.add('cc.' + name);
+    }
+    return [...keys];
 }
 
 function pointer(event: any): Pointer | null {
@@ -164,9 +170,14 @@ function createEditorGizmo(base: any): any {
                     else color.set(255, 174, 66, 255);
                     controller.setColor?.(color);
                     controller.setEditHandlesColor?.(color);
+                    controller.setOpacity?.(255);
+                    controller.editable = true;
+                    controller._edit = true;
+                    controller._editable = true;
+                    controller._defaultEditHandleSize = 0.08;
                     controller.initEditHandles?.();
                     controller.showEditHandles?.();
-                    controller._wireFrameBoxNode && (controller._wireFrameBoxNode.active = false);
+                    if (controller._wireFrameBoxNode) controller._wireFrameBoxNode.active = false;
                     if (controller._wireFrameBoxMeshRenderer) controller._wireFrameBoxMeshRenderer.enabled = false;
                     if (controller._editHandlesShape) {
                         controller._editHandlesShape.active = true;
@@ -174,8 +185,12 @@ function createEditorGizmo(base: any): any {
                             child.active = child.name === 'y';
                         }
                     }
+                    // The editable Y face handles Scene picking; the cube renders the point.
                     controller.setHandleColor?.('y', color, 0);
                     if (controller._cubeNode) {
+                        controller._cubeNode.active = true;
+                        if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
+                        controller.removeHandle?.(key);
                         controller.initHandle?.(controller._cubeNode, key);
                     }
                     const down = (event: any) => this.begin(entry, event);
