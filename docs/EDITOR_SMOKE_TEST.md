@@ -103,11 +103,22 @@ from **Extensions → Gizmos Settings → Check Scene integration**.
    - `outsideUp` shows the Scene released the pointer outside a Gizmo.
    - `missingPointer` shows a down event that could not be converted
      to Scene coordinates, which prevents starting a drag.
+   - `ignoredUp` counts mouse-up callbacks from a controller other than the
+     one that started the drag or click. Those callbacks must not end the gesture.
+   - `committedClick` / `cancelledClick` count confirmed and cancelled HUD
+     Button/Toggle/Checkbox clicks.
    - `recent` contains only event names (at most 16 entries); no
      pointer positions or project data are recorded.
 4. If neither down counter increases, the Editor has not delivered the
    click to the custom Gizmo. If the counters increase but values do not
    change, report the event counts and the full Scene Console output.
+
+For HUD picking, controls have 22-pixel row spacing and a roughly
+14-pixel square marker. A control's marker must not cover neighboring rows.
+Click a Toggle, move the mouse to another HUD control, and release: the first
+control should not activate when released by a different controller. Sliders
+should continue tracking while moving beyond their marker and should close
+only on the owning controller or the Scene operation's drag release.
 
 Showing/hiding a component repeatedly should not multiply registered
 listeners. The adapter registers each controller once per visible lifecycle;
