@@ -44,4 +44,15 @@ exports.methods = {
     gizmosGetViewSettings() { return presentation ? presentation.getSettings() : { display: 'always', hud: 'selected' }; },
     gizmosSetViewSettings(value) { return presentation ? presentation.configure(value) : { display: 'always', hud: 'selected' }; },
     gizmosHudStatus() { return presentation ? presentation.getStats() : { hudLabels: 0, defaults: null }; },
+    gizmosSmokeReport() {
+        const { buildGizmoSmokeReport } = require('./editor-runtime/GizmoDiagnostics.js');
+        const editor = globalThis.Editor || globalThis.window?.Editor;
+        const cce = globalThis.cce || globalThis.window?.cce;
+        return buildGizmoSmokeReport(
+            editor,
+            cce,
+            updater ? updater.status() : null,
+            handles ? handles.status() : null,
+        );
+    },
 };
