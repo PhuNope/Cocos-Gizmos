@@ -70,6 +70,21 @@ export function normalizeHudControls(value: unknown, maxItems = 12): HudControl[
     return controls;
 }
 
+/**
+ * Only changes that affect the interactive controller layout invalidate it.
+ * Dynamic labels and values must not rebuild Scene picking handles.
+ */
+export function hudControlLayoutSignature(controls: readonly HudControl[]): string {
+    return JSON.stringify(controls.map((control) => {
+        if (control.type === 'slider') {
+            return [control.type, control.id, control.property,
+                control.min, control.max, control.step, control.color];
+        }
+        if (control.type === 'button') return [control.type, control.id, control.color];
+        return [control.type, control.id, control.property, control.color];
+    }));
+}
+
 export function hudRowScreenPosition(anchor: { x: number; y: number }, index: number): {
     x: number; y: number;
 } {
