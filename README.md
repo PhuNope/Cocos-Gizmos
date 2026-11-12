@@ -362,6 +362,16 @@ Changes to control text or current values update labels without rebuilding
 picking controllers. Structural changes (ID, type, bound property, range,
 color, or control order) refresh the affected controller layout.
 
+**Multiple components on one Node:** HUD labels are namespaced per Component
+and laid out in component-discovery order, with one blank 22-pixel row between
+component groups. Each control's picking marker uses the same planned row as
+its rendered label. Two components can both use `id: 'title'` or
+`id: 'radius'` without overwriting each other's labels, and hiding one
+component's HUD moves following groups up automatically. You do not need to
+invent globally unique IDs; IDs only need to be unique within each component's
+own text entries or control list. The layout is recalculated once per Scene
+update and shared with the interactive adapter.
+
 Toggle
 and checkbox clicks are applied when the pointer is released, and cancelled
 clicks leave the property unchanged. Slider edits notify
