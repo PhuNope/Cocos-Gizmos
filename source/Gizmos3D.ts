@@ -485,18 +485,27 @@ class GizmosDebugDraw extends Component {
                     this._renderer.addMesh(Vec3.ZERO, vertices, color, this._depthTest, true, transform);
                 }
             } else {
+                // Indexed meshes share vertices between triangles. Transform each
+                // referenced vertex once per draw to avoid repeated matrix work.
+                const transformed: (Vec3 | undefined)[] = indices ? new Array(vertices.length) : [];
+                const getPoint = (index: number): Vec3 | undefined => {
+                    const source = vertices[index];
+                    if (!source) return undefined;
+                    if (!indices) return Vec3.transformMat4(new Vec3(), source, transform);
+                    let point = transformed[index];
+                    if (!point) {
+                        point = Vec3.transformMat4(new Vec3(), source, transform);
+                        transformed[index] = point;
+                    }
+                    return point;
+                };
                 const count = indices ? indices.length : vertices.length;
                 for (let i = 0; i + 2 < count; i += 3) {
-                    const a = vertices[indices ? indices[i] : i];
-                    const b = vertices[indices ? indices[i + 1] : i + 1];
-                    const c = vertices[indices ? indices[i + 2] : i + 2];
+                    const a = getPoint(indices ? indices[i] : i);
+                    const b = getPoint(indices ? indices[i + 1] : i + 1);
+                    const c = getPoint(indices ? indices[i + 2] : i + 2);
                     if (!a || !b || !c) continue;
-                    this._renderer.addTriangle(
-                        Vec3.transformMat4(new Vec3(), a, transform),
-                        Vec3.transformMat4(new Vec3(), b, transform),
-                        Vec3.transformMat4(new Vec3(), c, transform),
-                        color, false, this._depthTest, true,
-                    );
+                    this._renderer.addTriangle(a, b, c, color, false, this._depthTest, true);
                 }
             }
         }
