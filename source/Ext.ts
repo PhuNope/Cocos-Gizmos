@@ -78,8 +78,26 @@ declare global {
         color?: string;
     }
 
+    /** A two-state switch bound to a serialized boolean property. */
+    interface GizmoHudToggle {
+        type: 'toggle';
+        id: string;
+        text: string;
+        property: string;
+        color?: string;
+    }
+
+    /** A tickable box bound to a serialized boolean property. */
+    interface GizmoHudCheckbox {
+        type: 'checkbox';
+        id: string;
+        text: string;
+        property: string;
+        color?: string;
+    }
+
     /** Controls shown beside the component HUD text in the Scene View. */
-    type GizmoHudControl = GizmoHudButton | GizmoHudSlider;
+    type GizmoHudControl = GizmoHudButton | GizmoHudSlider | GizmoHudToggle | GizmoHudCheckbox;
     type GizmoHudControlList = GizmoHudControl[];
 
     /** A set of editable position handles returned by onGizmoHandles(). */
@@ -117,14 +135,14 @@ declare module 'cc' {
          */
         onGizmoHud?(): GizmoHudItem[];
 
-        /** Defines clickable buttons and editable numeric sliders in the Scene HUD. */
+        /** Defines buttons, sliders, toggles and checkboxes in the Scene HUD. */
         onGizmoHudControls?(): GizmoHudControlList;
 
         /** Invoked once when the corresponding HUD button is clicked. */
         onGizmoHudAction?(id: string): void;
 
-        /** Invoked when a numeric HUD slider begins, changes, ends, or is cancelled. */
-        onGizmoHudChanged?(property: string, phase: GizmoHandlePhase, value: number): void;
+        /** Invoked when a HUD slider, toggle or checkbox changes its component property. */
+        onGizmoHudChanged?(property: string, phase: GizmoHandlePhase, value: number | boolean): void;
 
         /** Receives handle changes, including cancelled edits. */
         onGizmoChanged?(property: string, phase: GizmoHandlePhase, index?: number): void;
