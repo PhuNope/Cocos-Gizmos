@@ -249,7 +249,13 @@ function createEditorGizmo(
                     controller.initHandle(controller._cubeNode, key);
                     const down = (event: any) => { input.record('controllerDown'); this.begin(entry, event); };
                     const move = (event: any) => { input.record('controllerMove'); this.move(entry, event); };
-                    const up = () => { input.record('controllerUp'); this.finish(false); };
+                    const up = () => {
+                        input.record('controllerUp');
+                        // An unrelated controller may receive the same Scene mouse-up.
+                        if (this.drag?.entry === entry) this.finish(false);
+                        else if (this.drag || this.hudDrag || this.pendingClick)
+                            input.record('ignoredUp');
+                    };
                     controller.onControllerMouseDown = down;
                     controller.onControllerMouseMove = move;
                     controller.onControllerMouseUp = up;
@@ -286,7 +292,16 @@ function createEditorGizmo(
                     controller.initHandle(controller._cubeNode, key);
                     const down = (event: any) => { input.record('controllerDown'); this.beginHud(entry, event); };
                     const move = (event: any) => { input.record('controllerMove'); this.moveHud(entry, event); };
-                    const up = () => { input.record('controllerUp'); this.finishHud(false); };
+                    const up = (event: any) => {
+                        input.record('controllerUp');
+                        if (this.hudDrag?.entry === entry) this.finishHud(false);
+                        else if (this.pendingClick === entry) {
+                            const releasedOn = readSceneHandleName(event);
+                            this.finishHud(!!releasedOn && releasedOn !== entry.key);
+                        } else if (this.drag || this.hudDrag || this.pendingClick) {
+                            input.record('ignoredUp');
+                        }
+                    };
                     controller.onControllerMouseDown = down;
                     controller.onControllerMouseMove = move;
                     controller.onControllerMouseUp = up;
@@ -420,6 +435,9 @@ function createEditorGizmo(
             const click = this.pendingClick;
             this.pendingClick = null;
             const component = this.target as Component;
+            if (click) {
+                input.record(cancelled ? 'cancelledClick' : 'committedClick');
+            }
             if (click && !cancelled) {
                 const control = click.control;
                 if (control.type === 'button') {
@@ -582,10 +600,15 @@ function createEditorGizmo(
             if (this.hudDrag) this.moveHud(this.hudDrag.entry, event);
         }
 
-        public onGizmoMouseUp(): void {
+        public onGizmoMouseUp(event?: any): void {
             input.record('gizmoUp');
+            // The Scene Operation route may include a named picking target.
+            // A different target must not activate a pending HUD button.
+            const click = this.pendingClick;
+            const releasedOn = readSceneHandleName(event);
+            const clickCancelled = !!click && !!releasedOn && releasedOn !== click.key;
             this.finish(false);
-            this.finishHud(false);
+            this.finishHud(clickCancelled);
         }
 
         // GizmoOperation dispatches these callbacks to every registered Gizmo
