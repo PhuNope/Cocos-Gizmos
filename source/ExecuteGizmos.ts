@@ -7,16 +7,24 @@ type UpdateStats = {
     selectedDrawn: number; scene: string | null; selectionApi: boolean;
     lastSource: string | null; errors: number;
     engineFrames: number; fallbackFrames: number;
-    timerSkips: number; reentrantSkips: number;
+    timerSkips: number; reentrantSkips: number; hudDrawn: number;
 };
 interface PositionHandleAdapter {
     refresh(components: readonly Component[], selected: ReadonlySet<string>, now: number): void;
 }
+interface PresentationAdapter {
+    evaluate(component: Component, selected: boolean): { draw: boolean; hud: boolean };
+    renderHud(component: Component): number;
+}
 
 let positionHandles: PositionHandleAdapter | null = null;
+let presentation: PresentationAdapter | null = null;
 
 export function setPositionHandleAdapter(adapter: PositionHandleAdapter | null): void {
     positionHandles = adapter;
+}
+export function setPresentationAdapter(adapter: PresentationAdapter | null): void {
+    presentation = adapter;
 }
 
 let running: {
@@ -64,7 +72,8 @@ function collectComponents(node: Node, out: Component[]): void {
     for (const comp of node.components) {
         if (!comp || !comp.isValid || !comp.enabled) continue;
         if (typeof comp.onDrawGizmos === 'function' || typeof comp.onDrawGizmosSelected === 'function' ||
-            typeof comp.onGizmoHandles === 'function') out.push(comp);
+            typeof comp.onGizmoHandles === 'function' ||
+            typeof comp.onGizmoHud === 'function') out.push(comp);
     }
     for (const child of node.children) collectComponents(child, out);
 }
@@ -97,7 +106,7 @@ export function start(): UpdateStats {
     const stats: UpdateStats = {
         started: true, frames: 0, components: 0, drawn: 0, selectedDrawn: 0,
         scene: null, selectionApi: false, lastSource: null, errors: 0,
-        engineFrames: 0, fallbackFrames: 0, timerSkips: 0, reentrantSkips: 0,
+        engineFrames: 0, fallbackFrames: 0, timerSkips: 0, reentrantSkips: 0, hudDrawn: 0,
     };
     const reported = new Set<string>();
     const registry = new GizmoComponentRegistry();
@@ -146,13 +155,23 @@ export function start(): UpdateStats {
         }
         for (const comp of components) {
             if (!comp.isValid || !comp.enabled || !comp.node?.activeInHierarchy) continue;
-            if (typeof comp.onDrawGizmos === 'function') {
+            const isSelected = selection.ids.has(comp.node.uuid);
+            let visible = { draw: true, hud: isSelected };
+            if (presentation) {
+                try { visible = presentation.evaluate(comp, isSelected); }
+                catch (error) { warnOnce('onGizmoSettings (' + comp.constructor?.name + ')', error); }
+            }
+            if (visible.draw && typeof comp.onDrawGizmos === 'function') {
                 try { comp.onDrawGizmos(); stats.drawn++; }
                 catch (error) { warnOnce('onDrawGizmos (' + comp.constructor?.name + ')', error); }
             }
-            if (selection.ids.has(comp.node?.uuid) && typeof comp.onDrawGizmosSelected === 'function') {
+            if (visible.draw && isSelected && typeof comp.onDrawGizmosSelected === 'function') {
                 try { comp.onDrawGizmosSelected(); stats.selectedDrawn++; }
                 catch (error) { warnOnce('onDrawGizmosSelected (' + comp.constructor?.name + ')', error); }
+            }
+            if (visible.hud && presentation && typeof comp.onGizmoHud === 'function') {
+                try { stats.hudDrawn += presentation.renderHud(comp); }
+                catch (error) { warnOnce('onGizmoHud (' + comp.constructor?.name + ')', error); }
             }
         }
     }
