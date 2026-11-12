@@ -88,6 +88,32 @@ ensure that old Gizmo instances and operation listeners are no longer active.
 If the errors remain, copy the full Scene Console stack trace and the results
 from **Extensions → Gizmos Settings → Check Scene integration**.
 
+## Diagnose Scene mouse picking
+
+1. Select a Node with Gizmo handles and open
+   **Extensions → Gizmos Settings → Check Scene integration**.
+2. Click a visible position handle, drag it a short distance, then release.
+3. Run **Check Scene integration** again and compare the
+   `handles.input` counters:
+   - `controllerDown` / `controllerMove` indicate that the
+     standalone marker controller received the pointer events.
+   - `gizmoDown` / `gizmoMove` show calls delivered to the
+     component Gizmo by Scene Operation. Some Editor builds use only one
+     dispatch route, so it is not necessary for both to increase.
+   - `outsideUp` shows the Scene released the pointer outside a Gizmo.
+   - `missingPointer` shows a down event that could not be converted
+     to Scene coordinates, which prevents starting a drag.
+   - `recent` contains only event names (at most 16 entries); no
+     pointer positions or project data are recorded.
+4. If neither down counter increases, the Editor has not delivered the
+   click to the custom Gizmo. If the counters increase but values do not
+   change, report the event counts and the full Scene Console output.
+
+Showing/hiding a component repeatedly should not multiply registered
+listeners. The adapter registers each controller once per visible lifecycle;
+the next show registers it again after the corresponding unregister.
+The test suite checks this behavior with an Editor controller stub.
+
 ## If a check fails
 
 Capture the **Gizmos Settings → Check Scene integration** result, relevant
