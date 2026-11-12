@@ -276,9 +276,15 @@ hudGizmo.onKeyDown({ key: 'Escape' });
 assert.equal(buttonClicks, 1, 'Cancelled button click is not dispatched');
 
 toggle.onMouseDown({ handleName: 'hud:visibility', x: 10, y: 10 });
-hudAdapter.refresh([component], new Set(), 2300);
-assert.equal(component.visible, true, 'Hiding a HUD cancels a pending toggle');
-assert.equal(hudAdapter.status().active, 0);
+const registeredBeforeClear = hudAdapter.status().registered;
+hudAdapter.clear();
+assert.equal(component.visible, true, 'Scene cleanup cancels a pending toggle');
+assert.equal(hudAdapter.status().active, 0, 'Scene cleanup hides all active controllers immediately');
+assert.equal(hudAdapter.status().registered, registeredBeforeClear,
+    'Scene cleanup must keep class registration for the next Scene');
+hudAdapter.refresh([component], selected, 2301);
+assert.equal(hudAdapter.status().active, 1, 'Opening another Scene can reuse registered controllers');
+hudAdapter.clear();
 hudAdapter.dispose();
 assert.equal(componentPool.typeDefs.ProbePosition, undefined);
 console.log('[hud-adapter] toggle/checkbox clicks, slider drag and cancel, button dispatch and cleanup OK');
