@@ -204,8 +204,13 @@ an imported readable `cc.Mesh` asset or a raw `{vertices: Vec3[], indices?: numb
 Wireframe is the default; `wireFrame=false` draws filled triangles. See
 `assets/GizmosDrawMeshTest.ts` for a 3D Scene example.
 
-The Scene dispatcher is started/stopped with the editor extension, scans the
-current Scene, and uses a 120ms idle fallback if Director updates stop.
+The Scene dispatcher starts and stops with the editor extension. It draws
+callbacks on each engine frame so animated 2D/3D Gizmos remain responsive,
+while component discovery and selection lookups use separate caches.
+A 250 ms idle watchdog updates the Scene when Director frames pause.
+The watchdog does not redraw when an engine frame arrived recently, and
+recursive update requests are coalesced.
+
 Diagnostics from Editor DevTools:
 
 ```js
@@ -213,6 +218,11 @@ Editor.Message.request('scene', 'execute-scene-script', {
     name: 'cocos-gizmos', method: 'gizmosStatus', args: []
 }).then(console.log);
 ```
+
+The status includes `engineFrames`, `fallbackFrames`, `timerSkips`, and
+`reentrantSkips`. Increasing `timerSkips` while moving the Scene View means
+the watchdog is correctly deferring to engine updates. `fallbackFrames`
+increases when the Scene needs updates while Director is paused.
 
 The build stripper still removes only the two Gizmos callbacks, not arbitrary
 helper methods. The extension runtime remains Editor-only.
