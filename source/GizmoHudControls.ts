@@ -83,6 +83,7 @@ export function formatHudControl(control: HudControl, value: unknown): string {
     if (control.type === 'button') return '[' + control.text + ']';
     if (control.type === 'toggle') return control.text + ': ' + (value === true ? '[ON]' : '[OFF]');
     if (control.type === 'checkbox') return '[' + (value === true ? 'x' : ' ') + '] ' + control.text;
+    if (control.type !== 'slider') return control.text;
     const current = typeof value === 'number' && Number.isFinite(value) ?
         Math.max(control.min, Math.min(control.max, value)) : control.min;
     const progress = Math.min(1, Math.max(0, (current - control.min) / (control.max - control.min)));
