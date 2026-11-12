@@ -8,7 +8,7 @@ const BUNDLE = path.join(ROOT, '.generated', 'Gizmos.ts');
 const TYPES_ENTRY = path.join(ROOT, 'Types', 'cocos-types.d.ts');
 const TSCONFIG_ASSETS = path.join(ROOT, 'tsconfig.assets.json');
 const OUT_FILE = path.join(ROOT, 'dist', 'Gizmos.d.ts');
-const EDITOR_ASSET_FILE = path.join(ROOT, 'assets', 'GizmosGlobal.ts');
+const EDITOR_ASSET_FILE = path.join(ROOT, 'editor-assets', 'GizmosGlobal.ts');
 const TEST_FILES = [
     path.join(ROOT, 'tests', 'dts', 'positive.ts'),
     path.join(ROOT, 'tests', 'dts', 'negative.ts'),
