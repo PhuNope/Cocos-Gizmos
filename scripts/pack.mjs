@@ -10,7 +10,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const distDir = path.join(ROOT, 'dist');
 const globalTypesAsset = path.join(ROOT, 'editor-assets', 'GizmosGlobal.ts');
-const expectedDist = ['Define.js', 'ExecuteGizmos.js', 'Gizmos.d.ts', 'Gizmos.js', 'Gizmos2D.js', 'Gizmos3D.js'].sort();
+const expectedDist = ['Define.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'Gizmos2D.js', 'Gizmos3D.js'].sort();
 const actualDist = readdirSync(distDir).sort();
 if (JSON.stringify(actualDist) !== JSON.stringify(expectedDist)) {
   throw new Error(`dist/ must contain only ${expectedDist.join(', ')}; found ${actualDist.join(', ')}`);
@@ -107,7 +107,7 @@ const entries = [
   ['editor-assets/GizmosGlobal.ts', readFileSync(globalTypesAsset)],
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
   ['scene.js', readFileSync(path.join(ROOT, 'scene.js'))],
-  ...['Define.js', 'ExecuteGizmos.js', 'Gizmos2D.js', 'Gizmos3D.js']
+  ...['Define.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos2D.js', 'Gizmos3D.js']
     .map(name => ['editor-runtime/' + name, readFileSync(path.join(ROOT, 'editor-runtime', name))]),
   ['builder.js', readFileSync(path.join(ROOT, 'builder.js'))],
   ['build/hooks.js', readFileSync(path.join(ROOT, 'build', 'hooks.js'))],
@@ -122,7 +122,7 @@ const entries = [
   ['dist/package.json', JSON.stringify({ type: 'module', private: true }, null, 2) + '\n'],
   ['dist/Gizmos.js', readFileSync(path.join(distDir, 'Gizmos.js'))],
   ['dist/Gizmos.d.ts', readFileSync(path.join(distDir, 'Gizmos.d.ts'))],
-  ...['Define.js', 'ExecuteGizmos.js', 'Gizmos2D.js', 'Gizmos3D.js']
+  ...['Define.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos2D.js', 'Gizmos3D.js']
     .map(name => ['dist/' + name, readFileSync(path.join(distDir, name))]),
 ];
 // Regression test: load the extracted directory structure in Node's own
