@@ -13,6 +13,12 @@ export type HudControl = {
     max: number;
     step?: number;
     color: string;
+} | {
+    type: 'toggle' | 'checkbox';
+    id: string;
+    text: string;
+    property: string;
+    color: string;
 };
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/;
@@ -31,7 +37,8 @@ export function normalizeHudControls(value: unknown, maxItems = 12): HudControl[
         const item = raw as Record<string, unknown>;
         if (typeof item.id !== 'string' || !item.id || item.id.length > 128 ||
             ids.has(item.id) || typeof item.text !== 'string' ||
-            (item.type !== 'button' && item.type !== 'slider')) continue;
+            (item.type !== 'button' && item.type !== 'slider' &&
+             item.type !== 'toggle' && item.type !== 'checkbox')) continue;
         const base = {
             id: item.id,
             text: item.text.slice(0, 128),
@@ -40,6 +47,9 @@ export function normalizeHudControls(value: unknown, maxItems = 12): HudControl[
         };
         if (item.type === 'button') {
             controls.push({ type: 'button', ...base });
+        } else if (item.type === 'toggle' || item.type === 'checkbox') {
+            if (typeof item.property !== 'string' || !FIELD_NAME.test(item.property)) continue;
+            controls.push({ type: item.type, ...base, property: item.property });
         } else {
             if (typeof item.property !== 'string' || !FIELD_NAME.test(item.property) ||
                 !Number.isFinite(item.min) || !Number.isFinite(item.max) ||
@@ -71,6 +81,8 @@ export function hudRowScreenPosition(anchor: { x: number; y: number }, index: nu
 
 export function formatHudControl(control: HudControl, value: unknown): string {
     if (control.type === 'button') return '[' + control.text + ']';
+    if (control.type === 'toggle') return control.text + ': ' + (value === true ? '[ON]' : '[OFF]');
+    if (control.type === 'checkbox') return '[' + (value === true ? 'x' : ' ') + '] ' + control.text;
     const current = typeof value === 'number' && Number.isFinite(value) ?
         Math.max(control.min, Math.min(control.max, value)) : control.min;
     const progress = Math.min(1, Math.max(0, (current - control.min) / (control.max - control.min)));
