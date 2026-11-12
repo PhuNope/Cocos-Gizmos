@@ -28,6 +28,25 @@ function selectedNodes(): { ids: Set<string>; available: boolean } {
     }
 }
 const DISCOVERY_INTERVAL_MS = 250;
+const SELECTION_POLL_INTERVAL_MS = 32;
+
+class SelectedNodeCache {
+    private previous = { ids: new Set<string>(), available: false };
+    private lastCheckedAt = -Infinity;
+
+    public get(now: number): { ids: Set<string>; available: boolean } {
+        if (now - this.lastCheckedAt >= SELECTION_POLL_INTERVAL_MS) {
+            this.previous = selectedNodes();
+            this.lastCheckedAt = now;
+        }
+        return this.previous;
+    }
+
+    public clear(): void {
+        this.previous = { ids: new Set<string>(), available: false };
+        this.lastCheckedAt = -Infinity;
+    }
+}
 
 function collectComponents(node: Node, out: Component[]): void {
     if (!node || !node.isValid || !node.active || !node.activeInHierarchy) return;
@@ -69,6 +88,8 @@ export function start(): UpdateStats {
     };
     const reported = new Set<string>();
     const registry = new GizmoComponentRegistry();
+    const selectionCache = new SelectedNodeCache();
+    let activeScene: Node | null = null;
     let lastEngineTick = 0;
     let firstComponentLog = false;
     function warnOnce(key: string, error: unknown): void {
@@ -86,6 +107,10 @@ export function start(): UpdateStats {
         try { root = director.getScene(); }
         catch (error) { warnOnce('director.getScene()', error); return; }
         stats.scene = root && (root.name || root.uuid || '(unnamed scene)');
+        if (root !== activeScene) {
+            activeScene = root;
+            selectionCache.clear();
+        }
         if (!root) {
             registry.clear();
             stats.components = 0;
@@ -99,7 +124,7 @@ export function start(): UpdateStats {
             firstComponentLog = true;
             console.info('[cocos-gizmos/updater] Found ' + components.length + ' Component(s) with Gizmos callbacks');
         }
-        const selection = selectedNodes();
+        const selection = selectionCache.get(Date.now());
         stats.selectionApi = selection.available;
         for (const comp of components) {
             if (!comp.isValid || !comp.enabled || !comp.node?.activeInHierarchy) continue;
@@ -117,7 +142,10 @@ export function start(): UpdateStats {
     director.on(Director.EVENT_BEFORE_UPDATE, onBeforeUpdate);
     const timer = setInterval(() => update('timer'), 120);
     (timer as any)?.unref?.();
-    running = { stats, onBeforeUpdate, timer, update, dispose: () => registry.clear() };
+    running = { stats, onBeforeUpdate, timer, update, dispose: () => {
+        registry.clear();
+        selectionCache.clear();
+    } };
     console.info('[cocos-gizmos/updater] Started; engine tick + 120ms idle fallback; no sessionStorage gate');
     update('initial');
     return status() as UpdateStats;
