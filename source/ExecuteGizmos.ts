@@ -1,16 +1,17 @@
 import { Component, director, Director, Node } from 'cc';
+import { SceneUpdateScheduler } from './SceneUpdateScheduler';
 
 // Scene process owns start/stop. A stale sessionStorage flag must not block the updater.
 type UpdateStats = {
     started: boolean; frames: number; components: number; drawn: number;
     selectedDrawn: number; scene: string | null; selectionApi: boolean;
     lastSource: string | null; errors: number;
+    engineFrames: number; fallbackFrames: number;
+    timerSkips: number; reentrantSkips: number;
 };
 let running: {
     stats: UpdateStats;
-    onBeforeUpdate: () => void;
-    timer: ReturnType<typeof setInterval>;
-    update: (source: string) => void;
+    scheduler: SceneUpdateScheduler;
     dispose: () => void;
 } | null = null;
 
@@ -85,12 +86,12 @@ export function start(): UpdateStats {
     const stats: UpdateStats = {
         started: true, frames: 0, components: 0, drawn: 0, selectedDrawn: 0,
         scene: null, selectionApi: false, lastSource: null, errors: 0,
+        engineFrames: 0, fallbackFrames: 0, timerSkips: 0, reentrantSkips: 0,
     };
     const reported = new Set<string>();
     const registry = new GizmoComponentRegistry();
     const selectionCache = new SelectedNodeCache();
     let activeScene: Node | null = null;
-    let lastEngineTick = 0;
     let firstComponentLog = false;
     function warnOnce(key: string, error: unknown): void {
         stats.errors++;
@@ -99,10 +100,11 @@ export function start(): UpdateStats {
         console.error('[cocos-gizmos/updater] ' + key, error);
     }
     function update(source: string): void {
-        if (source === 'timer' && Date.now() - lastEngineTick < 90) return;
-        if (source === 'engine') lastEngineTick = Date.now();
         stats.frames++;
         stats.lastSource = source;
+        if (source === 'engine') stats.engineFrames++;
+        if (source === 'timer') stats.fallbackFrames++;
+        const now = Date.now();
         let root: Node | null = null;
         try { root = director.getScene(); }
         catch (error) { warnOnce('director.getScene()', error); return; }
@@ -117,14 +119,14 @@ export function start(): UpdateStats {
             return;
         }
         let components: readonly Component[];
-        try { components = registry.get(root, Date.now()); }
+        try { components = registry.get(root, now); }
         catch (error) { warnOnce('Scene traversal failed', error); return; }
         stats.components = components.length;
         if (components.length && !firstComponentLog) {
             firstComponentLog = true;
             console.info('[cocos-gizmos/updater] Found ' + components.length + ' Component(s) with Gizmos callbacks');
         }
-        const selection = selectionCache.get(Date.now());
+        const selection = selectionCache.get(now);
         stats.selectionApi = selection.available;
         for (const comp of components) {
             if (!comp.isValid || !comp.enabled || !comp.node?.activeInHierarchy) continue;
@@ -138,22 +140,40 @@ export function start(): UpdateStats {
             }
         }
     }
-    const onBeforeUpdate = () => update('engine');
-    director.on(Director.EVENT_BEFORE_UPDATE, onBeforeUpdate);
-    const timer = setInterval(() => update('timer'), 120);
-    (timer as any)?.unref?.();
-    running = { stats, onBeforeUpdate, timer, update, dispose: () => {
+    const scheduler = new SceneUpdateScheduler({
+        now: () => Date.now(),
+        subscribe: (listener) => director.on(Director.EVENT_BEFORE_UPDATE, listener),
+        unsubscribe: (listener) => director.off(Director.EVENT_BEFORE_UPDATE, listener),
+        schedule: (listener, intervalMs) => setInterval(listener, intervalMs),
+        cancel: (handle) => clearInterval(handle),
+        update,
+        onSkip: (reason) => {
+            if (reason === 'recent-engine') stats.timerSkips++;
+            else stats.reentrantSkips++;
+        },
+    });
+    running = {
+        stats,
+        scheduler,
+        dispose: () => {
+            registry.clear();
+            selectionCache.clear();
+        },
+    };
+    try {
+        scheduler.start();
+    } catch (error) {
+        running = null;
         registry.clear();
         selectionCache.clear();
-    } };
-    console.info('[cocos-gizmos/updater] Started; engine tick + 120ms idle fallback; no sessionStorage gate');
-    update('initial');
+        throw error;
+    }
+    console.info('[cocos-gizmos/updater] Started with engine frames and 250ms idle watchdog');
     return status() as UpdateStats;
 }
 export function stop(): void {
     if (!running) return;
-    director.off(Director.EVENT_BEFORE_UPDATE, running.onBeforeUpdate);
-    clearInterval(running.timer);
+    running.scheduler.stop();
     running.dispose();
     running = null;
     console.info('[cocos-gizmos/updater] Stopped');
@@ -162,6 +182,6 @@ export function status(): UpdateStats | { started: false } {
     return running ? { ...running.stats } : { started: false };
 }
 export function tickOnce(): UpdateStats | { started: false } {
-    if (running) running.update('manual');
+    if (running) running.scheduler.tickOnce();
     return status();
 }
