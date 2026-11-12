@@ -70,6 +70,12 @@ const sandbox = {
 };
 vm.runInNewContext(compiled, sandbox, { filename: 'ExecuteGizmos.js' });
 const { start, stop } = sandbox.exports;
+const handleRefreshes = [];
+sandbox.exports.setPositionHandleAdapter({
+    refresh(components, selected, at) {
+        handleRefreshes.push({ count: components.length, selectedCount: selected.size, at });
+    },
+});
 try {
     start(); // Initial scan and render.
     assert.equal(scanCount, 1);
@@ -109,6 +115,11 @@ try {
     now += 16;
     beforeUpdate();
     assert.equal(sandbox.exports.status().components, 0);
+    const lastRefresh = handleRefreshes.at(-1);
+    assert.equal(lastRefresh.count, 0,
+        'Closing the Scene must release interactive Gizmos with an empty component registry');
+    assert.equal(lastRefresh.selectedCount, 0);
+    assert.equal(lastRefresh.at, now);
 
     const beforeTimer = sandbox.exports.status().frames;
     now += 16;
