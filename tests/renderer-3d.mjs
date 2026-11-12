@@ -29,8 +29,10 @@ class Color {
 Color.BLUE = new Color(0, 0, 255);
 Color.WHITE = new Color();
 class Vec3 {
+    static transforms = 0;
     constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
     static transformMat4(out, point, matrix) {
+        Vec3.transforms++;
         out.x = point.x * matrix.scale.x + matrix.position.x;
         out.y = point.y * matrix.scale.y + matrix.position.y;
         out.z = point.z * matrix.scale.z + matrix.position.z;
@@ -112,8 +114,11 @@ const cc = {
     Layers: { Enum: { GIZMOS: 4 } },
     director: { getScene: () => null },
     toRadian: number => number * Math.PI / 180,
-    Mat4: class Mat4 {},
-    Quat: class Quat {},
+    Mat4: class Mat4 {
+        static fromRTS(out, quat, position, scale) { out.position = position; out.scale = scale; }
+        static multiply(out, left, right) { Object.assign(out, right); }
+    },
+    Quat: class Quat { static fromEuler() {} },
     gfx: { Format: {}, AttributeName: {} },
 };
 const sceneCamera = {
@@ -179,4 +184,22 @@ debug.lateUpdate(0);
 assert.equal(label.stringWrites, labelAfterClear, 'Idle overlay must not repeatedly clear text');
 assert.equal(sprite.frameWrites, spriteAfterClear, 'Idle overlay must not repeatedly clear sprite');
 
-console.log('[renderer-3d] 200 primitives, one color snapshot, transformed local points, stable overlay state OK');
+const vertices = [
+    new Vec3(0, 0, 0), new Vec3(1, 0, 0),
+    new Vec3(1, 1, 0), new Vec3(0, 1, 0),
+];
+Vec3.transforms = 0;
+Gizmos3D.drawMesh(
+    node,
+    { vertices, indices: [0, 1, 2, 0, 2, 3] },
+    new Vec3(10, 20, 30),
+    Vec3.ZERO,
+    Vec3.ONE,
+    false,
+);
+assert.equal(calls.triangles.length, 2);
+assert.equal(Vec3.transforms, 4, 'Each unique indexed vertex must be transformed once');
+assert.deepEqual({ ...calls.triangles[0][0] }, { x: 10, y: 20, z: 30 });
+assert.deepEqual({ ...calls.triangles[1][2] }, { x: 10, y: 21, z: 30 });
+
+console.log('[renderer-3d] primitive state, local transforms, stable overlays and indexed mesh reuse OK');
