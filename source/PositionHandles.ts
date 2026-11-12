@@ -145,6 +145,14 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         private shown = false;
         private layout = '';
 
+        private closeControl(property: string, index: number | undefined, cancelled: boolean): void {
+            if (cancelled && typeof this.onControlCancel === 'function') {
+                this.onControlCancel(property, index);
+            } else {
+                this.onControlEnd?.(property, index);
+            }
+        }
+
         public init(): void {
             this.shouldRegisterGizmoOperationEvent = true;
             this.rebuild();
@@ -347,7 +355,11 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                     {
                         begin: (value) => {
                             this.onControlBegin?.(property);
-                            component.onGizmoHudChanged?.(property, 'begin', value);
+                            try { component.onGizmoHudChanged?.(property, 'begin', value); }
+                            catch (error) {
+                                this.closeControl(property, undefined, true);
+                                throw error;
+                            }
                         },
                         update: (value) => {
                             component.onGizmoHudChanged?.(property, 'update', value);
@@ -359,11 +371,14 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                             this.onComponentChanged?.(component.node);
                             cceNamespace()?.Engine?.repaintInEditMode?.();
                         },
-                        end: (value, cancelled) => {
-                            component.onGizmoHudChanged?.(
-                                property, cancelled ? 'cancel' : 'end', value);
-                            this.onControlEnd?.(property);
-                            this.updateMarkers();
+                        end: (value, cancelled, changed) => {
+                            try {
+                                component.onGizmoHudChanged?.(
+                                    property, cancelled ? 'cancel' : 'end', value);
+                            } finally {
+                                this.closeControl(property, undefined, cancelled || !changed);
+                                this.updateMarkers();
+                            }
                         },
                     },
                 );
@@ -381,7 +396,11 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             if (!at) return;
             const next = drag.solver.move(at.x);
             if (next === null) return;
-            drag.session.apply(next);
+            try { drag.session.apply(next); }
+            catch (error) {
+                try { this.finishHud(true); }
+                finally { console.warn('[cocos-gizmos/hud] Slider edit cancelled:', error); }
+            }
         }
 
         private finishHud(cancelled: boolean): void {
@@ -408,7 +427,11 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                             {
                                 begin: (initial) => {
                                     this.onControlBegin?.(property);
-                                    component.onGizmoHudChanged?.(property, 'begin', initial);
+                                    try { component.onGizmoHudChanged?.(property, 'begin', initial); }
+                                    catch (error) {
+                                        this.closeControl(property, undefined, true);
+                                        throw error;
+                                    }
                                 },
                                 update: (next) => {
                                     component.onGizmoHudChanged?.(property, 'update', next);
@@ -417,10 +440,13 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                                     cceNamespace()?.Engine?.repaintInEditMode?.();
                                 },
                                 rollback: () => this.onComponentChanged?.(component.node),
-                                end: (next, cancelled) => {
-                                    component.onGizmoHudChanged?.(
-                                        property, cancelled ? 'cancel' : 'end', next);
-                                    this.onControlEnd?.(property);
+                                end: (next, cancelled, changed) => {
+                                    try {
+                                        component.onGizmoHudChanged?.(
+                                            property, cancelled ? 'cancel' : 'end', next);
+                                    } finally {
+                                        this.closeControl(property, undefined, cancelled || !changed);
+                                    }
                                 },
                             },
                         );
@@ -470,7 +496,11 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                     {
                         begin: () => {
                             this.onControlBegin?.(property, index);
-                            target.onGizmoChanged?.(property, 'begin', index);
+                            try { target.onGizmoChanged?.(property, 'begin', index); }
+                            catch (error) {
+                                this.closeControl(property, index, true);
+                                throw error;
+                            }
                         },
                         update: () => {
                             target.onGizmoChanged?.(property, 'update', index);
@@ -483,11 +513,14 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                             this.onComponentChanged?.(target.node);
                             cceNamespace()?.Engine?.repaintInEditMode?.();
                         },
-                        end: (_value, cancelled) => {
-                            target.onGizmoChanged?.(
-                                property, cancelled ? 'cancel' : 'end', index);
-                            this.onControlEnd?.(property, index);
-                            this.updateMarkers();
+                        end: (_value, cancelled, changed) => {
+                            try {
+                                target.onGizmoChanged?.(
+                                    property, cancelled ? 'cancel' : 'end', index);
+                            } finally {
+                                this.closeControl(property, index, cancelled || !changed);
+                                this.updateMarkers();
+                            }
                         },
                     },
                 );
@@ -506,7 +539,11 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             if (!ray) return;
             const next = drag.solver.move(ray);
             if (!next) return;
-            drag.session.apply(next);
+            try { drag.session.apply(next); }
+            catch (error) {
+                try { this.finish(true); }
+                finally { console.warn('[cocos-gizmos/handles] Position edit cancelled:', error); }
+            }
         }
 
         private finish(cancelled: boolean): void {
