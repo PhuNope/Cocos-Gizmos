@@ -67,6 +67,27 @@ callbacks may still work, but interactive handles cannot be assumed to work.
 - **Camera:** Pan, zoom and switch between orthographic 2D and perspective 3D.
   HUD text and picking markers should remain aligned.
 
+## Cocos Creator 3.8.8 controller compatibility
+
+The standalone Gizmo marker is expected to respond to pointer up even when
+the mouse is released outside the marker. Check Position Handles, HUD sliders,
+and Button/Toggle/Checkbox clicks, including releases outside their hit area.
+An outside release of a HUD button does not activate the button.
+
+Selecting a Node must not log either of these errors:
+
+- `onNotGizmoMouseUp is not a function`
+- `Cannot read properties of undefined (reading 'topNode')`
+
+The extension uses standalone cube picking markers. It does **not** initialize
+BoxController editable face handles or call `BoxController.updateSize()`,
+which relies on private editable handle state in Creator 3.8.8.
+
+After replacing a development build, close and reopen the Editor project to
+ensure that old Gizmo instances and operation listeners are no longer active.
+If the errors remain, copy the full Scene Console stack trace and the results
+from **Extensions → Gizmos Settings → Check Scene integration**.
+
 ## If a check fails
 
 Capture the **Gizmos Settings → Check Scene integration** result, relevant
