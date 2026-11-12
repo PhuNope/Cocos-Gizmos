@@ -33,6 +33,31 @@ declare global {
         color?: string;
     }
 
+    /** Controls when a component draws in the Scene View. */
+    type GizmoDisplayMode = 'always' | 'selected' | 'off';
+
+    /** Per-component Gizmo rendering and HUD visibility. */
+    interface GizmoViewSettings {
+        /** Draw on every Scene frame, only while selected, or never. */
+        display?: GizmoDisplayMode;
+        /** Draw HUD for selected nodes, all nodes, or never. */
+        hud?: 'selected' | 'always' | 'off';
+    }
+
+    /** Screen-space text attached to a component in the Scene View. */
+    interface GizmoHudItem {
+        /** Stable identifier for reusing the label across Scene frames. */
+        id: string;
+        /** Text to display beside the component in the Scene View. */
+        text: string;
+        /** Order within the component HUD. */
+        order?: number;
+        /** Font size in screen pixels. */
+        fontSize?: number;
+        /** RGBA hexadecimal color for the text. */
+        color?: string;
+    }
+
     /** A set of editable position handles returned by onGizmoHandles(). */
     type GizmoHandleList = GizmoHandleDescriptor[];
 }
@@ -54,6 +79,19 @@ declare module 'cc' {
          * completion for plane, space, axis, snap, bounds, and color.
          */
         onGizmoHandles?(): GizmoHandleList;
+
+        /**
+         * Controls this component's Scene drawing and HUD visibility.
+         * Keep serialized Inspector properties on the component and return
+         * their current values from this callback.
+         */
+        onGizmoSettings?(): GizmoViewSettings;
+
+        /**
+         * Returns informational text labels anchored near this node in Scene View.
+         * Entries with stable IDs reuse the same Label components across frames.
+         */
+        onGizmoHud?(): GizmoHudItem[];
 
         /** Receives handle changes, including cancelled edits. */
         onGizmoChanged?(property: string, phase: GizmoHandlePhase, index?: number): void;
