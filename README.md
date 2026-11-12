@@ -4,6 +4,59 @@ See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
 
 A Cocos Creator **3.8.2+ extension** providing two public classes: `Gizmos2D` and `Gizmos3D`.
 
+## Optional Gizmos callbacks (no registration decorator)
+
+Components can implement `onDrawGizmos()` and `onDrawGizmosSelected()` directly.
+Neither callback needs `@registerGizmos` or an import of the extension runtime.
+
+```ts
+import { _decorator, Color, Component, Vec2 } from 'cc';
+
+const { ccclass, property } = _decorator;
+
+@ccclass('RangeGizmo')
+export class RangeGizmo extends Component {
+    @property
+    radius = 100;
+
+    onDrawGizmos(): void {
+        Gizmos2D.beginColor(this.node, Color.GREEN);
+        Gizmos2D.drawCircle(this.node, Vec2.ZERO, this.radius);
+    }
+
+    onDrawGizmosSelected(): void {
+        Gizmos2D.drawLine(this.node, Vec2.ZERO, new Vec2(this.radius, 0));
+    }
+}
+```
+
+When the extension is enabled, the Scene View finds these methods automatically.
+`onDrawGizmos()` draws for enabled components, and
+`onDrawGizmosSelected()` draws only while the node is selected.
+
+### Using only TypeScript definitions
+
+The `Gizmos.d.ts` declarations provide global API types but do not install
+JavaScript globals. A game project that has only the type definitions can still
+compile and load components written as shown above: the Gizmos functions are
+used only inside the optional Scene View callbacks, which are not invoked by
+the game lifecycle.
+
+Keep `Gizmos2D` and `Gizmos3D` calls inside those two callbacks. If game
+lifecycle methods need to use them, first check that the Editor runtime exists:
+
+```ts
+if (typeof Gizmos2D !== 'undefined') {
+    Gizmos2D.drawCircle(this.node, Vec2.ZERO, 100);
+}
+```
+
+When building a game without the extension, there is no Gizmos build hook.
+The unused callback methods may remain in the compiled JavaScript, but the
+game does not call them automatically. Calls made explicitly from gameplay
+code still require a runtime guard. The type-only package does not provide
+`@registerGizmos`; avoid using that decorator.
+
 ## Install the extension
 
 1. Download `Cocos-Gizmos-v2.0.3.zip` from GitHub Releases (or the CI artifact).
