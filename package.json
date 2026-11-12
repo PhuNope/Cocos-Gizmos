@@ -34,7 +34,7 @@
         "builder": "./builder.js",
         "asset-db": {
             "mount": {
-                "path": "./assets",
+                "path": "./editor-assets",
                 "readonly": true
             }
         }
