@@ -117,7 +117,7 @@ const entries = [
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
   ['scene.js', readFileSync(path.join(ROOT, 'scene.js'))],
   ['panels/settings/index.js', readFileSync(path.join(ROOT, 'panels/settings/index.js'))],
-  ...['Define.js', 'GizmoPresentation.js', 'GizmoHudOverlay.js', 'GizmoPresentationService.js', 'PositionDragSolver.js', 'PositionHandles.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos2D.js', 'Gizmos3D.js']
+  ...['Define.js', 'GizmoPresentation.js', 'GizmoHudControls.js', 'GizmoHudOverlay.js', 'GizmoPresentationService.js', 'PositionDragSolver.js', 'PositionHandles.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos2D.js', 'Gizmos3D.js']
     .map(name => ['editor-runtime/' + name, readFileSync(path.join(ROOT, 'editor-runtime', name))]),
   ['builder.js', readFileSync(path.join(ROOT, 'builder.js'))],
   ['build/hooks.js', readFileSync(path.join(ROOT, 'build', 'hooks.js'))],
