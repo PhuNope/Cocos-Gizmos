@@ -58,6 +58,30 @@ declare global {
         color?: string;
     }
 
+    /** A clickable Scene View HUD button. */
+    interface GizmoHudButton {
+        type: 'button';
+        id: string;
+        text: string;
+        color?: string;
+    }
+
+    /** A Scene View slider bound to a serialized numeric component property. */
+    interface GizmoHudSlider {
+        type: 'slider';
+        id: string;
+        text: string;
+        property: string;
+        min: number;
+        max: number;
+        step?: number;
+        color?: string;
+    }
+
+    /** Controls shown beside the component HUD text in the Scene View. */
+    type GizmoHudControl = GizmoHudButton | GizmoHudSlider;
+    type GizmoHudControlList = GizmoHudControl[];
+
     /** A set of editable position handles returned by onGizmoHandles(). */
     type GizmoHandleList = GizmoHandleDescriptor[];
 }
@@ -92,6 +116,15 @@ declare module 'cc' {
          * Entries with stable IDs reuse the same Label components across frames.
          */
         onGizmoHud?(): GizmoHudItem[];
+
+        /** Defines clickable buttons and editable numeric sliders in the Scene HUD. */
+        onGizmoHudControls?(): GizmoHudControlList;
+
+        /** Invoked once when the corresponding HUD button is clicked. */
+        onGizmoHudAction?(id: string): void;
+
+        /** Invoked when a numeric HUD slider begins, changes, ends, or is cancelled. */
+        onGizmoHudChanged?(property: string, phase: GizmoHandlePhase, value: number): void;
 
         /** Receives handle changes, including cancelled edits. */
         onGizmoChanged?(property: string, phase: GizmoHandlePhase, index?: number): void;
