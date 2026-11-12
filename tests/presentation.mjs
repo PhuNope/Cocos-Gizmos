@@ -23,6 +23,7 @@ function load(name, imports = {}) {
 }
 
 const presentation = load('GizmoPresentation');
+const controls = load('GizmoHudControls');
 const { normalizeViewConfig, shouldDrawGizmo, shouldDrawHud, normalizeHudItems } = presentation;
 assert.deepEqual({ ...normalizeViewConfig({}) }, { display: 'always', hud: 'selected' });
 assert.deepEqual({ ...normalizeViewConfig({ display: 'selected', hud: 'off' }) },
@@ -68,6 +69,7 @@ const { GizmoPresentationService } = load('GizmoPresentationService', {
     './Gizmos3D': { Gizmos3D: gizmos3d },
     './GizmoHudOverlay': { GizmoHudOverlay: FakeOverlay },
     './GizmoPresentation': presentation,
+    './GizmoHudControls': controls,
 });
 const service = new GizmoPresentationService();
 const component = {
