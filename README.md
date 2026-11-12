@@ -369,6 +369,18 @@ clicks leave the property unchanged. Slider edits notify
 Boolean edits notify `begin`, `update`, and `end` for successful clicks.
 The Editor component change handler is notified after a property edit.
 
+Each drag opens one change transaction and closes it once on mouse release.
+Only changes to the actual property value trigger update notifications.
+Pressing Escape or changing the selected Node cancels an unfinished drag and
+restores the starting serialized value. A cancelled or unchanged gesture uses
+the controller's cancellation hook when available. The Editor's native undo
+and inspector integration is provided through the component Gizmo controller.
+Verify Ctrl+Z / Ctrl+Shift+Z with Cocos Creator 3.8.x before shipping.
+
+For component state derived from serialized fields, use the Cocos
+`onRestore()` lifecycle callback to resynchronize derived values after
+an Inspector reset or Undo/Redo operation.
+
 Interactive HUD controls appear for selected nodes when HUD visibility is
 enabled. They require the compatible Editor Gizmo controller. The extension
 does not add runtime JavaScript to the game; these optional callbacks can
