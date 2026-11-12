@@ -73,7 +73,8 @@ function collectComponents(node: Node, out: Component[]): void {
         if (!comp || !comp.isValid || !comp.enabled) continue;
         if (typeof comp.onDrawGizmos === 'function' || typeof comp.onDrawGizmosSelected === 'function' ||
             typeof comp.onGizmoHandles === 'function' ||
-            typeof comp.onGizmoHud === 'function') out.push(comp);
+            typeof comp.onGizmoHud === 'function' ||
+            typeof comp.onGizmoHudControls === 'function') out.push(comp);
     }
     for (const child of node.children) collectComponents(child, out);
 }
@@ -169,7 +170,9 @@ export function start(): UpdateStats {
                 try { comp.onDrawGizmosSelected(); stats.selectedDrawn++; }
                 catch (error) { warnOnce('onDrawGizmosSelected (' + comp.constructor?.name + ')', error); }
             }
-            if (visible.hud && presentation && typeof comp.onGizmoHud === 'function') {
+            if (visible.hud && presentation &&
+                (typeof comp.onGizmoHud === 'function' ||
+                 typeof comp.onGizmoHudControls === 'function')) {
                 try { stats.hudDrawn += presentation.renderHud(comp); }
                 catch (error) { warnOnce('onGizmoHud (' + comp.constructor?.name + ')', error); }
             }
