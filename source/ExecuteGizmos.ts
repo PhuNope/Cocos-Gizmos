@@ -11,6 +11,7 @@ let running: {
     onBeforeUpdate: () => void;
     timer: ReturnType<typeof setInterval>;
     update: (source: string) => void;
+    dispose: () => void;
 } | null = null;
 
 function selectedNodes(): { ids: Set<string>; available: boolean } {
@@ -26,13 +27,38 @@ function selectedNodes(): { ids: Set<string>; available: boolean } {
         return { ids: new Set<string>(), available: false };
     }
 }
+const DISCOVERY_INTERVAL_MS = 250;
+
 function collectComponents(node: Node, out: Component[]): void {
     if (!node || !node.isValid || !node.active || !node.activeInHierarchy) return;
     for (const comp of node.components) {
         if (!comp || !comp.isValid || !comp.enabled) continue;
         if (typeof comp.onDrawGizmos === 'function' || typeof comp.onDrawGizmosSelected === 'function') out.push(comp);
     }
-    for (const child of Array.from(node.children)) collectComponents(child, out);
+    for (const child of node.children) collectComponents(child, out);
+}
+
+class GizmoComponentRegistry {
+    private scene: Node | null = null;
+    private lastScanAt = -Infinity;
+    private components: Component[] = [];
+
+    public get(scene: Node, now: number): readonly Component[] {
+        if (scene !== this.scene || now - this.lastScanAt >= DISCOVERY_INTERVAL_MS) {
+            const found: Component[] = [];
+            collectComponents(scene, found);
+            this.components = found;
+            this.scene = scene;
+            this.lastScanAt = now;
+        }
+        return this.components;
+    }
+
+    public clear(): void {
+        this.scene = null;
+        this.lastScanAt = -Infinity;
+        this.components = [];
+    }
 }
 
 export function start(): UpdateStats {
@@ -42,6 +68,7 @@ export function start(): UpdateStats {
         scene: null, selectionApi: false, lastSource: null, errors: 0,
     };
     const reported = new Set<string>();
+    const registry = new GizmoComponentRegistry();
     let lastEngineTick = 0;
     let firstComponentLog = false;
     function warnOnce(key: string, error: unknown): void {
@@ -59,9 +86,13 @@ export function start(): UpdateStats {
         try { root = director.getScene(); }
         catch (error) { warnOnce('director.getScene()', error); return; }
         stats.scene = root && (root.name || root.uuid || '(unnamed scene)');
-        if (!root) { stats.components = 0; return; }
-        const components: Component[] = [];
-        try { collectComponents(root, components); }
+        if (!root) {
+            registry.clear();
+            stats.components = 0;
+            return;
+        }
+        let components: readonly Component[];
+        try { components = registry.get(root, Date.now()); }
         catch (error) { warnOnce('Scene traversal failed', error); return; }
         stats.components = components.length;
         if (components.length && !firstComponentLog) {
@@ -71,6 +102,7 @@ export function start(): UpdateStats {
         const selection = selectedNodes();
         stats.selectionApi = selection.available;
         for (const comp of components) {
+            if (!comp.isValid || !comp.enabled || !comp.node?.activeInHierarchy) continue;
             if (typeof comp.onDrawGizmos === 'function') {
                 try { comp.onDrawGizmos(); stats.drawn++; }
                 catch (error) { warnOnce('onDrawGizmos (' + comp.constructor?.name + ')', error); }
@@ -85,7 +117,7 @@ export function start(): UpdateStats {
     director.on(Director.EVENT_BEFORE_UPDATE, onBeforeUpdate);
     const timer = setInterval(() => update('timer'), 120);
     (timer as any)?.unref?.();
-    running = { stats, onBeforeUpdate, timer, update };
+    running = { stats, onBeforeUpdate, timer, update, dispose: () => registry.clear() };
     console.info('[cocos-gizmos/updater] Started; engine tick + 120ms idle fallback; no sessionStorage gate');
     update('initial');
     return status() as UpdateStats;
@@ -94,6 +126,7 @@ export function stop(): void {
     if (!running) return;
     director.off(Director.EVENT_BEFORE_UPDATE, running.onBeforeUpdate);
     clearInterval(running.timer);
+    running.dispose();
     running = null;
     console.info('[cocos-gizmos/updater] Stopped');
 }
