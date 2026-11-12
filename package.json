@@ -37,7 +37,38 @@
                 "path": "./editor-assets",
                 "readonly": true
             }
+        },
+        "menu": [
+            {
+                "path": "i18n:menu.extension/Gizmos Settings",
+                "label": "Gizmos Settings",
+                "message": "open-settings"
+            }
+        ],
+        "messages": {
+            "open-settings": {
+                "methods": [
+                    "openSettings"
+                ]
+            },
+            "get-settings": {
+                "methods": [
+                    "getSettings"
+                ]
+            },
+            "set-settings": {
+                "methods": [
+                    "setSettings"
+                ]
+            }
         }
     },
-    "main": "./main.js"
+    "main": "./main.js",
+    "panels": {
+        "settings": {
+            "title": "Gizmos Settings",
+            "type": "dockable",
+            "main": "./panels/settings/index.js"
+        }
+    }
 }
