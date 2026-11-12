@@ -467,6 +467,8 @@ sharedLayout.beginFrame([ownerA, ownerB], comp => comp === ownerB);
 multiAdapter.refresh([ownerA, ownerB], selected, 3400);
 assert.equal(multiAdapter.status().hudControls, 1,
     'Hidden component HUD does not retain its picking controller');
+assert.equal(multiAdapter.status().active, 1,
+    'HUD-only components with invisible HUD do not keep active Gizmo instances');
 assert.equal(ownerB.gizmo.controllers[0].position.y, 2,
     'Remaining HUD moves to the first row when preceding HUD is hidden');
 multiAdapter.dispose();
