@@ -188,10 +188,42 @@ function collectModuleAugmentations(emittedText, sourceFile) {
     return blocks;
 }
 
+/**
+ * Keep named global handle types alongside the public Gizmos globals.
+ * Their declarations do not load any JavaScript at runtime.
+ */
+function collectGlobalHandleDeclarations(emittedText, sourceFile) {
+    const declarations = [];
+    for (const statement of sourceFile.statements) {
+        if (!ts.isModuleDeclaration(statement) || !ts.isIdentifier(statement.name) ||
+            statement.name.text !== 'global' || !statement.body ||
+            !ts.isModuleBlock(statement.body)) continue;
+        for (const member of statement.body.statements) {
+            if (!ts.isInterfaceDeclaration(member) && !ts.isTypeAliasDeclaration(member)) continue;
+            declarations.push({
+                name: member.name.text,
+                text: emittedText.slice(member.getFullStart(), member.getEnd()).trim(),
+                identifiers: collectIdentifiers(member),
+            });
+        }
+    }
+    const expected = [
+        'GizmoHandlePlane', 'GizmoHandleSpace', 'GizmoHandleAxis',
+        'GizmoHandlePhase', 'GizmoHandleDescriptor', 'GizmoHandleList',
+    ];
+    const found = new Set(declarations.map((entry) => entry.name));
+    for (const name of expected) {
+        if (!found.has(name)) fail('Missing global Gizmo handle declaration: ' + name);
+    }
+    if (found.size !== declarations.length) fail('Duplicate global Gizmo handle declarations');
+    return declarations;
+}
+
 function buildOutputText(emittedText) {
     const sourceFile = ts.createSourceFile('Gizmos.d.ts', emittedText, ts.ScriptTarget.ES2017, true, ts.ScriptKind.TS);
     const classes = findPublicClasses(sourceFile);
     const augmentations = collectModuleAugmentations(emittedText, sourceFile);
+    const globalHandles = collectGlobalHandleDeclarations(emittedText, sourceFile);
 
     const usedNames = new Set();
     const classTexts = [];
@@ -202,6 +234,9 @@ function buildOutputText(emittedText) {
     }
     for (const augmentation of augmentations) {
         for (const identifier of augmentation.identifiers) usedNames.add(identifier);
+    }
+    for (const declaration of globalHandles) {
+        for (const identifier of declaration.identifiers) usedNames.add(identifier);
     }
 
     const imports = collectImports(sourceFile);
@@ -235,9 +270,10 @@ function buildOutputText(emittedText) {
     parts.push('');
     const globalBlock = [
         'declare global {',
-                "    const Gizmos2D: typeof import('./Gizmos').Gizmos2D;",
+        ...globalHandles.map(({ text }) => text.split('\n').map((line) => '    ' + line).join('\n')),
+        "    const Gizmos2D: typeof import('./Gizmos').Gizmos2D;",
         "    const Gizmos3D: typeof import('./Gizmos').Gizmos3D;",
-                '}',
+        '}',
     ];
     parts.push(globalBlock.join('\n'));
     parts.push('');
@@ -253,6 +289,11 @@ function checkOutput(output) {
         "declare module 'cc' {",
         'onDrawGizmos?(): void;',
         'onDrawGizmosSelected?(): void;',
+        'onGizmoHandles?(): GizmoHandleList;',
+        'interface GizmoHandleDescriptor {',
+        'type GizmoHandlePlane =',
+        'type GizmoHandleList =',
+        'type GizmoHandlePhase =',
         'declare global {',
         "const Gizmos2D: typeof import('./Gizmos').Gizmos2D;",
         "const Gizmos3D: typeof import('./Gizmos').Gizmos3D;",
