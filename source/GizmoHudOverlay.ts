@@ -2,6 +2,7 @@ import { Color, Component, Vec3 } from 'cc';
 import { Gizmos3D } from './Gizmos3D';
 import { intersectHandlePlane } from './PositionDragSolver';
 import { GizmoHudText } from './GizmoPresentation';
+import { hudRowScreenPosition } from './GizmoHudControls';
 
 type ViewCamera = {
     node?: { forward?: Vec3 };
@@ -71,8 +72,8 @@ export class GizmoHudOverlay {
         let drawn = 0;
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
-            const placement = positionAtScreenPoint(camera, node.worldPosition,
-                anchor.x + 20, anchor.y + 24 - i * (item.fontSize + 5));
+            const screen = hudRowScreenPosition(anchor, i);
+            const placement = positionAtScreenPoint(camera, node.worldPosition, screen.x, screen.y);
             if (!placement) continue;
             let color = this.colors.get(item.color);
             if (!color) {
