@@ -81,7 +81,7 @@ try {
     assert.equal(host.$.diagnosticsRun.listenerCount(), 1);
     await host.$.diagnosticsRun.click();
     assert.match(host.$.diagnosticsResult.textContent, /SampleScene/);
-    assert.match(host.$.diagnosticsResult.textContent, /Ctrl\\\\\+Z/); // textual Ctrl+Z included
+    assert.ok(host.$.diagnosticsResult.textContent.includes('Ctrl+Z'));
 
     host.$.display.value = 'selected';
     host.$.hud.value = 'off';
