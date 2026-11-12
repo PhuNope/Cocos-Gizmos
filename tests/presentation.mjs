@@ -24,6 +24,10 @@ function load(name, imports = {}) {
 
 const presentation = load('GizmoPresentation');
 const controls = load('GizmoHudControls');
+const layout = load('GizmoHudLayout', {
+    './GizmoHudControls': controls,
+    './GizmoPresentation': presentation,
+});
 const { normalizeViewConfig, shouldDrawGizmo, shouldDrawHud, normalizeHudItems } = presentation;
 assert.deepEqual({ ...normalizeViewConfig({}) }, { display: 'always', hud: 'selected' });
 assert.deepEqual({ ...normalizeViewConfig({ display: 'selected', hud: 'off' }) },
@@ -57,8 +61,8 @@ let rendered = [];
 let disposed = false;
 class FakeOverlay {
     get totalDrawn() { return rendered.length; }
-    render(component, entries) {
-        rendered.push({ component, entries });
+    render(component, entries, placement) {
+        rendered.push({ component, entries, placement });
         return entries.length;
     }
     dispose() { disposed = true; }
@@ -70,6 +74,7 @@ const { GizmoPresentationService } = load('GizmoPresentationService', {
     './GizmoHudOverlay': { GizmoHudOverlay: FakeOverlay },
     './GizmoPresentation': presentation,
     './GizmoHudControls': controls,
+    './GizmoHudLayout': layout,
 });
 const service = new GizmoPresentationService();
 const component = {
