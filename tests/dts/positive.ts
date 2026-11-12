@@ -9,6 +9,38 @@ declare const comp: Component;
 comp.onDrawGizmos?.();
 comp.onDrawGizmosSelected?.();
 
+// All handle types are global: components do not import the extension runtime.
+const handle: GizmoHandleDescriptor = {
+    property: 'target',
+    plane: 'xy',
+    space: 'local',
+    axis: 'x',
+    snap: 5,
+    bounds: { min: { x: -500 }, max: { x: 500, y: 200 } },
+    color: '#ff8800',
+};
+const handles: GizmoHandleList = [handle, {
+    property: 'points',
+    index: 0,
+    plane: 'view',
+    space: 'world',
+}];
+const plane: GizmoHandlePlane = 'xz';
+const axis: GizmoHandleAxis = 'z';
+const space: GizmoHandleSpace = 'world';
+const phase: GizmoHandlePhase = 'cancel';
+const callback: NonNullable<Component['onGizmoHandles']> = () => handles;
+const handleChanged: NonNullable<Component['onGizmoChanged']> =
+    (property, currentPhase, index) => {
+        const reported: GizmoHandlePhase = currentPhase;
+        void property;
+        void reported;
+        void index;
+    };
+void [plane, axis, space, phase, callback, handleChanged];
+comp.onGizmoHandles?.();
+comp.onGizmoChanged?.('target', 'update', 0);
+
 Gizmos2D.beginColor(node, color);
 const circleResult: void = Gizmos2D.drawCircle(node, { x: 0, y: 0 }, 100);
 Gizmos2D.drawLabel(node, 'id', 'text', { x: 0, y: 0 });
