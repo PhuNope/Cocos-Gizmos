@@ -97,6 +97,12 @@ program. For external IDEs, ensure the TypeScript project includes the mounted
 declaration. IDE discovery in Cocos Creator 3.8.8 should be verified using the
 installed extension.
 
+When upgrading a project that previously generated
+`assets/cocos-gizmos.global.d.ts`, delete that obsolete file from the project's
+assets directory. The Editor logs a warning if it remains so duplicate global
+declarations can be resolved safely. The extension never removes or replaces
+project files.
+
 The runtime is split across internal modules because Cocos Creator 3.8 rejects multiple decorated Components in a single script ("Each script can have at most one Component"). Only `Gizmos.js` is a public entry; consumers still have just two globals and don't import internal files.
 
 The extension's root `main.js`, `scene.js`, and `editor-runtime/` are CommonJS for Cocos Editor processes. The `dist/Gizmos.js` reference entry uses ES module imports from `cc` and `cc/env` but is **not mounted into game assets**. The nested `dist/package.json` explicitly sets `type: module` so Cocos 3.8.x does not parse `Gizmos.js` as CommonJS. The `npm run pack` build validates both module formats using Node's syntax checker. `Gizmos.d.ts` declares both classes globally. The Editor Scene script installs runtime globals only in the Scene process; do not call Gizmos at top level before the Scene script loads.
