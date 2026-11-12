@@ -52,6 +52,29 @@ comp.onGizmoSettings?.();
 comp.onGizmoHud?.();
 void [displayMode, getSettings, getHud];
 
+const hudControls: GizmoHudControlList = [
+    { type: 'button', id: 'reset', text: 'Reset' },
+    { type: 'slider', id: 'radius', text: 'Radius', property: 'radius',
+      min: 0, max: 100, step: 5 },
+    { type: 'toggle', id: 'visible', text: 'Visible', property: 'visible' },
+    { type: 'checkbox', id: 'grid', text: 'Grid', property: 'grid', color: '#44aaff' },
+];
+const checkbox: GizmoHudCheckbox = hudControls[3] as GizmoHudCheckbox;
+const toggle: GizmoHudToggle = hudControls[2] as GizmoHudToggle;
+const getControls: NonNullable<Component['onGizmoHudControls']> = () => hudControls;
+const onAction: NonNullable<Component['onGizmoHudAction']> = id => { void id; };
+const onChanged: NonNullable<Component['onGizmoHudChanged']> = (property, phase, value) => {
+    const typed: number | boolean = value;
+    const changePhase: GizmoHandlePhase = phase;
+    void [property, typed, changePhase];
+};
+comp.onGizmoHudControls?.();
+comp.onGizmoHudAction?.('reset');
+comp.onGizmoHudChanged?.('grid', 'update', true);
+comp.onGizmoHudChanged?.('radius', 'update', 50);
+void [checkbox, toggle, getControls, onAction, onChanged];
+
+
 
 Gizmos2D.beginColor(node, color);
 const circleResult: void = Gizmos2D.drawCircle(node, { x: 0, y: 0 }, 100);
