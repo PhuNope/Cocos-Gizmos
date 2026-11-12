@@ -62,9 +62,10 @@ class Base {
     }
     show() { this.onShow?.(); }
     hide() { this.onHide?.(); }
-    onControlBegin(property) { events.push('begin:' + property); }
-    onControlUpdate(property) { events.push('update:' + property); }
-    onControlEnd(property) { events.push('end:' + property); }
+    onControlBegin(property) { events.push('native-begin:' + property); }
+    onControlUpdate(property) { events.push('native-update:' + property); }
+    onControlEnd(property) { events.push('native-end:' + property); }
+    onControlCancel(property) { events.push('native-cancel:' + property); }
     onComponentChanged() { events.push('component-changed'); }
 }
 const componentPool = { typeDefs: { 'cc.BoxCollider': Base } };
@@ -152,9 +153,9 @@ assert.ok(events.includes('begin:target'));
 assert.ok(events.includes('update:target'));
 assert.ok(events.includes('end:target'));
 assert.ok(events.includes('component-changed'));
-assert.equal(events.filter(value => value === 'begin:target').length, 2,
+assert.equal(events.filter(value => value === 'native-begin:target').length, 1,
     'One position drag opens one controller transaction');
-assert.equal(events.filter(value => value === 'end:target').length, 2,
+assert.equal(events.filter(value => value === 'native-end:target').length, 1,
     'One position drag closes one controller transaction');
 
 ctrl.onMouseDown({ handleName: 'y', x: 150, y: 0 });
@@ -164,8 +165,22 @@ assert.deepEqual([component.target.x, component.target.y, component.target.z], [
     'Escape must cancel and restore serialized coordinates');
 assert.ok(events.includes('cancel:target'));
 assert.equal(gizmo.controllers.length, 1);
+assert.ok(events.includes('native-cancel:target'),
+    'Escape cancels the native controller transaction when supported');
 
+const baselineWrites = events.filter(value => value === 'component-changed').length;
+ctrl.onMouseDown({ handleName: 'y', x: 150, y: 0 });
+ctrl.onMouseMove({ handleName: 'y', x: 150, y: 0 });
+ctrl.onMouseUp();
+assert.equal(events.filter(value => value === 'component-changed').length, baselineWrites,
+    'No-op drag must not refresh Inspector or write component data');
+
+ctrl.onMouseDown({ handleName: 'y', x: 150, y: 0 });
+ctrl.onMouseMove({ handleName: 'y', x: -400, y: 180 });
+assert.notEqual(component.target.x, 150);
 adapter.refresh([component], new Set(), 1300);
+assert.deepEqual([component.target.x, component.target.y, component.target.z], [150, 0, 0],
+    'Selection change must cancel an active drag and restore original property');
 assert.equal(adapter.status().active, 0);
 adapter.dispose();
 assert.equal(adapter.status().reason, 'disposed');
