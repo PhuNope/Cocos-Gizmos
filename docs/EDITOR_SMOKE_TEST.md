@@ -51,6 +51,13 @@ callbacks may still work, but interactive handles cannot be assumed to work.
 - **Vec3 array:** Move both checkpoints. Check each `checkpoints[i]` value.
 - **HUD:** Click Show Range toggle, Show Grid checkbox and Reset Radius button.
   Drag the Radius slider repeatedly. Inspector should show the live values.
+- **Multiple components on one Node:** Attach both 2D and 3D API test
+  components to the same test Node (or create two lightweight components with
+  duplicate label and control IDs). Their HUD lines should appear in separate
+  groups with a blank row between them. Click a control in the second group:
+  only the second component's property should change. Turn off the first
+  component's HUD and confirm that the second group shifts upward without
+  leaving invisible picking markers.
 - **Undo / Redo:** Perform one continuous nontrivial drag, release the pointer,
   press Ctrl+Z once, then Ctrl+Shift+Z. Compare the Scene position and
   Inspector value with the original and final values. Test Button, Toggle,
