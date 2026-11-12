@@ -386,6 +386,26 @@ enabled. They require the compatible Editor Gizmo controller. The extension
 does not add runtime JavaScript to the game; these optional callbacks can
 remain in a project using only the TypeScript declarations.
 
+## Verify in Cocos Creator 3.8.8
+
+Open **Extensions → Gizmos Settings → Check Scene integration** to view the
+live Editor connection status without modifying scene data. The report checks
+the selected-node API, camera projection, component Gizmo controller bridge,
+active handle counts and currently running editor callbacks. It also lists
+checks that cannot be verified automatically, including real mouse picking,
+native Undo/Redo and Prefab override tracking.
+
+The development extension ZIP contains `examples/GizmoSmokeProbe.ts` and
+`docs/EDITOR_SMOKE_TEST.md`. Copy the example into your project's
+`assets/` directory only when you want to run the interactive smoke test;
+the extension never creates that file in your project. Follow the guide to
+test drag/cancel, HUD controls, Scene close/reopen, Inspector synchronization,
+Prefab instances and Ctrl+Z / Ctrl+Shift+Z.
+
+The component Gizmo pool and controller hooks are private Editor interfaces.
+A green CI or a successful compatibility probe cannot guarantee that they
+support real pointer events or native Undo/Redo in your local Creator build.
+
 ## Build locally
 
 ```bash
