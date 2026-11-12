@@ -36,6 +36,8 @@ try {
         'export class OptionalGizmo extends Component {',
         '    private readonly typesOnly: Gizmos2DType | null = null;',
         '    public ticks = 0;',
+        '    public point = { x: 100, y: 0, z: 0 };',
+        "    public onGizmoHandles() { return [{ property: 'point', plane: 'xy' as const }]; }",
         '    public update(): void { this.ticks++; }',
         '    public onDrawGizmos(): void {',
         '        Gizmos2D.drawCircle(this.node, { x: 0, y: 0 }, 100);',
@@ -95,6 +97,9 @@ try {
     const instance = new sandbox.exports.OptionalGizmo();
     instance.update();
     assert.equal(instance.ticks, 1, 'Game lifecycle must run with no Gizmos extension');
+    assert.equal(instance.onGizmoHandles()[0].property, 'point',
+        'Handle declarations are plain data and work without runtime Gizmos');
+
 
     // When the Editor extension is present, it invokes the optional callbacks.
     let circles = 0;
