@@ -9,6 +9,7 @@ import { deflateRawSync } from 'node:zlib';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const distDir = path.join(ROOT, 'dist');
+const globalTypesAsset = path.join(ROOT, 'editor-assets', 'GizmosGlobal.ts');
 const expectedDist = ['Define.js', 'ExecuteGizmos.js', 'Gizmos.d.ts', 'Gizmos.js', 'Gizmos2D.js', 'Gizmos3D.js'].sort();
 const actualDist = readdirSync(distDir).sort();
 if (JSON.stringify(actualDist) !== JSON.stringify(expectedDist)) {
@@ -31,7 +32,11 @@ const manifest = {
   main: './main.js',
   // The Scene Script is Editor-only: unlike asset-db mounts, it is never
   // included in the Cocos game script graph.
-  contributions: { scene: { script: './scene.js' }, builder: './builder.js' },
+  contributions: {
+    scene: { script: './scene.js' },
+    builder: './builder.js',
+    'asset-db': { mount: { path: './editor-assets', readonly: true } },
+  },
 };
 const usage = `# Cocos-Gizmos v${pkg.version}\n\nCocos Creator extension providing global Gizmos2D and Gizmos3D.\n\n## Install\n\n1. In Cocos Creator 3.8.2+, open Extensions > Extension Manager.\n2. Select the Project or Global tab, choose Import Extension (+), and select this ZIP.\n3. Enable the Cocos-Gizmos extension and allow the Asset Database to finish importing.\n\nEditor-only Scene Script runs Gizmos outside the game Asset Database, so runtime JS is not imported into game builds. The build hook removes only onDrawGizmos and onDrawGizmosSelected from compiled game JS. Other calls are not checked or modified. The JavaScript module must be evaluated before using the runtime globals. Use Gizmos2D and Gizmos3D inside lifecycle callbacks after startup; don't reference them in top-level initializers.\n\nTypes are in dist/Gizmos.d.ts. Cocos Creator's engine provides cc and cc/env.\n\nSource: https://github.com/PhuNope/Cocos-Gizmos\n`;
 
@@ -99,6 +104,7 @@ function toZip(entries) {
 const entries = [
   ['package.json', JSON.stringify(manifest, null, 2) + '\n'],
   ['README.md', usage],
+  ['editor-assets/GizmosGlobal.ts', readFileSync(globalTypesAsset)],
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
   ['scene.js', readFileSync(path.join(ROOT, 'scene.js'))],
   ...['Define.js', 'ExecuteGizmos.js', 'Gizmos2D.js', 'Gizmos3D.js']
