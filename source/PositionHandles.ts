@@ -18,7 +18,7 @@ type HudEntry = { control: HudControl; controller: any; key: string; index: numb
 type HudDrag = { entry: HudEntry; solver: HudSliderDrag; session: GizmoEditSession<number> };
 
 function cceNamespace(): any {
-    return (globalThis as any).cce || (globalThis as any).window?.cce || null;
+    return (globalThis as any).window?.cce || (globalThis as any).cce || null;
 }
 
 function camera(): any {
