@@ -31,11 +31,12 @@ class Base {
     constructor() { this.controllers = []; }
     createController() {
         const c = {
-            _cubeNode: { name: 'marker' },
+            _cubeNode: { name: 'marker', active: false },
+            _cubeNodeMR: { enabled: false },
             _editHandlesShape: { children: [{ name: 'x', active: true }, { name: 'y', active: true }] },
             _wireFrameBoxNode: { active: true },
             _wireFrameBoxMeshRenderer: { enabled: true },
-            setColor() {}, setEditHandlesColor() {}, setHandleColor() {},
+            setColor() {}, setEditHandlesColor() {}, setHandleColor() {}, setOpacity() {},
             initEditHandles() {}, showEditHandles() {}, initHandle() {},
             registerEvents() {}, unregisterEvents() {}, hideEditHandles() {},
             hide() {}, show() {}, setPosition(v) { this.position = v; },
@@ -104,12 +105,17 @@ assert.equal(adapter.status().reason, 'not-initialized');
 const selected = new Set([node.uuid]);
 adapter.refresh([component], selected, 1000);
 assert.equal(adapter.status().active, 1, 'A selected component must display its Gizmo');
-assert.equal(adapter.status().registered, 1);
+assert.equal(adapter.status().registered, 2, 'Register both plain and cc-prefixed Cocos component names');
+assert.ok(componentPool.typeDefs['cc.ProbePosition']);
 const gizmo = component.gizmo;
 assert.ok(gizmo);
 assert.equal(gizmo.controllers.length, 1);
 assert.equal(gizmo.controllers[0]._editHandlesShape.children[1].active, true);
 assert.equal(gizmo.controllers[0]._editHandlesShape.children[0].active, false);
+assert.equal(gizmo.controllers[0]._cubeNode.active, true, 'The rendered point remains visible');
+assert.equal(gizmo.controllers[0]._cubeNodeMR.enabled, true, 'Point mesh rendering is enabled');
+assert.equal(gizmo.controllers[0]._wireFrameBoxMeshRenderer.enabled, false, 'Collider wireframe is hidden');
+assert.equal(gizmo.controllers[0].editable, true, 'Controller accepts editor interaction');
 const ctrl = gizmo.controllers[0];
 ctrl.onMouseDown({ handleName: 'y', x: 150, y: 0 });
 for (const [x, y] of [[0, 150], [-150, 0], [0, -150], [150, 0]]) {
@@ -136,6 +142,8 @@ assert.equal(adapter.status().active, 0);
 adapter.dispose();
 assert.equal(adapter.status().reason, 'disposed');
 assert.equal(componentPool.typeDefs.ProbePosition, undefined,
-    'Unloading the extension must restore the Gizmo registry');
+    'Unloading the extension must restore the plain Gizmo registration');
+assert.equal(componentPool.typeDefs['cc.ProbePosition'], undefined,
+    'Unloading the extension must restore the prefixed Gizmo registration');
 
 console.log('[position-adapter] selected handle, XY dragging, undo hooks, Escape and cleanup OK');
