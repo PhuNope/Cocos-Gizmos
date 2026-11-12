@@ -145,7 +145,7 @@ function verifyModuleFormats() {
     mkdirSync(tempDist);
     for (const [name, data] of entries) {
       if (name === 'main.js' || name === 'builder.js' || name === 'scene.js' || name === 'package.json' ||
-          name.startsWith('editor-runtime/') ||
+          name.startsWith('editor-runtime/') || name.startsWith('panels/') ||
           name.startsWith('dist/') || (name.startsWith('build/') && !name.includes('/vendor/'))) {
         const destination = path.join(tempRoot, name);
         mkdirSync(path.dirname(destination), { recursive: true });
