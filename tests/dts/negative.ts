@@ -15,3 +15,12 @@ const invalidHandleSpace: GizmoHandleSpace = 'screen';
 const invalidHandlePhase: GizmoHandlePhase = 'drag';
 // @ts-expect-error — snap is a number, not a string
 const invalidHandleSnap: GizmoHandleDescriptor = { property: 'target', snap: '5' };
+
+// @ts-expect-error — toggle needs a boolean component property name
+const invalidToggle: GizmoHudToggle = { type: 'toggle', id: 'x', text: 'Toggle' };
+// @ts-expect-error — checkbox is distinct from slider
+const invalidCheckbox: GizmoHudCheckbox = { type: 'slider', id: 'x', text: 'Check', property: 'flag' };
+// @ts-expect-error — slider requires min/max numeric range
+const invalidHudSlider: GizmoHudSlider = { type: 'slider', id: 'x', text: 'Speed', property: 'speed' };
+// @ts-expect-error — control kind is a literal union
+const invalidHudKind: GizmoHudControl = { type: 'switch', id: 'x', text: 'Wrong', property: 'flag' };
