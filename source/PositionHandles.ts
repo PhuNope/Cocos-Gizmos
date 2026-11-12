@@ -1,4 +1,4 @@
-import { Color, Component, director, Quat, Vec3 } from 'cc';
+import { Color, Component, Layers, Quat, Vec3 } from 'cc';
 import {
     handlePlaneNormal,
     intersectHandlePlane,
@@ -36,6 +36,12 @@ function selectedKeys(component: Component): string[] {
         if (!name.includes('.')) keys.add('cc.' + name);
     }
     return [...keys];
+}
+
+function applyGizmoLayer(node: any): void {
+    if (!node) return;
+    node.layer = Layers.Enum.GIZMOS;
+    for (const child of node.children || []) applyGizmoLayer(child);
 }
 
 function pointer(event: any): Pointer | null {
@@ -181,10 +187,12 @@ function createEditorGizmo(base: any): any {
                     if (controller._wireFrameBoxMeshRenderer) controller._wireFrameBoxMeshRenderer.enabled = false;
                     if (controller._editHandlesShape) {
                         controller._editHandlesShape.active = true;
+                        applyGizmoLayer(controller._editHandlesShape);
                         for (const child of controller._editHandlesShape.children || []) {
                             child.active = child.name === 'y';
                         }
                     }
+                    applyGizmoLayer(controller._cubeNode);
                     // The editable Y face handles Scene picking; the cube renders the point.
                     controller.setHandleColor?.('y', color, 0);
                     if (controller._cubeNode) {
