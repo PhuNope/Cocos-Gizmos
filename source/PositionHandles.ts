@@ -8,6 +8,7 @@ import { HudControl, HudSliderDrag, hudRowScreenPosition, normalizeHudControls, 
 import { createSceneHudProjection } from './GizmoHudProjection';
 import { normalizeHudItems } from './GizmoPresentation';
 import { GizmoEditSession } from './GizmoEditSession';
+import { GizmoHudLayout } from './GizmoHudLayout';
 import {
     GizmoInputDiagnostics, GizmoInputSnapshot, readSceneHandleName,
     readScenePointer, ScenePointer,
@@ -147,6 +148,7 @@ function setMarkerSize(controller: any, size: number): void {
 function createEditorGizmo(
     base: any, allowHud: (component: Component) => boolean,
     input: GizmoInputDiagnostics,
+    hudLayout?: GizmoHudLayout,
 ): any {
     return class PositionHandleEditorGizmo extends base {
         private entries: Entry[] = [];
@@ -212,8 +214,9 @@ function createEditorGizmo(
         private hudDescriptors(): HudControl[] {
             const component = this.target as Component;
             if (!component || !allowHud(component)) return [];
-            const raw = component.onGizmoHudControls?.();
-            return normalizeHudControls(raw).filter((control) =>
+            const raw = hudLayout ? hudLayout.get(component)?.controls || [] :
+                normalizeHudControls(component.onGizmoHudControls?.());
+            return raw.filter((control) =>
                 control.type === 'button' ||
                 (control.type === 'slider' ?
                     typeof (component as any)[control.property] === 'number' &&
@@ -373,14 +376,18 @@ function createEditorGizmo(
                 for (const entry of this.hudEntries) this.hideUnavailableMarker(entry.controller);
                 return;
             }
-            const texts = normalizeHudItems(component.onGizmoHud?.());
+            const placement = hudLayout?.get(component);
+            const textCount = placement ? placement.textCount :
+                normalizeHudItems(component.onGizmoHud?.()).length;
+            const startRow = placement?.startRow || 0;
             // A HUD row is 22 screen pixels tall. Keep its picking cube about
             // 14 pixels wide; multiplying a 10px world size by 14 creates a
             // ~140px hit box overlapping adjacent buttons and sliders.
             const size = Math.min(1000, projection.pixelSize * 14);
             for (const entry of this.hudEntries) {
                 this.restoreMarker(entry.controller);
-                const row = hudRowScreenPosition(projection.screen, texts.length + entry.index);
+                const row = hudRowScreenPosition(
+                    projection.screen, startRow + textCount + entry.index);
                 const world = projection.worldAt(row.x - 14, row.y);
                 entry.controller.setPosition?.(world);
                 setMarkerSize(entry.controller, size);
@@ -741,6 +748,7 @@ export interface PositionHandleSceneAdapter {
 
 export function createPositionHandleAdapter(
     allowHud: (component: Component) => boolean = () => true,
+    hudLayout?: GizmoHudLayout,
 ): PositionHandleSceneAdapter {
     const registered = new Map<string, any>();
     const active = new Map<Component, any>();
@@ -760,7 +768,7 @@ export function createPositionHandleAdapter(
         }
         manager = gizmo;
         typeDefs = pool.typeDefs;
-        if (!gizmoConstructor) gizmoConstructor = createEditorGizmo(typeDefs['cc.BoxCollider'], allowHud, input);
+        if (!gizmoConstructor) gizmoConstructor = createEditorGizmo(typeDefs['cc.BoxCollider'], allowHud, input, hudLayout);
         reason = 'ready';
         return true;
     }
