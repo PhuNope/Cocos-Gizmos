@@ -13,6 +13,13 @@ const compiled = ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2017, module: ts.ModuleKind.CommonJS },
 }).outputText;
 
+const schedulerSource = readFileSync(path.join(root, 'source/SceneUpdateScheduler.ts'), 'utf8');
+const schedulerCode = ts.transpileModule(schedulerSource, {
+    compilerOptions: { target: ts.ScriptTarget.ES2017, module: ts.ModuleKind.CommonJS },
+}).outputText;
+const schedulerExports = {};
+vm.runInNewContext(schedulerCode, { exports: schedulerExports }, { filename: 'SceneUpdateScheduler.js' });
+
 let now = 1000;
 let scene = null;
 let selected = [];
@@ -53,9 +60,10 @@ const sandbox = {
     } } },
     Date: class extends Date { static now() { return now; } },
     console: { info() {}, warn() {}, error: (...args) => { throw new Error(args.join(' ')); } },
-    setInterval: (fn, ms) => { assert.equal(ms, 120); timer = fn; return 1; },
+    setInterval: (fn, ms) => { assert.equal(ms, 250); timer = fn; return 1; },
     clearInterval: (id) => { assert.equal(id, 1); timer = null; },
     require: (id) => {
+        if (id === './SceneUpdateScheduler') return schedulerExports;
         assert.equal(id, 'cc');
         return { Component: class {}, Node: class {}, director, Director: { EVENT_BEFORE_UPDATE: 'before-update' } };
     },
@@ -101,6 +109,20 @@ try {
     now += 16;
     beforeUpdate();
     assert.equal(sandbox.exports.status().components, 0);
+
+    const beforeTimer = sandbox.exports.status().frames;
+    now += 16;
+    timer();
+    assert.equal(sandbox.exports.status().frames, beforeTimer,
+        'Idle watchdog must skip a tick immediately after an engine frame');
+    assert.equal(sandbox.exports.status().timerSkips, 1);
+
+    now += 251;
+    timer();
+    assert.equal(sandbox.exports.status().frames, beforeTimer + 1,
+        'Watchdog must keep the Scene responsive when the engine is paused');
+    assert.equal(sandbox.exports.status().fallbackFrames, 1);
+    assert.equal(sandbox.exports.status().engineFrames, 14);
 } finally {
     stop();
 }
