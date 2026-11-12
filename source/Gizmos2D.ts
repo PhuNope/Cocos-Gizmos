@@ -20,6 +20,7 @@ const { ccclass, executeInEditMode } = _decorator;
 
 class GizmosRenderer {
     public readonly commands = new DrawCommandBuffer2D();
+    private readonly previous: number[] = [];
     private hasGeometry = false;
 
     constructor(private readonly graphic: Graphics) {}
@@ -30,12 +31,25 @@ class GizmosRenderer {
                 this.graphic.clear();
                 this.hasGeometry = false;
             }
+            this.previous.length = 0;
             return;
         }
 
-        this.graphic.clear();
-        this.commands.replay(this.graphic);
-        this.hasGeometry = true;
+        if (this.hasGeometry && this.commands.equals(this.previous)) {
+            this.commands.reset();
+            return;
+        }
+
+        this.commands.copyTo(this.previous);
+        try {
+            this.graphic.clear();
+            this.commands.replay(this.graphic);
+            this.hasGeometry = true;
+        } catch (error) {
+            this.previous.length = 0;
+            this.hasGeometry = false;
+            throw error;
+        }
     }
 }
 
