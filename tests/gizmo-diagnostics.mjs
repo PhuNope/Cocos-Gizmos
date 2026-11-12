@@ -67,6 +67,14 @@ assert.equal(report.bridge.hasNativeControlBegin, true);
 assert.equal(report.bridge.hasNativeControlEnd, true);
 assert.equal(report.bridge.hasNativeControlCancel, false,
     'Do not claim native cancellation support when the hook is missing');
+assert.equal(report.bridge.cameraSource, 'direct');
+const wrapped = buildGizmoSmokeReport(Editor, {
+    ...cce,
+    Camera: { _camera: { camera: cce.Camera.camera } },
+}, { started: true, scene: 'Scene', selectionApi: true }, { reason: 'ready' });
+assert.equal(wrapped.bridge.cameraSource, 'wrapped');
+assert.equal(wrapped.bridge.cameraScreenPointToRay, true);
+assert.equal(wrapped.bridge.cameraWorldToScreen, true);
 assert.equal(report.handles.positionHandles, 2);
 assert.equal(report.handles.hudControls, 4);
 assert.equal(report.handles.draggingPosition, 1);
