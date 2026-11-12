@@ -354,7 +354,15 @@ export class GizmoHudExample extends Component {
 }
 ```
 
-The HUD uses stable control IDs and reuses the Scene label renderer. Toggle
+The HUD uses stable control IDs and reuses the Scene label renderer. Each
+component's text HUD computes one screen-to-world projection from three camera
+rays per render pass; all labels reuse that projection for positioning and
+scale. Interactive HUD markers share a projection within their update pass.
+Changes to control text or current values update labels without rebuilding
+picking controllers. Structural changes (ID, type, bound property, range,
+color, or control order) refresh the affected controller layout.
+
+Toggle
 and checkbox clicks are applied when the pointer is released, and cancelled
 clicks leave the property unchanged. Slider edits notify
 `onGizmoHudChanged()` during `begin`, `update`, `end`, and `cancel`.
