@@ -122,7 +122,8 @@ function classToDeclarationText(classNode, sourceText, sourceFile) {
     }
 
     let text = sourceText.slice(classStart, classNode.getEnd());
-    for (const member of dropped) {
+    // Remove text ranges from the end so earlier offsets remain valid.
+    for (const member of dropped.sort((left, right) => right.getFullStart() - left.getFullStart())) {
         const from = member.getFullStart() - classStart;
         const to = member.getEnd() - classStart;
         text = text.slice(0, from) + text.slice(to);
