@@ -2,6 +2,7 @@
 // Editor Scene process only; no runtime assets mounted.
 let installed = null;
 let updater = null;
+let handles = null;
 exports.load = function load() {
     const path = require('node:path');
     if (globalThis.Editor?.App?.path) module.paths.push(path.join(globalThis.Editor.App.path, 'node_modules'));
@@ -10,12 +11,20 @@ exports.load = function load() {
     installed = { Gizmos2D, Gizmos3D };
     Object.assign(globalThis, installed);
     updater = require('./editor-runtime/ExecuteGizmos.js');
+    const { createPositionHandleAdapter } = require('./editor-runtime/PositionHandles.js');
+    handles = createPositionHandleAdapter();
+    updater.setPositionHandleAdapter(handles);
     const status = updater.start();
     console.info('[cocos-gizmos] Scene runtime loaded; updater=' + status.started +
         ', Scene=' + (status.scene || '(not ready)'));
 };
 exports.unload = function unload() {
-    if (updater) { updater.stop(); updater = null; }
+    if (updater) {
+        updater.stop();
+        updater.setPositionHandleAdapter(null);
+        updater = null;
+    }
+    if (handles) { handles.dispose(); handles = null; }
     if (!installed) return;
     if (globalThis.Gizmos2D === installed.Gizmos2D) delete globalThis.Gizmos2D;
     if (globalThis.Gizmos3D === installed.Gizmos3D) delete globalThis.Gizmos3D;
@@ -24,4 +33,5 @@ exports.unload = function unload() {
 exports.methods = {
     gizmosStatus() { return updater ? updater.status() : { started: false }; },
     gizmosTick() { return updater ? updater.tickOnce() : { started: false }; },
+    gizmosHandleStatus() { return handles ? handles.status() : { registered: 0, active: 0, reason: 'not-loaded' }; },
 };
