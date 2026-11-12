@@ -58,11 +58,13 @@ class Base {
             initEditHandles() { throw new Error('topNode: unsafe initEditHandles'); },
             showEditHandles() { throw new Error('topNode: unsafe showEditHandles'); },
             initHandle() {},
-            registerCount: 0, unregisterCount: 0,
+            registerCount: 0, unregisterCount: 0, showCount: 0, hideCount: 0,
             registerEvents() { this.registerCount++; },
             unregisterEvents() { this.unregisterCount++; },
             hideEditHandles() { throw new Error('topNode: unsafe hideEditHandles'); },
-            hide() {}, show() {}, setPosition(v) { this.position = v; },
+            hide() { this.hideCount++; },
+            show() { this.showCount++; },
+            setPosition(v) { this.position = v; },
             setRotation() {},
             updateSize() { throw new Error('topNode: unsafe BoxController.updateSize'); },
             removeHandle() {},
@@ -297,6 +299,29 @@ const toggle = hudGizmo.controllers[1];
 const checkbox = hudGizmo.controllers[2];
 const slider = hudGizmo.controllers[3];
 const button = hudGizmo.controllers[4];
+
+// Cocos can replace the Scene camera during a 2D/3D switch.
+const originalCamera = sandbox.cce.Camera._camera.camera;
+const initialHide = button.hideCount;
+const initialUnregister = button.unregisterCount;
+sandbox.cce.Camera._camera.camera = null;
+hudGizmo.refreshHandles();
+hudGizmo.refreshHandles();
+assert.equal(button.hideCount, initialHide + 1,
+    'Missing camera hides a HUD marker only once');
+assert.equal(button.unregisterCount, initialUnregister + 1,
+    'Camera loss unregisters its picking listener');
+const initialRegister = button.registerCount;
+sandbox.cce.Camera._camera.camera = originalCamera;
+hudGizmo.refreshHandles();
+assert.equal(button.registerCount, initialRegister + 1,
+    'Restored camera registers HUD picking listener again');
+assert.equal(button.showCount > 0, true,
+    'Restored camera shows the hidden marker again');
+hudGizmo.refreshHandles();
+assert.equal(button.registerCount, initialRegister + 1,
+    'Repeated frames never duplicate listeners');
+
 assert.equal(hudAdapter.status().input.controllerDown, 0,
     'Input statistics are isolated per Scene adapter instance');
 
