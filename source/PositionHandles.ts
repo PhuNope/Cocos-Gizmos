@@ -4,12 +4,16 @@ import {
     intersectHandlePlane,
     PositionDragSolver,
 } from './PositionDragSolver';
+import { HudControl, HudSliderDrag, hudRowScreenPosition, normalizeHudControls } from './GizmoHudControls';
+import { normalizeHudItems } from './GizmoPresentation';
 
 type Point = { x: number; y: number; z: number };
 type Pointer = { x: number; y: number };
 type Field = GizmoHandleDescriptor;
 type Entry = { field: Field; controller: any; key: string };
 type DragState = { entry: Entry; solver: PositionDragSolver; original: Point; changed: boolean };
+type HudEntry = { control: HudControl; controller: any; key: string; index: number };
+type HudDrag = { entry: HudEntry; solver: HudSliderDrag; changed: boolean };
 
 function cceNamespace(): any {
     return (globalThis as any).cce || (globalThis as any).window?.cce || null;
@@ -129,10 +133,13 @@ function markerSize(world: Point): number {
     return 0.3;
 }
 
-function createEditorGizmo(base: any): any {
+function createEditorGizmo(base: any, allowHud: (component: Component) => boolean): any {
     return class PositionHandleEditorGizmo extends base {
         private entries: Entry[] = [];
+        private hudEntries: HudEntry[] = [];
         private drag: DragState | null = null;
+        private hudDrag: HudDrag | null = null;
+        private pendingButton: HudEntry | null = null;
         private shown = false;
         private layout = '';
 
@@ -152,18 +159,32 @@ function createEditorGizmo(base: any): any {
                 readField(component, field) !== null);
         }
 
-        private signature(fields: Field[]): string {
-            return JSON.stringify(fields.map((field) => [
-                field.property, field.index, field.plane || 'xy',
-                field.space || 'local', field.axis, field.snap,
-                field.color, field.bounds,
-            ]));
+        private hudDescriptors(): HudControl[] {
+            const component = this.target as Component;
+            if (!component || !allowHud(component)) return [];
+            const raw = component.onGizmoHudControls?.();
+            return normalizeHudControls(raw).filter((control) =>
+                control.type === 'button' ||
+                (typeof (component as any)[control.property] === 'number' &&
+                 Number.isFinite((component as any)[control.property])));
+        }
+
+        private signature(fields: Field[], controls: HudControl[]): string {
+            return JSON.stringify({
+                fields: fields.map((field) => [
+                    field.property, field.index, field.plane || 'xy',
+                    field.space || 'local', field.axis, field.snap,
+                    field.color, field.bounds,
+                ]),
+                controls,
+            });
         }
 
         private rebuild(): void {
             this.clearEntries();
             const fields = this.descriptors();
-            this.layout = this.signature(fields);
+            const controls = this.hudDescriptors();
+            this.layout = this.signature(fields, controls);
             for (const field of fields) {
                 try {
                     super.createController();
@@ -216,13 +237,54 @@ function createEditorGizmo(base: any): any {
                     console.warn('[cocos-gizmos/handles] Cannot initialize position controller:', error);
                 }
             }
+            for (const [index, control] of controls.entries()) {
+                try {
+                    super.createController();
+                    const controller = this._controller;
+                    if (!controller) continue;
+                    const key = 'hud:' + control.id;
+                    const entry: HudEntry = { control, controller, key, index };
+                    const color = new Color();
+                    if (typeof Color.fromHEX === 'function') Color.fromHEX(color, control.color);
+                    else color.set(58, 182, 255, 255);
+                    controller.setColor?.(color);
+                    controller.setOpacity?.(255);
+                    controller.editable = true;
+                    controller._edit = true;
+                    controller._editable = true;
+                    if (controller._wireFrameBoxNode) controller._wireFrameBoxNode.active = false;
+                    if (controller._wireFrameBoxMeshRenderer) controller._wireFrameBoxMeshRenderer.enabled = false;
+                    if (controller._editHandlesShape) controller._editHandlesShape.active = false;
+                    if (controller._cubeNode) {
+                        applyGizmoLayer(controller._cubeNode);
+                        controller._cubeNode.active = true;
+                        if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
+                        controller.initHandle?.(controller._cubeNode, key);
+                    }
+                    const down = (event: any) => this.beginHud(entry, event);
+                    const move = (event: any) => this.moveHud(entry, event);
+                    const up = () => this.finishHud(false);
+                    controller.onControllerMouseDown = down;
+                    controller.onControllerMouseMove = move;
+                    controller.onControllerMouseUp = up;
+                    controller.onMouseDown = down;
+                    controller.onMouseMove = move;
+                    controller.onMouseUp = up;
+                    controller.registerEvents?.();
+                    this.hudEntries.push(entry);
+                } catch (error) {
+                    console.warn('[cocos-gizmos/hud] Cannot initialize HUD controller:', error);
+                }
+            }
             this.updateMarkers();
         }
 
         public refreshHandles(): void {
-            const next = this.descriptors();
-            if (this.signature(next) !== this.layout && !this.drag) this.rebuild();
-            else this.updateMarkers();
+            const fields = this.descriptors();
+            const controls = this.hudDescriptors();
+            if (this.signature(fields, controls) !== this.layout && !this.drag && !this.hudDrag && !this.pendingButton) {
+                this.rebuild();
+            } else this.updateMarkers();
         }
 
         private updateMarkers(): void {
@@ -242,6 +304,96 @@ function createEditorGizmo(base: any): any {
                 const size = markerSize(world);
                 entry.controller.updateSize?.(Vec3.ZERO, new Vec3(size, size, size));
             }
+            if (!this.hudEntries.length) return;
+            const view = camera();
+            if (typeof view?.worldToScreen !== 'function') return;
+            const anchor = new Vec3();
+            try { view.worldToScreen(component.node.worldPosition, anchor); }
+            catch { return; }
+            if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return;
+            const texts = normalizeHudItems(component.onGizmoHud?.());
+            for (const entry of this.hudEntries) {
+                const row = hudRowScreenPosition(anchor, texts.length + entry.index);
+                const pointer = sceneRay({ x: row.x - 14, y: row.y });
+                const normal = view.node?.forward || pointer?.d;
+                const point = pointer && normal ?
+                    intersectHandlePlane(pointer, component.node.worldPosition, normal) : null;
+                if (!point) {
+                    entry.controller.hide?.();
+                    continue;
+                }
+                const world = new Vec3(point.x, point.y, point.z);
+                entry.controller.setPosition?.(world);
+                const size = markerSize(world) * 14;
+                entry.controller.updateSize?.(Vec3.ZERO, new Vec3(size, size, size));
+            }
+        }
+
+        private beginHud(entry: HudEntry, event: any): void {
+            if (!this.shown || this.drag || this.hudDrag || this.pendingButton) return;
+            if (event?.handleName && event.handleName !== entry.key && event.handleName !== 'y') return;
+            const component = this.target as Component;
+            if (entry.control.type === 'button') {
+                this.pendingButton = entry;
+                return;
+            }
+            const current = (component as any)[entry.control.property];
+            const at = pointer(event);
+            if (!at || !Number.isFinite(current)) return;
+            try {
+                const solver = new HudSliderDrag(entry.control, current, at.x);
+                this.hudDrag = { entry, solver, changed: false };
+                this.onControlBegin?.(entry.control.property);
+                component.onGizmoHudChanged?.(entry.control.property, 'begin', current);
+            } catch (error) {
+                console.warn('[cocos-gizmos/hud] Cannot begin slider drag:', error);
+            }
+        }
+
+        private moveHud(entry: HudEntry, event: any): void {
+            const drag = this.hudDrag;
+            if (!drag || drag.entry !== entry || drag.entry.control.type !== 'slider') return;
+            const at = pointer(event);
+            if (!at) return;
+            const next = drag.solver.move(at.x);
+            if (next === null) return;
+            const component = this.target as Component;
+            const property = drag.entry.control.property;
+            if ((component as any)[property] === next) return;
+            (component as any)[property] = next;
+            drag.changed = true;
+            component.onGizmoHudChanged?.(property, 'update', next);
+            this.onControlUpdate?.(property);
+            this.onComponentChanged?.(component.node);
+            cceNamespace()?.Engine?.repaintInEditMode?.();
+        }
+
+        private finishHud(cancelled: boolean): void {
+            const button = this.pendingButton;
+            this.pendingButton = null;
+            const component = this.target as Component;
+            if (button && !cancelled) {
+                this.onControlBegin?.(button.key);
+                try {
+                    component.onGizmoHudAction?.(button.control.id);
+                    this.onComponentChanged?.(component.node);
+                } finally {
+                    this.onControlEnd?.(button.key);
+                }
+            }
+            const drag = this.hudDrag;
+            this.hudDrag = null;
+            if (!drag || drag.entry.control.type !== 'slider') return;
+            const property = drag.entry.control.property;
+            if (cancelled && drag.changed) {
+                (component as any)[property] = drag.solver.cancel();
+                this.onComponentChanged?.(component.node);
+            }
+            component.onGizmoHudChanged?.(
+                property, cancelled ? 'cancel' : 'end', (component as any)[property],
+            );
+            this.onControlEnd?.(property);
+            this.updateMarkers();
         }
 
         private begin(entry: Entry, event: any): void {
@@ -306,19 +458,25 @@ function createEditorGizmo(base: any): any {
             const name = event?.handleName;
             const entry = this.entries.find((item) => item.key === name);
             if (entry) this.begin(entry, event);
+            const hud = this.hudEntries.find((item) => item.key === name);
+            if (hud) this.beginHud(hud, event);
         }
 
         public onGizmoMouseMove(event: any): void {
             if (this.drag) this.move(this.drag.entry, event);
+            if (this.hudDrag) this.moveHud(this.hudDrag.entry, event);
         }
 
         public onGizmoMouseUp(): void {
             this.finish(false);
+            this.finishHud(false);
         }
 
         public onKeyDown(event: any): boolean | void {
-            if (this.drag && (event?.key === 'Escape' || event?.keyCode === 27)) {
+            if ((this.drag || this.hudDrag || this.pendingButton) &&
+                (event?.key === 'Escape' || event?.keyCode === 27)) {
                 this.finish(true);
+                this.finishHud(true);
                 return true;
             }
         }
@@ -326,7 +484,7 @@ function createEditorGizmo(base: any): any {
         public onShow(): void {
             this.shown = true;
             this.refreshHandles();
-            for (const { controller } of this.entries) {
+            for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 controller.show?.();
                 controller.showEditHandles?.();
                 controller.registerEvents?.();
@@ -335,8 +493,9 @@ function createEditorGizmo(base: any): any {
 
         public onHide(): void {
             this.finish(false);
+            this.finishHud(false);
             this.shown = false;
-            for (const { controller } of this.entries) {
+            for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 controller.unregisterEvents?.();
                 controller.hideEditHandles?.();
                 controller.hide?.();
@@ -348,17 +507,19 @@ function createEditorGizmo(base: any): any {
         public updateControllerTransform(): void { this.updateMarkers(); }
 
         private clearEntries(): void {
-            for (const { controller, key } of this.entries) {
+            for (const { controller, key } of [...this.entries, ...this.hudEntries]) {
                 controller.unregisterEvents?.();
                 controller.removeHandle?.(key);
                 controller.hideEditHandles?.();
                 controller.hide?.();
             }
             this.entries.length = 0;
+            this.hudEntries.length = 0;
         }
 
         public onDestroy(): void {
             this.finish(false);
+            this.finishHud(true);
             this.shown = false;
             this.clearEntries();
         }
@@ -371,7 +532,9 @@ export interface PositionHandleSceneAdapter {
     status(): { registered: number; active: number; reason: string };
 }
 
-export function createPositionHandleAdapter(): PositionHandleSceneAdapter {
+export function createPositionHandleAdapter(
+    allowHud: (component: Component) => boolean = () => true,
+): PositionHandleSceneAdapter {
     const registered = new Map<string, any>();
     const active = new Map<Component, any>();
     let gizmoConstructor: any = null;
@@ -389,7 +552,7 @@ export function createPositionHandleAdapter(): PositionHandleSceneAdapter {
         }
         manager = gizmo;
         typeDefs = pool.typeDefs;
-        if (!gizmoConstructor) gizmoConstructor = createEditorGizmo(typeDefs['cc.BoxCollider']);
+        if (!gizmoConstructor) gizmoConstructor = createEditorGizmo(typeDefs['cc.BoxCollider'], allowHud);
         reason = 'ready';
         return true;
     }
@@ -428,7 +591,9 @@ export function createPositionHandleAdapter(): PositionHandleSceneAdapter {
             const wanted = new Set<Component>();
             for (const component of components) {
                 if (!component?.isValid || !component.enabled || !component.node?.activeInHierarchy ||
-                    !selected.has(component.node.uuid) || typeof component.onGizmoHandles !== 'function') continue;
+                    !selected.has(component.node.uuid) ||
+                    (typeof component.onGizmoHandles !== 'function' &&
+                     typeof component.onGizmoHudControls !== 'function')) continue;
                 wanted.add(component);
                 let installed = false;
                 for (const key of selectedKeys(component)) {
