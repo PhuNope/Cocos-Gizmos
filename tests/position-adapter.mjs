@@ -12,6 +12,10 @@ const compile = name => ts.transpileModule(
 ).outputText;
 const math = { exports: {} };
 vm.runInNewContext(compile('PositionDragSolver'), math);
+const hud = { exports: {} };
+vm.runInNewContext(compile('GizmoHudControls'), hud);
+const presentation = { exports: {} };
+vm.runInNewContext(compile('GizmoPresentation'), presentation);
 const events = [];
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
@@ -96,6 +100,8 @@ const sandbox = {
     require(name) {
         if (name === 'cc') return { Color, Vec3, Quat, Layers: { Enum: { GIZMOS: 4 } }, Component: class {} };
         if (name === './PositionDragSolver') return math.exports;
+        if (name === './GizmoHudControls') return hud.exports;
+        if (name === './GizmoPresentation') return presentation.exports;
         throw new Error('Unknown import ' + name);
     },
 };
