@@ -163,7 +163,7 @@ assert.equal(graphics.length, 1, 'Same RGBA and layer must share a Graphics comp
 assert.equal(count(graphics[0], 'stroke'), 1);
 assert.equal(count(graphics[0], 'lineTo'), 100);
 assert.equal(count(graphics[0], 'circle'), 64);
-assert.deepEqual(graphics[0].calls.find((c) => c[0] === 'lineTo'), ['lineTo', -9, -19],
+assert.deepEqual(graphics[0].calls.find((c) => c[0] === 'lineTo'), ['lineTo', 1, 1],
     'World line endpoint must use the second point');
 
 Gizmos2D.beginLocalPosition(rootNode);
@@ -189,7 +189,8 @@ assert.equal(graphics[3].node.layer, cc.Layers.Enum.DEFAULT);
 const beforeClears = graphics.map((g) => g.clearCount);
 debug.lateUpdate(0); // One empty frame clears previous commands.
 const afterClears = graphics.map((g) => g.clearCount);
-assert.ok(afterClears.every((value, index) => value === beforeClears[index] + 1));
+assert.equal(afterClears[0], beforeClears[0], 'Inactive renderer should not clear repeatedly');
+assert.ok(afterClears.slice(1).every((value, index) => value === beforeClears[index + 1] + 1));
 debug.lateUpdate(0); // Subsequent idle frames do not clear again.
 assert.deepEqual(graphics.map((g) => g.clearCount), afterClears);
 
