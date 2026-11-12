@@ -65,7 +65,9 @@ callbacks may still work, but interactive handles cannot be assumed to work.
   Prefab instance. Ensure that the Inspector's Prefab override indicator and
   Undo/Redo history agree with the changed serialized values.
 - **Camera:** Pan, zoom and switch between orthographic 2D and perspective 3D.
-  HUD text and picking markers should remain aligned.
+  HUD text and picking markers should remain aligned. If the Scene camera is
+  temporarily unavailable, HUD picking markers should disappear and then
+  reappear automatically when the camera returns, without duplicated listeners.
 
 ## Cocos Creator 3.8.8 controller compatibility
 
