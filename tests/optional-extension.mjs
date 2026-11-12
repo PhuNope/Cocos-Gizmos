@@ -30,7 +30,7 @@ try {
     ].join('\n'));
     const file = write('Consumer.ts', [
         "import { _decorator, Component } from 'cc';",
-        "import type { Gizmos2D as Gizmos2DType } from '@types/cocos-gizmos';",
+        "import type { Gizmos2D as Gizmos2DType } from 'cocos-gizmos';",
         'const { ccclass } = _decorator;',
         "@ccclass('OptionalGizmo')",
         'export class OptionalGizmo extends Component {',
@@ -49,8 +49,8 @@ try {
 
     const options = {
         target: ts.ScriptTarget.ES2017,
-        module: ts.ModuleKind.CommonJS,
-        moduleResolution: ts.ModuleResolutionKind.Node10,
+        module: ts.ModuleKind.Node16,
+        moduleResolution: ts.ModuleResolutionKind.Node16,
         experimentalDecorators: true,
         strict: true,
         skipLibCheck: true,
