@@ -49,7 +49,7 @@ const sink = {
 };
 const sandbox = {
     exports: {},
-    cce: { Camera: { camera } },
+    cce: { Camera: { _camera: { camera } } },
     require(id) {
         if (id === 'cc') return { Color, Vec3 };
         if (id === './Gizmos3D') return { Gizmos3D: sink };
