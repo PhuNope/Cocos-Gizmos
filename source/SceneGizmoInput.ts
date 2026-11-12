@@ -4,7 +4,8 @@ export interface ScenePointer { x: number; y: number }
 type InputEventName =
     'controllerDown' | 'controllerMove' | 'controllerUp' |
     'gizmoDown' | 'gizmoMove' | 'gizmoUp' |
-    'outsideDown' | 'outsideUp' | 'missingPointer';
+    'outsideDown' | 'outsideUp' | 'missingPointer' |
+    'ignoredUp' | 'committedClick' | 'cancelledClick';
 
 function pointFrom(value: any): ScenePointer | null {
     if (!value || typeof value !== 'object') return null;
@@ -57,6 +58,9 @@ export interface GizmoInputSnapshot {
     outsideDown: number;
     outsideUp: number;
     missingPointer: number;
+    ignoredUp: number;
+    committedClick: number;
+    cancelledClick: number;
     recent: string[];
 }
 
@@ -69,6 +73,7 @@ export class GizmoInputDiagnostics {
         controllerDown: 0, controllerMove: 0, controllerUp: 0,
         gizmoDown: 0, gizmoMove: 0, gizmoUp: 0,
         outsideDown: 0, outsideUp: 0, missingPointer: 0,
+        ignoredUp: 0, committedClick: 0, cancelledClick: 0,
     };
     private readonly recent: string[] = [];
 
