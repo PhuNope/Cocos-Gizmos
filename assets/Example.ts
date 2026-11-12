@@ -1,71 +1,31 @@
-import { _decorator, Color, Component, Layers, Node, SpriteFrame, Vec2, Vec3 } from 'cc';
+import { _decorator, Color, Component, Vec2, Vec3 } from 'cc';
 
 const { ccclass, property } = _decorator;
 
-// Gizmos hooks are auto-discovered by the editor; no decorator or import is required.
 @ccclass('Gizmos.Example')
-export default class Example extends Component {
-    @property(SpriteFrame)
-    private spriteFrame: SpriteFrame;
+export default class GizmosExample extends Component {
+    @property
+    public radius = 100;
 
     /**
-     * Gizmos2D chỉ có thể hiện thị khi được bọc bởi 1 canvas hoặc 1 RenderRoot2D
-     * Gizmos 3D có thể hiện thị cả trong canvas và ngoài canvas
-     * Với các hình 3D có thể gặp tình trạng lag nếu hình vẽ quá lớn và phức tạp
-     * có thể chuyền segment vào để điều chỉnh giảm độ phân giải của 1 số hình vẽ cho tối ưu (mặc định là 32)
-     * hoặc tăng độ phân giải đề hình được mượt và đều hơn với những hình nhỏ
+     * Draws the range in the Scene View while the Gizmos extension is enabled.
+     * The method is optional and requires no registration decorator.
      */
+    public onDrawGizmos(): void {
+        Gizmos2D.beginColor(this.node, Color.GREEN);
+        Gizmos2D.drawCircle(this.node, new Vec2(0, 0), this.radius);
+    }
 
-    //luôn luôn update mỗi frame trong editor
-    onDrawGizmos(): void {
-        Gizmos3D.drawLabel(this.node, 'T', 'OK', this.node.worldPosition, 50, 0.01);
+    /**
+     * Draws a 3D marker when this node is selected in the Scene View.
+     */
+    public onDrawGizmosSelected(): void {
         Gizmos3D.beginColor(this.node, Color.YELLOW);
-        Gizmos3D.drawLabel(this.node, 'T1', '1234', this.node.worldPosition, 50, 0.01);
-        Gizmos3D.drawSprite(this.node, 't', this.spriteFrame, this.node.worldPosition, new Vec2(0.01, 0.01));
-
-        Gizmos3D.beginColor(this.node, Gizmos3D.DEFAULT_COLOR);
-        Gizmos2D.drawEllipse(this.node, this.node.worldPosition, 100, 50);
-        Gizmos3D.drawCapsule(this.node, this.node.worldPosition, 2, 1);
-        // dùng beginColor để set một màu khác, các lệnh gọi draw sau dòng này sẽ có màu mới được set
-        // màu mặc định của gizmos sử dụng Gizmos2D.DEFAULT_COLOR
-        Gizmos2D.beginColor(this.node, Color.RED);
-        Gizmos2D.drawCircle(this.node, this.node.worldPosition, 100);
-        Gizmos2D.drawCircle(this.node, this.node.worldPosition, 200);
-        Gizmos3D.beginColor(this.node, Color.RED);
         Gizmos3D.drawSphere(this.node, this.node.worldPosition, 1);
-        //layer mặc định là gizmos chỉ hiện thị trên editor để đổi layer dùng beginLayer, các lệnh gọi draw sau dòng này sẽ có layer mới được set
-        // layer mặc định của gizmos sử dụng Gizmos2D.DEFAULT_LAYER
-        Gizmos2D.beginLayer(this.node, Layers.Enum.UI_2D);
-        Gizmos2D.drawCircle(this.node, this.node.worldPosition, 100);
-        Gizmos2D.drawCircle(this.node, this.node.worldPosition, 200);
-        Gizmos2D.beginLayer(this.node, Layers.Enum.DEFAULT);
-        Gizmos2D.drawCircle(this.node, this.node.worldPosition, 100);
-        Gizmos2D.drawCircle(this.node, this.node.worldPosition, 200);
-        // gizmos 3d không cần set layer mà mặc định đều có thể hiện thị trên cả editor và runtime
-        //theo mặc định gizmos sử dụng world position, để chuyển qua sử dụng local position dùng beginLocalPosition
-        Gizmos2D.beginLocalPosition(this.node);
-        Gizmos2D.drawCircle(this.node, new Vec3(100, 100), 100);
-        Gizmos2D.drawCircle(this.node, new Vec3(100, 200), 100);
-        // để kết thúc dùng endLocalPosition
-        Gizmos2D.endLocalPosition(this.node);
-        Gizmos2D.drawCircle(this.node, new Vec3(100, 100), 100);
-        Gizmos2D.drawCircle(this.node, new Vec3(100, 200), 100);
-        Gizmos3D.setDepTest(this.node, false);
-        Gizmos3D.beginLocalPosition(this.node);
-        Gizmos3D.drawSphere(this.node, new Vec3(2, 3), 1);
-        Gizmos3D.endLocalPosition(this.node);
-        Gizmos3D.drawSphere(this.node, new Vec3(2, 3), 1);
-        Gizmos3D.setDepTest(this.node, true);
-    }
-
-    //update mỗi frame trong editor khi object được chọn
-    onDrawGizmosSelected(): void {
-        Gizmos2D.drawSolidCircle(this.node, this.node.worldPosition, 100);
-    }
-
-    // nếu muốn debug ở runtime thì có thể dùng update
-    protected update(dt: number): void {
-        Gizmos2D.drawLine(this.node, new Vec2(0, 0), new Vec2(200, 300));
-        Gizmos3D.drawCylinder(this.node, new Vec3(100, 100), 100, 100, new Vec3(), true, 16);
+        Gizmos3D.drawLine(
+            this.node,
+            this.node.worldPosition,
+            new Vec3(this.node.worldPosition.x, this.node.worldPosition.y + 2, this.node.worldPosition.z),
+        );
     }
 }
