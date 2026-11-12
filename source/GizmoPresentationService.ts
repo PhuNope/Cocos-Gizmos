@@ -1,6 +1,7 @@
 import { Component } from 'cc';
 import { Gizmos3D } from './Gizmos3D';
 import { GizmoHudOverlay } from './GizmoHudOverlay';
+import { formatHudControl, normalizeHudControls } from './GizmoHudControls';
 import {
     GizmoViewConfig,
     normalizeHudItems,
@@ -39,9 +40,23 @@ export class GizmoPresentationService {
     }
 
     public renderHud(component: Component): number {
-        const callback = component.onGizmoHud;
-        if (typeof callback !== 'function') return 0;
-        const entries = normalizeHudItems(callback.call(component));
+        const textCallback = component.onGizmoHud;
+        const controlsCallback = component.onGizmoHudControls;
+        const entries = typeof textCallback === 'function' ?
+            normalizeHudItems(textCallback.call(component)) : [];
+        if (typeof controlsCallback === 'function') {
+            for (const control of normalizeHudControls(controlsCallback.call(component))) {
+                const value = control.type === 'slider' ?
+                    (component as any)[control.property] : undefined;
+                entries.push({
+                    id: 'control:' + control.id,
+                    text: formatHudControl(control, value),
+                    order: entries.length,
+                    fontSize: 14,
+                    color: control.color,
+                });
+            }
+        }
         const count = this.overlay.render(component, entries);
         if (count) Gizmos3D.beginColor(component.node, Gizmos3D.DEFAULT_COLOR);
         return count;
