@@ -94,7 +94,7 @@ const sandbox = {
     cce: { Camera: { camera: cam }, Gizmo: manager, Engine: { repaintInEditMode() {} } },
     console: { warn(...args) { throw new Error(args.join(' ')); } },
     require(name) {
-        if (name === 'cc') return { Color, Vec3, Quat, Component: class {}, director: {} };
+        if (name === 'cc') return { Color, Vec3, Quat, Layers: { Enum: { GIZMOS: 4 } }, Component: class {} };
         if (name === './PositionDragSolver') return math.exports;
         throw new Error('Unknown import ' + name);
     },
@@ -114,6 +114,9 @@ assert.equal(gizmo.controllers[0]._editHandlesShape.children[1].active, true);
 assert.equal(gizmo.controllers[0]._editHandlesShape.children[0].active, false);
 assert.equal(gizmo.controllers[0]._cubeNode.active, true, 'The rendered point remains visible');
 assert.equal(gizmo.controllers[0]._cubeNodeMR.enabled, true, 'Point mesh rendering is enabled');
+assert.equal(gizmo.controllers[0]._cubeNode.layer, 4, 'Point marker uses the Gizmos render layer');
+assert.equal(gizmo.controllers[0]._editHandlesShape.children[1].layer, 4,
+    'Picking proxy uses the Gizmos layer');
 assert.equal(gizmo.controllers[0]._wireFrameBoxMeshRenderer.enabled, false, 'Collider wireframe is hidden');
 assert.equal(gizmo.controllers[0].editable, true, 'Controller accepts editor interaction');
 const ctrl = gizmo.controllers[0];
