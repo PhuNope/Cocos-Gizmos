@@ -284,7 +284,7 @@ if (globalThis.Editor && globalThis.Editor.App && globalThis.Editor.App.path) {
     module.paths.push(require('node:path').join(globalThis.Editor.App.path, 'node_modules'));
 }
 `;
-for (const name of ['GizmoPresentation', 'GizmoHudOverlay', 'GizmoPresentationService', 'PositionDragSolver', 'PositionHandles', 'SceneUpdateScheduler', 'DrawCommandBuffer2D', 'Gizmos2D', 'Gizmos3D', 'ExecuteGizmos']) {
+for (const name of ['GizmoPresentation', 'GizmoHudControls', 'GizmoHudOverlay', 'GizmoPresentationService', 'PositionDragSolver', 'PositionHandles', 'SceneUpdateScheduler', 'DrawCommandBuffer2D', 'Gizmos2D', 'Gizmos3D', 'ExecuteGizmos']) {
     const fileName = path.join(SRC_DIR, name + '.ts');
     const result = ts.transpileModule(readFileSync(fileName, 'utf8'), {
         fileName,
