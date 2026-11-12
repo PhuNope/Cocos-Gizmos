@@ -237,6 +237,74 @@ Component handle declarations contain data only. Projects with type definitions
 but without the extension can load these components normally; the game does
 not invoke these Editor callbacks automatically.
 
+## Scene View display settings and HUD
+
+Open **Extensions → Gizmos Settings** to configure default visibility without
+modifying project files. The two controls are **Gizmo display** (`Always`,
+`Selected`, `Off`) and **HUD labels** (`Selected`, `Always`, `Off`).
+The settings are applied to the active Scene View and do not modify Game builds.
+
+A component can use regular serialized `@property` fields in the Cocos
+Inspector and expose their values through `onGizmoSettings()`. The Inspector
+continues to render the component's own fields without a replacement renderer.
+
+```ts
+import { _decorator, Component, Enum } from 'cc';
+
+const { ccclass, property } = _decorator;
+
+enum GizmoVisibility {
+    Always = 0,
+    Selected = 1,
+    Off = 2,
+}
+
+@ccclass('RangeGizmoView')
+export class RangeGizmoView extends Component {
+    @property({ type: Enum(GizmoVisibility) })
+    gizmoVisibility = GizmoVisibility.Selected;
+
+    @property
+    hudEnabled = true;
+
+    onGizmoSettings(): GizmoViewSettings {
+        return {
+            display: ['always', 'selected', 'off'][this.gizmoVisibility] as GizmoDisplayMode,
+            hud: this.hudEnabled ? 'selected' : 'off',
+        };
+    }
+
+    onGizmoHud(): GizmoHudItem[] {
+        return [
+            { id: 'name', text: this.node.name, order: 0, color: '#ffffff' },
+            { id: 'mode', text: 'Range preview', order: 1, fontSize: 14 },
+        ];
+    }
+}
+```
+
+Use stable `id` values to reuse HUD Label components between Scene frames.
+The HUD is positioned near the node in the Scene View, not drawn into the game.
+A component may return up to 24 text entries; unsupported colors and invalid
+entries fall back to safe values or are skipped. HUD text updates only when
+the underlying label content changes, while projection follows Scene camera
+movement.
+
+A per-component `onGizmoSettings()` result overrides the default panel settings.
+The `display` option controls `onDrawGizmos()` and `onDrawGizmosSelected()`.
+The `hud` option controls `onGizmoHud()` independently. Both callbacks are
+optional; the extension is not required for game runtime.
+
+To inspect HUD activity from Developer Tools:
+
+```js
+Editor.Message.request('scene', 'execute-scene-script', {
+    name: 'cocos-gizmos',
+    method: 'gizmosHudStatus',
+    args: []
+}).then(console.log);
+```
+
 ## Build locally
 
 ```bash
