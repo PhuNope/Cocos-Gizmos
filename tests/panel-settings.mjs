@@ -12,8 +12,10 @@ const manifest = require('../package.json');
 assert.equal(manifest.panels.settings.main, './panels/settings/index.js');
 assert.equal(manifest.contributions.messages['get-settings'].methods[0], 'getSettings');
 assert.equal(manifest.contributions.messages['set-settings'].methods[0], 'setSettings');
+assert.equal(manifest.contributions.messages['get-diagnostics'].methods[0], 'getDiagnostics');
 assert.match(panel.template, /Gizmo display/);
 assert.match(panel.template, /HUD labels/);
+assert.match(panel.template, /Check Scene integration/);
 
 const originalEditor = globalThis.Editor;
 const forwarded = [];
@@ -25,10 +27,18 @@ globalThis.Editor = {
             if (service === 'cocos-gizmos') {
                 if (message === 'get-settings') return main.methods.getSettings();
                 if (message === 'set-settings') return main.methods.setSettings(args);
+                if (message === 'get-diagnostics') return main.methods.getDiagnostics();
                 throw new Error('unexpected settings message');
             }
             assert.equal(service, 'scene');
             assert.equal(message, 'execute-scene-script');
+            if (args.method === 'gizmosSmokeReport') {
+                if (!allowScene) throw new Error('Scene not ready');
+                assert.deepEqual(args.args, []);
+                return { scene: { updaterStarted: true, name: 'SampleScene' },
+                    bridge: { colliderControllerAvailable: true },
+                    requiresManualVerification: ['Ctrl+Z'], concerns: [] };
+            }
             assert.equal(args.method, 'gizmosSetViewSettings');
             forwarded.push(args.args[0]);
             if (!allowScene) throw new Error('Scene not ready');
@@ -52,6 +62,7 @@ try {
                 handlers.delete(name);
             },
             async change() { return handlers.get('change')(); },
+            async click() { return handlers.get('click')(); },
             listenerCount() { return handlers.size; },
         };
     }
@@ -60,11 +71,18 @@ try {
             display: makeSelect(''),
             hud: makeSelect(''),
             feedback: { textContent: '' },
+            diagnosticsRun: makeSelect(''),
+            diagnosticsResult: { textContent: '' },
         },
     };
     await panel.ready.call(host);
     assert.equal(host.$.display.value, 'always');
     assert.equal(host.$.hud.value, 'selected');
+    assert.equal(host.$.diagnosticsRun.listenerCount(), 1);
+    await host.$.diagnosticsRun.click();
+    assert.match(host.$.diagnosticsResult.textContent, /SampleScene/);
+    assert.match(host.$.diagnosticsResult.textContent, /Ctrl\\\\\+Z/); // textual Ctrl+Z included
+
     host.$.display.value = 'selected';
     host.$.hud.value = 'off';
     await host.$.display.change();
@@ -79,9 +97,12 @@ try {
     assert.equal(host.$.display.value, 'selected', 'Failed updates restore last applied settings');
     assert.equal(main.methods.getSettings().display, 'selected');
     assert.match(host.$.feedback.textContent, /Cannot update Scene View/);
+    await host.$.diagnosticsRun.click();
+    assert.match(host.$.diagnosticsResult.textContent, /Scene diagnostics unavailable/);
     panel.close.call(host);
     assert.equal(host.$.display.listenerCount(), 0);
     assert.equal(host.$.hud.listenerCount(), 0);
+    assert.equal(host.$.diagnosticsRun.listenerCount(), 0);
 
     console.log('[settings-panel] manifest, scene messaging, update rollback and cleanup OK');
 } finally {
