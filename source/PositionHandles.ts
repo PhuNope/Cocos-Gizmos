@@ -493,7 +493,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
 
         public onHide(): void {
             this.finish(false);
-            this.finishHud(false);
+            this.finishHud(true);
             this.shown = false;
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 controller.unregisterEvents?.();
