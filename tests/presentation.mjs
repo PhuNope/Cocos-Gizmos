@@ -46,7 +46,7 @@ const hud = normalizeHudItems([
     { id: 'three', text: 'Third', order: 3, color: '<script>' },
 ], 3);
 assert.equal(hud.length, 3);
-assert.deepEqual(hud.map(x => x.id), ['one', 'two', 'three']);
+assert.deepEqual(Array.from(hud, x => x.id), ['one', 'two', 'three']);
 assert.equal(hud[0].fontSize, 9);
 assert.equal(hud[1].fontSize, 60);
 assert.equal(hud[2].color, '#ffffff');
