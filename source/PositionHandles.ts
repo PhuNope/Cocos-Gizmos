@@ -643,6 +643,8 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
 
 export interface PositionHandleSceneAdapter {
     refresh(components: readonly Component[], selected: ReadonlySet<string>, now: number): void;
+    /** Immediately hide active controllers when the Scene changes or closes. */
+    clear(): void;
     dispose(): void;
     status(): {
         registered: number; active: number; reason: string;
@@ -736,6 +738,11 @@ export function createPositionHandleAdapter(
                     active.delete(component);
                 }
             }
+        },
+        clear() {
+            for (const gizmo of active.values()) gizmo.hide?.();
+            active.clear();
+            latestScan = -Infinity;
         },
         dispose() {
             for (const gizmo of active.values()) gizmo.hide?.();
