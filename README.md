@@ -305,6 +305,67 @@ Editor.Message.request('scene', 'execute-scene-script', {
 }).then(console.log);
 ```
 
+## Interactive HUD controls
+
+Components can return buttons, sliders, toggles, and checkboxes from
+`onGizmoHudControls(): GizmoHudControlList`. The Editor displays these controls
+beside the node in Scene View. A toggle displays `[ON]` or `[OFF]`, and a
+checkbox displays `[x]` or `[ ]`. Click them to flip a serialized
+boolean property; sliders drag a numeric property.
+
+```ts
+import { _decorator, Component } from 'cc';
+const { ccclass, property } = _decorator;
+
+@ccclass('GizmoHudExample')
+export class GizmoHudExample extends Component {
+    @property
+    showRange = true;
+
+    @property
+    showGrid = false;
+
+    @property
+    radius = 50;
+
+    onGizmoHudControls(): GizmoHudControlList {
+        return [
+            { type: 'toggle', id: 'range', text: 'Range', property: 'showRange' },
+            { type: 'checkbox', id: 'grid', text: 'Grid', property: 'showGrid' },
+            {
+                type: 'slider', id: 'radius', text: 'Radius',
+                property: 'radius', min: 0, max: 200, step: 5,
+            },
+            { type: 'button', id: 'reset', text: 'Reset' },
+        ];
+    }
+
+    onGizmoHudAction(id: string): void {
+        if (id === 'reset') this.radius = 50;
+    }
+
+    onGizmoHudChanged(
+        property: string,
+        phase: GizmoHandlePhase,
+        value: number | boolean,
+    ): void {
+        // Handle dependent values after a Scene HUD edit.
+    }
+}
+```
+
+The HUD uses stable control IDs and reuses the Scene label renderer. Toggle
+and checkbox clicks are applied when the pointer is released, and cancelled
+clicks leave the property unchanged. Slider edits notify
+`onGizmoHudChanged()` during `begin`, `update`, `end`, and `cancel`.
+Boolean edits notify `begin`, `update`, and `end` for successful clicks.
+The Editor component change handler is notified after a property edit.
+
+Interactive HUD controls appear for selected nodes when HUD visibility is
+enabled. They require the compatible Editor Gizmo controller. The extension
+does not add runtime JavaScript to the game; these optional callbacks can
+remain in a project using only the TypeScript declarations.
+
 ## Build locally
 
 ```bash
