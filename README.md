@@ -156,6 +156,75 @@ The Scene callback scheduler refreshes the selection snapshot regularly while
 keeping component discovery separate from every-frame drawing. Draw callbacks
 remain active every Scene frame so animated Gizmos still update.
 
+## Position Handles in the Scene View
+
+Declare `onGizmoHandles()` on a component to expose editable Vec3 properties
+while its node is selected. The component does not need a registration decorator
+or any runtime import.
+
+```ts
+import { _decorator, Component, Vec3 } from 'cc';
+const { ccclass, property } = _decorator;
+
+@ccclass('LineHandles')
+export class LineHandles extends Component {
+    @property(Vec3)
+    startPoint = new Vec3(-150, 0, 0);
+
+    @property(Vec3)
+    endPoint = new Vec3(150, 0, 0);
+
+    onGizmoHandles() {
+        return [
+            { property: 'startPoint', plane: 'xy' as const, space: 'local' as const, snap: 5 },
+            { property: 'endPoint', plane: 'xy' as const, space: 'local' as const, snap: 5 },
+        ];
+    }
+
+    onDrawGizmosSelected(): void {
+        Gizmos2D.beginLocalPosition(this.node);
+        Gizmos2D.drawLine(this.node, this.startPoint, this.endPoint);
+        Gizmos2D.endLocalPosition(this.node);
+    }
+
+    onGizmoChanged(property: string, phase: 'begin' | 'update' | 'end' | 'cancel'): void {
+        // Respond to handle edits when dependent component values need refreshing.
+    }
+}
+```
+
+- `plane`: `xy`, `xz`, `yz` or `view`. Use `xy` to move a point around
+  a 2D Node. Movement is not restricted by a maximum distance.
+- `space`: `local` (default) or `world`. The plane follows the node
+  transform in local space.
+- `axis`: optional `x`, `y` or `z` to allow movement on only one axis.
+- `snap`: positive step size in the selected coordinate space.
+- `bounds`: optional `min` and `max` per coordinate axis.
+- `index`: use when the property is an array of `Vec3` positions.
+- `color`: optional hex color for the handle marker.
+
+Dragging invokes `onGizmoChanged(property, phase, index?)` for the
+`begin`, `update`, and `end` phases. Escape cancels an active drag,
+restores its starting value, and reports `cancel`. The Editor controller
+also receives begin/update/end calls for its normal change tracking.
+
+The extension uses the Editor component Gizmo controller when it is available.
+If the current Cocos Creator version does not expose that controller, drawing
+callbacks continue working but editable handles remain unavailable.
+Use `gizmosHandleStatus` in Scene DevTools to inspect registration:
+
+```js
+Editor.Message.request('scene', 'execute-scene-script', {
+    name: 'cocos-gizmos',
+    method: 'gizmosHandleStatus',
+    args: []
+}).then(console.log);
+```
+
+Component handle declarations contain data only. Projects with type definitions
+but without the extension can load these components normally; the game does
+not invoke these Editor callbacks automatically.
+
 ## Build locally
 
 ```bash
