@@ -12,6 +12,8 @@ const compile = name => ts.transpileModule(
 ).outputText;
 const math = { exports: {} };
 vm.runInNewContext(compile('PositionDragSolver'), math);
+const edits = { exports: {} };
+vm.runInNewContext(compile('GizmoEditSession'), edits);
 const hud = { exports: {} };
 vm.runInNewContext(compile('GizmoHudControls'), hud);
 const presentation = { exports: {} };
@@ -32,6 +34,7 @@ vm.runInNewContext(compile('GizmoHudProjection'), {
     require(name) {
         if (name === 'cc') return { Vec3 };
         if (name === './PositionDragSolver') return math.exports;
+        if (name === './GizmoEditSession') return edits.exports;
         throw new Error('Unknown projection import ' + name);
     },
 });
@@ -149,6 +152,10 @@ assert.ok(events.includes('begin:target'));
 assert.ok(events.includes('update:target'));
 assert.ok(events.includes('end:target'));
 assert.ok(events.includes('component-changed'));
+assert.equal(events.filter(value => value === 'begin:target').length, 2,
+    'One position drag opens one controller transaction');
+assert.equal(events.filter(value => value === 'end:target').length, 2,
+    'One position drag closes one controller transaction');
 
 ctrl.onMouseDown({ handleName: 'y', x: 150, y: 0 });
 ctrl.onMouseMove({ handleName: 'y', x: -300, y: 250 });
