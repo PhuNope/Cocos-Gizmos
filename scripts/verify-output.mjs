@@ -6,7 +6,7 @@ import ts from 'typescript';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const fail = (message) => { throw new Error('[verify-output] ' + message); };
-const expected = ['Define.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'Gizmos2D.js', 'Gizmos3D.js'].sort();
+const expected = ['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'Gizmos2D.js', 'Gizmos3D.js'].sort();
 const actual = readdirSync(dist).sort();
 if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     fail('Expected runtime and type files, got: ' + actual.join(', '));
@@ -38,7 +38,7 @@ if (!publicEntry.includes('if (EDITOR_NOT_IN_PREVIEW) Object.assign(globalThis, 
 // Check actual class decorators in each original source module. Their emitted
 // counterparts must remain in different JS files (never concatenate again).
 let totalDecorated = 0;
-for (const name of ['Gizmos2D', 'Gizmos3D', 'DrawCommandBuffer2D', 'Define', 'ExecuteGizmos']) {
+for (const name of ['Gizmos2D', 'Gizmos3D', 'SceneUpdateScheduler', 'DrawCommandBuffer2D', 'Define', 'ExecuteGizmos']) {
     const sourceFile = path.join(root, 'source', name + '.ts');
     const sourceText = readFileSync(sourceFile, 'utf8');
     const source = ts.createSourceFile(sourceFile, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -63,6 +63,9 @@ for (const dependency of ['Gizmos2D.js', 'Gizmos3D.js', 'ExecuteGizmos.js']) {
     if (!publicEntry.includes("'" + (dependency === 'ExecuteGizmos.js' ? './ExecuteGizmos.js' : './' + dependency) + "'")) {
         fail('Missing module dependency ' + dependency);
     }
+}
+if (!read('ExecuteGizmos.js').includes("from './SceneUpdateScheduler.js'")) {
+    fail('ExecuteGizmos must import the Scene update scheduler');
 }
 if (!read('Gizmos2D.js').includes("from './DrawCommandBuffer2D.js'")) {
     fail('Gizmos2D must import the shared 2D command buffer');
