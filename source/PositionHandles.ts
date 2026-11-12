@@ -22,7 +22,9 @@ function cceNamespace(): any {
 }
 
 function camera(): any {
-    return cceNamespace()?.Camera?.camera || null;
+    const editorCamera = cceNamespace()?.Camera;
+    // Creator 3.8 Scene camera is often exposed through the internal wrapper.
+    return editorCamera?.camera || editorCamera?._camera?.camera || null;
 }
 
 function validPoint(value: any): value is Point {
