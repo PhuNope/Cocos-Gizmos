@@ -214,6 +214,21 @@ ctrl.onMouseUp();
 assert.equal(events.filter(value => value === 'component-changed').length, baselineWrites,
     'No-op drag must not refresh Inspector or write component data');
 
+const operationsBefore = events.filter(v => v === 'native-begin:target').length;
+gizmo.onGizmoMouseDown({
+    detail: { handleName: 'position:target:single' },
+    getUILocation() { return { x: 150, y: 0 }; },
+});
+ctrl.onMouseDown({ handleName: 'position:target:single', x: 150, y: 0 });
+gizmo.onGizmoMouseMove({ getLocation() { return { x: 190, y: 0 }; } });
+gizmo.onGizmoMouseUp();
+assert.equal(component.target.x, 190, 'Operation-level events can drag a position handle');
+assert.equal(events.filter(v => v === 'native-begin:target').length, operationsBefore + 1,
+    'Operation and controller duplicate down events must open only one transaction');
+assert.equal(adapter.status().input.gizmoDown, 1);
+assert.equal(adapter.status().input.gizmoUp, 1);
+component.target = new Vec3(150, 0, 0);
+
 ctrl.onMouseDown({ handleName: 'position:target:single', x: 150, y: 0 });
 ctrl.onMouseMove({ handleName: 'position:target:single', x: -400, y: 180 });
 assert.notEqual(component.target.x, 150);
@@ -324,6 +339,10 @@ assert.equal(buttonClicks, 1, 'Cancelled button click is not dispatched');
 button.onMouseDown({ handleName: 'hud:reset', x: 10, y: 10 });
 hudGizmo.onNotGizmoMouseUp();
 assert.equal(buttonClicks, 1, 'Releasing outside the handle must not click a button');
+hudGizmo.onGizmoMouseDown({ detail: { handleName: 'hud:reset' } });
+hudGizmo.onGizmoMouseUp();
+assert.equal(buttonClicks, 2, 'Operation-level HUD events can click a button exactly once');
+assert.equal(hudAdapter.status().input.gizmoDown, 1);
 slider.onMouseDown({ handleName: 'hud:radius', x: 30, y: 10 });
 slider.onMouseMove({ handleName: 'hud:radius', x: 42, y: 10 });
 hudGizmo.onNotGizmoMouseUp();
