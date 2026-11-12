@@ -83,7 +83,8 @@ export function buildGizmoSmokeReport(
             draggingPosition: handleState.draggingPosition ?? 0,
             draggingSlider: handleState.draggingSlider ?? 0,
             pendingClicks: handleState.pendingClicks ?? 0,
-        } : { registered: 0, active: 0, reason: 'not-loaded' },
+            input: handleState.input ?? null,
+        } : { registered: 0, active: 0, reason: 'not-loaded', input: null },
         concerns: [],
         requiresManualVerification: [
             'Click and drag a position handle in the real Scene View',
@@ -107,6 +108,9 @@ export function buildGizmoSmokeReport(
         report.concerns.push('Expected controller transaction hooks are not exposed');
     }
     if (report.scene.callbackErrors) report.concerns.push('Gizmo callback errors have occurred');
+    if ((report.handles.input?.missingPointer ?? 0) > 0) {
+        report.concerns.push('Some handle events did not provide usable Scene pointer coordinates');
+    }
     if (report.handles.reason && report.handles.reason !== 'ready' &&
         report.handles.reason !== 'not-initialized') {
         report.concerns.push('Handle adapter: ' + report.handles.reason);
