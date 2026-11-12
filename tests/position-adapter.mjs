@@ -18,6 +18,8 @@ const hud = { exports: {} };
 vm.runInNewContext(compile('GizmoHudControls'), hud);
 const presentation = { exports: {} };
 vm.runInNewContext(compile('GizmoPresentation'), presentation);
+const gizmoInput = { exports: {} };
+vm.runInNewContext(compile('SceneGizmoInput'), gizmoInput);
 const events = [];
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
@@ -56,7 +58,9 @@ class Base {
             initEditHandles() { throw new Error('topNode: unsafe initEditHandles'); },
             showEditHandles() { throw new Error('topNode: unsafe showEditHandles'); },
             initHandle() {},
-            registerEvents() {}, unregisterEvents() {},
+            registerCount: 0, unregisterCount: 0,
+            registerEvents() { this.registerCount++; },
+            unregisterEvents() { this.unregisterCount++; },
             hideEditHandles() { throw new Error('topNode: unsafe hideEditHandles'); },
             hide() {}, show() {}, setPosition(v) { this.position = v; },
             setRotation() {},
@@ -124,6 +128,7 @@ const sandbox = {
         if (name === './GizmoHudControls') return hud.exports;
         if (name === './GizmoPresentation') return presentation.exports;
         if (name === './GizmoHudProjection') return projection.exports;
+        if (name === './SceneGizmoInput') return gizmoInput.exports;
         throw new Error('Unknown import ' + name);
     },
 };
@@ -153,9 +158,22 @@ assert.equal(typeof gizmo.onNotGizmoMouseMove, 'function');
 assert.equal(typeof gizmo.onNotGizmoMouseUp, 'function');
 assert.equal(gizmo.shouldRegisterGizmoOperationEvent, true);
 const ctrl = gizmo.controllers[0];
-ctrl.onMouseDown({ handleName: 'position:target:single', x: 150, y: 0 });
+assert.equal(ctrl.registerCount, 1, 'Controller registers only once on first show');
+gizmo.onShow();
+assert.equal(ctrl.registerCount, 1, 'Repeated onShow does not register duplicate listeners');
+gizmo.onHide();
+assert.equal(ctrl.unregisterCount, 1, 'Hiding unregisters listeners once');
+gizmo.onHide();
+assert.equal(ctrl.unregisterCount, 1, 'Repeated onHide does not unregister twice');
+gizmo.onShow();
+assert.equal(ctrl.registerCount, 2, 'Showing again re-registers a single listener');
+ctrl.onMouseDown({
+    detail: { handleName: 'position:target:single' },
+    data: { mouseX: 150, mouseY: 0 },
+});
 for (const [x, y] of [[0, 150], [-150, 0], [0, -150], [150, 0]]) {
-    ctrl.onMouseMove({ handleName: 'position:target:single', x, y });
+    ctrl.onMouseMove({ handleName: 'position:target:single',
+        getLocation() { return { x, y }; } });
     assert.deepEqual([component.target.x, component.target.y, component.target.z], [x, y, 0],
         'Dragging must cover 360 degrees around a 2D node');
 }
@@ -203,6 +221,16 @@ adapter.refresh([component], new Set(), 1300);
 assert.deepEqual([component.target.x, component.target.y, component.target.z], [150, 0, 0],
     'Selection change must cancel an active drag and restore original property');
 assert.equal(adapter.status().active, 0);
+assert.ok(adapter.status().input.controllerDown >= 4,
+    'Diagnostics count real controller entry points');
+assert.ok(adapter.status().input.controllerMove >= 4,
+    'Diagnostics count actual controller movement');
+const missingBefore = adapter.status().input.missingPointer;
+gizmo.onShow();
+ctrl.onMouseDown({ handleName: 'position:target:single' });
+assert.equal(adapter.status().input.missingPointer, missingBefore + 1,
+    'Missing Cocos pointer coordinates are explicitly diagnosed');
+gizmo.onHide();
 adapter.dispose();
 assert.equal(adapter.status().reason, 'disposed');
 assert.equal(componentPool.typeDefs.ProbePosition, undefined,
@@ -242,6 +270,8 @@ const toggle = hudGizmo.controllers[1];
 const checkbox = hudGizmo.controllers[2];
 const slider = hudGizmo.controllers[3];
 const button = hudGizmo.controllers[4];
+assert.equal(hudAdapter.status().input.controllerDown, 0,
+    'Input statistics are isolated per Scene adapter instance');
 
 const raysBefore = cam.rays;
 hudGizmo.refreshHandles();
@@ -286,6 +316,8 @@ button.onMouseDown({ handleName: 'hud:reset', x: 10, y: 10 });
 assert.equal(buttonClicks, 0);
 button.onMouseUp();
 assert.equal(buttonClicks, 1);
+assert.equal(hudAdapter.status().input.controllerDown > 0, true,
+    'HUD click dispatch is visible in diagnostics');
 button.onMouseDown({ handleName: 'hud:reset', x: 10, y: 10 });
 hudGizmo.onKeyDown({ key: 'Escape' });
 assert.equal(buttonClicks, 1, 'Cancelled button click is not dispatched');
