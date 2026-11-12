@@ -304,6 +304,9 @@ component.onGizmoHudControls = controlsBeforeText;
 
 toggle.onMouseDown({ handleName: 'hud:visibility', x: 10, y: 10 });
 assert.equal(component.visible, false, 'Toggle changes on pointer release');
+checkbox.onMouseUp();
+assert.equal(component.visible, false, 'Mouse up from another controller cannot trigger toggle');
+assert.equal(hudAdapter.status().pendingClicks, 1);
 toggle.onMouseUp();
 assert.equal(component.visible, true);
 assert.ok(hudEvents.includes('visible:begin:false'));
@@ -318,6 +321,9 @@ hudGizmo.onKeyDown({ key: 'Escape' });
 assert.equal(component.grid, false, 'Cancelled click leaves checkbox unchanged');
 
 slider.onMouseDown({ handleName: 'hud:radius', x: 30, y: 10 });
+toggle.onMouseUp();
+assert.equal(hudAdapter.status().draggingSlider, 1,
+    'An unrelated controller up must not end slider drag');
 slider.onMouseMove({ handleName: 'hud:radius', x: 90, y: 10 });
 assert.equal(component.radius, 70);
 slider.onMouseUp();
@@ -329,6 +335,8 @@ assert.equal(component.radius, 70, 'Escape restores the slider value');
 
 button.onMouseDown({ handleName: 'hud:reset', x: 10, y: 10 });
 assert.equal(buttonClicks, 0);
+checkbox.onMouseUp();
+assert.equal(buttonClicks, 0, 'Different HUD controller cannot activate a pending button');
 button.onMouseUp();
 assert.equal(buttonClicks, 1);
 assert.equal(hudAdapter.status().input.controllerDown > 0, true,
@@ -340,9 +348,17 @@ button.onMouseDown({ handleName: 'hud:reset', x: 10, y: 10 });
 hudGizmo.onNotGizmoMouseUp();
 assert.equal(buttonClicks, 1, 'Releasing outside the handle must not click a button');
 hudGizmo.onGizmoMouseDown({ detail: { handleName: 'hud:reset' } });
-hudGizmo.onGizmoMouseUp();
-assert.equal(buttonClicks, 2, 'Operation-level HUD events can click a button exactly once');
-assert.equal(hudAdapter.status().input.gizmoDown, 1);
+hudGizmo.onGizmoMouseUp({ handleName: 'hud:grid' });
+assert.equal(buttonClicks, 1,
+    'Releasing Scene operation over a different control must cancel the button');
+hudGizmo.onGizmoMouseDown({ detail: { handleName: 'hud:reset' } });
+hudGizmo.onGizmoMouseUp({ detail: { handleName: 'hud:reset' } });
+assert.equal(buttonClicks, 2, 'Named operation-level up commits a matching button exactly once');
+assert.equal(hudAdapter.status().input.gizmoDown, 2);
+assert.ok(hudAdapter.status().input.ignoredUp >= 3,
+    'Cross-control releases are visible to diagnostics');
+assert.ok(hudAdapter.status().input.committedClick >= 2);
+assert.ok(hudAdapter.status().input.cancelledClick >= 1);
 slider.onMouseDown({ handleName: 'hud:radius', x: 30, y: 10 });
 slider.onMouseMove({ handleName: 'hud:radius', x: 42, y: 10 });
 hudGizmo.onNotGizmoMouseUp();
