@@ -37,7 +37,7 @@ try {
         '    private readonly typesOnly: Gizmos2DType | null = null;',
         '    public ticks = 0;',
         '    public point = { x: 100, y: 0, z: 0 };',
-        "    public onGizmoHandles() { return [{ property: 'point', plane: 'xy' as const }]; }",
+        "    public onGizmoHandles(): GizmoHandleList { return [{ property: 'point', plane: 'xy', snap: 5 }]; }",
         '    public update(): void { this.ticks++; }',
         '    public onDrawGizmos(): void {',
         '        Gizmos2D.drawCircle(this.node, { x: 0, y: 0 }, 100);',
