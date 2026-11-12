@@ -21,6 +21,12 @@ exports.template = `
         </select>
     </div>
     <p id="gizmo-feedback" role="status"></p>
+    <section class="diagnostics">
+        <h3>Scene diagnostics</h3>
+        <p>Check the current Scene and Gizmo controller capabilities without changing any nodes.</p>
+        <button id="gizmo-diagnostics-run" type="button">Check Scene integration</button>
+        <pre id="gizmo-diagnostics-result" role="status" aria-live="polite"></pre>
+    </section>
 </section>
 `;
 
@@ -31,12 +37,18 @@ exports.style = `
 .gizmos-settings .field { margin: 16px 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .gizmos-settings select { min-width: 150px; border: 1px solid #666; border-radius: 4px; padding: 5px; background: #303030; color: #eee; }
 #gizmo-feedback { min-height: 20px; }
+.gizmos-settings .diagnostics { margin-top: 22px; padding-top: 12px; border-top: 1px solid #666; }
+.gizmos-settings .diagnostics h3 { font-size: 14px; }
+.gizmos-settings .diagnostics button { border: 1px solid #888; border-radius: 4px; padding: 6px 10px; background: #444; color: #eee; }
+.gizmos-settings .diagnostics pre { margin-top: 8px; max-height: 280px; overflow: auto; white-space: pre-wrap; word-wrap: break-word; font: 11px monospace; }
 `;
 
 exports.$ = {
     display: '#gizmo-display',
     hud: '#gizmo-hud',
     feedback: '#gizmo-feedback',
+    diagnosticsRun: '#gizmo-diagnostics-run',
+    diagnosticsResult: '#gizmo-diagnostics-result',
 };
 
 exports.ready = async function ready() {
@@ -75,6 +87,23 @@ exports.ready = async function ready() {
     this._gizmosOnChange = changed;
     display.addEventListener('change', changed);
     hud.addEventListener('change', changed);
+
+    const checkScene = async () => {
+        const button = this.$.diagnosticsRun;
+        const output = this.$.diagnosticsResult;
+        button.disabled = true;
+        output.textContent = 'Checking Scene process...';
+        try {
+            const report = await editor.Message.request('cocos-gizmos', 'get-diagnostics');
+            output.textContent = JSON.stringify(report, null, 2);
+        } catch (error) {
+            output.textContent = 'Scene diagnostics unavailable: ' + String(error?.message || error);
+        } finally {
+            button.disabled = false;
+        }
+    };
+    this._gizmosOnDiagnostics = checkScene;
+    this.$.diagnosticsRun.addEventListener('click', checkScene);
 };
 
 exports.close = function close() {
@@ -82,4 +111,8 @@ exports.close = function close() {
     this.$.display.removeEventListener('change', this._gizmosOnChange);
     this.$.hud.removeEventListener('change', this._gizmosOnChange);
     this._gizmosOnChange = null;
+    if (this._gizmosOnDiagnostics) {
+        this.$.diagnosticsRun.removeEventListener('click', this._gizmosOnDiagnostics);
+        this._gizmosOnDiagnostics = null;
+    }
 };
