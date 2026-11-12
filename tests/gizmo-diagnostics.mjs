@@ -56,6 +56,12 @@ const report = buildGizmoSmokeReport(Editor, cce, {
     registered: 2, active: 1, reason: 'ready',
     positionHandles: 2, hudControls: 4, draggingPosition: 1,
     draggingSlider: 0, pendingClicks: 0,
+    input: {
+        controllerDown: 2, controllerMove: 14, controllerUp: 2,
+        gizmoDown: 2, gizmoMove: 14, gizmoUp: 2,
+        outsideDown: 0, outsideUp: 3, missingPointer: 0,
+        recent: ['controllerDown', 'controllerUp'],
+    },
 });
 assert.equal(selections, 1);
 assert.equal(pools, 1);
@@ -78,6 +84,13 @@ assert.equal(wrapped.bridge.cameraWorldToScreen, true);
 assert.equal(report.handles.positionHandles, 2);
 assert.equal(report.handles.hudControls, 4);
 assert.equal(report.handles.draggingPosition, 1);
+assert.equal(report.handles.input.controllerDown, 2);
+assert.deepEqual(Array.from(report.handles.input.recent), ['controllerDown', 'controllerUp']);
+const missingPointer = buildGizmoSmokeReport(Editor, cce, {
+    started: true, scene: 'Scene', selectionApi: true,
+}, { reason: 'ready', input: { missingPointer: 2 } });
+assert.ok(missingPointer.concerns.some(x => x.includes('pointer coordinates')),
+    'Unsupported Cocos mouse event shapes must be visible in diagnostics');
 assert.deepEqual(Array.from(report.concerns), []);
 assert.ok(report.requiresManualVerification.length >= 4,
     'Probe must never claim it has verified actual click/Undo behavior');
