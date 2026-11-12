@@ -100,6 +100,7 @@ class Node {
         this.components = [];
         this.layer = 0;
         this.hideFlags = 0;
+        this.componentSearches = 0;
     }
     set parent(parent) {
         this._parent = parent;
@@ -113,6 +114,7 @@ class Node {
         return component;
     }
     getComponentInChildren(Type) {
+        this.componentSearches++;
         for (const node of [this, ...this.children]) {
             const candidate = node.components.find((component) => component instanceof Type);
             if (candidate) return candidate;
@@ -163,6 +165,21 @@ assert.equal(graphics.length, 1, 'Same RGBA and layer must share a Graphics comp
 assert.equal(count(graphics[0], 'stroke'), 1);
 assert.equal(count(graphics[0], 'lineTo'), 100);
 assert.equal(count(graphics[0], 'circle'), 64);
+assert.equal(rootNode.componentSearches, 1, 'Debug component lookup must be cached per Node');
+
+const originalClearCount = graphics[0].clearCount;
+const originalStrokeCount = count(graphics[0], 'stroke');
+for (let i = 0; i < 100; i++) {
+    Gizmos2D.drawLine(rootNode, { x: i + 10, y: 20 }, { x: i + 11, y: 21 });
+}
+for (let i = 0; i < 64; i++) {
+    Gizmos2D.drawCircle(rootNode, { x: 20, y: 30 }, 25);
+}
+debug.lateUpdate(0);
+assert.equal(graphics[0].clearCount, originalClearCount, 'Identical frames must retain geometry');
+assert.equal(count(graphics[0], 'stroke'), originalStrokeCount, 'Identical frames must not submit geometry');
+assert.equal(rootNode.componentSearches, 1, 'Repeated draw calls must reuse the cached component');
+
 assert.deepEqual(graphics[0].calls.find((c) => c[0] === 'lineTo'), ['lineTo', 1, 1],
     'World line endpoint must use the second point');
 
