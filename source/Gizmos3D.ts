@@ -147,7 +147,8 @@ class GizmosDebugDraw extends Component {
     private _labelMap: Map<string, Label> = new Map();
     private _spriteMap: Map<string, Sprite> = new Map();
     private _root2D: Node;
-    private _drawCalls2D: (() => void)[] = [];
+    private readonly _usedLabelIds = new Set<string>();
+    private readonly _usedSpriteIds = new Set<string>();
 
     protected onLoad(): void {
         this._root2D = new Node('Root2D');
@@ -187,27 +188,21 @@ class GizmosDebugDraw extends Component {
     }
 
     protected lateUpdate(dt: number): void {
-        this._labelMap.forEach((label) => {
-            label.string = '';
-            if (this._camera) label.node.setRotationFromEuler(this._camera.eulerAngles);
+        this._labelMap.forEach((label, id) => {
+            if (!this._usedLabelIds.has(id) && label.string) label.string = '';
+        });
+        this._spriteMap.forEach((sprite, id) => {
+            if (!this._usedSpriteIds.has(id) && sprite.spriteFrame) sprite.spriteFrame = null;
         });
 
-        this._spriteMap.forEach((sprite) => {
-            sprite.spriteFrame = null;
-            if (this._camera) sprite.node.setRotationFromEuler(this._camera.eulerAngles);
-        });
-
-        this._drawCalls2D.forEach((drawCall) => drawCall());
-
-        this._drawCalls2D = [];
+        this._usedLabelIds.clear();
+        this._usedSpriteIds.clear();
         this._color = Gizmos3D.DEFAULT_COLOR;
         this._useLocalPosition = false;
     }
 
-    private worldToLocal(world: Vec3): Vec3 {
-        const local = new Vec3();
-        Vec3.add(local, this.node.worldPosition, world);
-        return local;
+    private localToWorld(local: Vec3): Vec3 {
+        return Vec3.transformMat4(new Vec3(), local, this.node.worldMatrix);
     }
 
     public setDepthTest(value: boolean) {
@@ -215,7 +210,8 @@ class GizmosDebugDraw extends Component {
     }
 
     public setColor(color: Color) {
-        this._color = color;
+        // Snapshot once per state change so every primitive can share one color.
+        this._color = color.clone();
     }
 
     public setUseLocalPosition(value: boolean) {
@@ -265,45 +261,38 @@ class GizmosDebugDraw extends Component {
 
     public drawSprite(id: string, spriteFrame: SpriteFrame, position: Vec3, scale: Vec2, color: Color = Color.WHITE) {
         const sprite = this.getSprite(id);
-        this._drawCalls2D.push(() => {
-            sprite.spriteFrame = spriteFrame;
-            sprite.color = color;
-            sprite.node.setScale(new Vec3(scale.x, scale.y));
-            if (this._useLocalPosition) {
-                sprite.node.setPosition(position);
-            } else {
-                sprite.node.setWorldPosition(position);
-            }
-        });
+        this._usedSpriteIds.add(id);
+        if (sprite.spriteFrame !== spriteFrame) sprite.spriteFrame = spriteFrame;
+        if (sprite.color !== color) sprite.color = color;
+        sprite.node.setScale(scale.x, scale.y, 1);
+        if (this._useLocalPosition) sprite.node.setPosition(position);
+        else sprite.node.setWorldPosition(position);
+        if (this._camera) sprite.node.setRotationFromEuler(this._camera.eulerAngles);
     }
 
     public drawLabel(id: string, text: string, position: Vec3, fontSize: number = 40, scale: number = 1) {
-        const color = this._color.clone();
         const label = this.getLabel(id);
-        this._drawCalls2D.push(() => {
-            label.string = text;
-            label.color = color;
-            label.fontSize = fontSize;
-            label.lineHeight = fontSize;
-            label.node.setScale(new Vec3(scale, scale));
-            if (this._useLocalPosition) {
-                label.node.setPosition(position);
-            } else {
-                label.node.setWorldPosition(position);
-            }
-        });
+        this._usedLabelIds.add(id);
+        if (label.string !== text) label.string = text;
+        label.color = this._color;
+        if (label.fontSize !== fontSize) label.fontSize = fontSize;
+        if (label.lineHeight !== fontSize) label.lineHeight = fontSize;
+        label.node.setScale(scale, scale, 1);
+        if (this._useLocalPosition) label.node.setPosition(position);
+        else label.node.setWorldPosition(position);
+        if (this._camera) label.node.setRotationFromEuler(this._camera.eulerAngles);
     }
 
     public drawLine(point1: Vec3, point2: Vec3) {
-        const color = this._color.clone();
-        const p1 = this._useLocalPosition ? this.worldToLocal(point1) : point1;
-        const p2 = this._useLocalPosition ? this.worldToLocal(point2) : point2;
+        const color = this._color;
+        const p1 = this._useLocalPosition ? this.localToWorld(point1) : point1;
+        const p2 = this._useLocalPosition ? this.localToWorld(point2) : point2;
         this._renderer?.addLine(p1, p2, color, this._depthTest);
     }
 
     public drawLineList(points: Vec3[], close: boolean = false) {
-        const color = this._color.clone();
-        const pointList = this._useLocalPosition ? points.map((p) => this.worldToLocal(p)) : points;
+        const color = this._color;
+        const pointList = this._useLocalPosition ? points.map((p) => this.localToWorld(p)) : points;
         if (pointList.length > 0) {
             for (let i = 0; i < pointList.length - 1; i++) {
                 this._renderer?.addLine(pointList[i], pointList[i + 1], color, this._depthTest);
@@ -316,15 +305,15 @@ class GizmosDebugDraw extends Component {
     }
 
     public drawDashLine(point1: Vec3, point2: Vec3) {
-        const color = this._color.clone();
-        const p1 = this._useLocalPosition ? this.worldToLocal(point1) : point1;
-        const p2 = this._useLocalPosition ? this.worldToLocal(point2) : point2;
+        const color = this._color;
+        const p1 = this._useLocalPosition ? this.localToWorld(point1) : point1;
+        const p2 = this._useLocalPosition ? this.localToWorld(point2) : point2;
         this._renderer?.addDashedLine(p1, p2, color, this._depthTest);
     }
 
     public drawDashLineList(points: Vec3[], close: boolean = false) {
-        const color = this._color.clone();
-        const pointList = this._useLocalPosition ? points.map((p) => this.worldToLocal(p)) : points;
+        const color = this._color;
+        const pointList = this._useLocalPosition ? points.map((p) => this.localToWorld(p)) : points;
         if (pointList.length > 0) {
             for (let i = 0; i < pointList.length - 1; i++) {
                 this._renderer?.addDashedLine(pointList[i], pointList[i + 1], color, this._depthTest);
@@ -337,8 +326,8 @@ class GizmosDebugDraw extends Component {
     }
 
     public drawCircle(center: Vec3, radius: number, rot: Vec3 = Vec3.ZERO, segments: number = 32) {
-        const color = this._color.clone();
-        const c = this._useLocalPosition ? this.worldToLocal(center) : center;
+        const color = this._color;
+        const c = this._useLocalPosition ? this.localToWorld(center) : center;
         const transform = this.rotate(c, rot);
         this._renderer?.addCircle(c, radius, color, segments, this._depthTest, true, transform);
     }
@@ -350,18 +339,18 @@ class GizmosDebugDraw extends Component {
         wireFrame: boolean = false,
         segments: number = 32,
     ) {
-        const color = this._color.clone();
-        const c = this._useLocalPosition ? this.worldToLocal(center) : center;
+        const color = this._color;
+        const c = this._useLocalPosition ? this.localToWorld(center) : center;
         const transform = this.rotate(c, rot);
         this._renderer?.addDisc(c, radius, color, segments, wireFrame, this._depthTest, true, true, transform);
     }
 
     public drawQuad(point1: Vec3, point2: Vec3, point3: Vec3, point4: Vec3, wireFrame: boolean = false) {
-        const color = this._color.clone();
-        const p1 = this._useLocalPosition ? this.worldToLocal(point1) : point1;
-        const p2 = this._useLocalPosition ? this.worldToLocal(point2) : point2;
-        const p3 = this._useLocalPosition ? this.worldToLocal(point3) : point3;
-        const p4 = this._useLocalPosition ? this.worldToLocal(point4) : point4;
+        const color = this._color;
+        const p1 = this._useLocalPosition ? this.localToWorld(point1) : point1;
+        const p2 = this._useLocalPosition ? this.localToWorld(point2) : point2;
+        const p3 = this._useLocalPosition ? this.localToWorld(point3) : point3;
+        const p4 = this._useLocalPosition ? this.localToWorld(point4) : point4;
         this._renderer?.addQuad(p1, p2, p3, p4, color, wireFrame, this._depthTest);
     }
 
@@ -372,8 +361,8 @@ class GizmosDebugDraw extends Component {
         segmentsX: number = 32,
         segmentsY: number = 16,
     ) {
-        const color = this._color.clone();
-        const c = this._useLocalPosition ? this.worldToLocal(center) : center;
+        const color = this._color;
+        const c = this._useLocalPosition ? this.localToWorld(center) : center;
         this._renderer?.addSphere(c, radius, color, segmentsX, segmentsY, wireFrame, this._depthTest);
     }
 
@@ -385,8 +374,8 @@ class GizmosDebugDraw extends Component {
         rot: Vec3 = Vec3.ZERO,
         segments: number = 32,
     ) {
-        const color = this._color.clone();
-        const c = this._useLocalPosition ? this.worldToLocal(center) : center;
+        const color = this._color;
+        const c = this._useLocalPosition ? this.localToWorld(center) : center;
         const transform = this.rotate(c, rot);
         this._renderer?.addArc(c, radius, color, startAngle, endAngle, segments, this._depthTest, true, transform);
     }
@@ -400,8 +389,8 @@ class GizmosDebugDraw extends Component {
         wireFrame: boolean = false,
         segments: number = 32,
     ) {
-        const color = this._color.clone();
-        const c = this._useLocalPosition ? this.worldToLocal(center) : center;
+        const color = this._color;
+        const c = this._useLocalPosition ? this.localToWorld(center) : center;
         const transform = this.rotate(c, rot);
         this._renderer?.addSector(
             c,
@@ -425,22 +414,22 @@ class GizmosDebugDraw extends Component {
         rot: Vec3 = Vec3.ZERO,
         wireFrame: boolean = false,
     ) {
-        const color = this._color.clone();
-        const p = this._useLocalPosition ? this.worldToLocal(position) : position;
+        const color = this._color;
+        const p = this._useLocalPosition ? this.localToWorld(position) : position;
         const transform = this.rotate(p, rot);
         this._renderer?.addPolygon(p, radius, color, segments, wireFrame, this._depthTest, true, true, transform);
     }
 
     public drawOctahedron(position: Vec3, radius: number, rot: Vec3 = Vec3.ZERO, wireFrame: boolean = false) {
-        const color = this._color.clone();
-        const p = this._useLocalPosition ? this.worldToLocal(position) : position;
+        const color = this._color;
+        const p = this._useLocalPosition ? this.localToWorld(position) : position;
         const transform = this.rotate(p, rot);
         this._renderer?.addOctahedron(p, radius, color, wireFrame, this._depthTest, false, true, transform);
     }
 
     public drawCross(position: Vec3, size: number) {
-        const color = this._color.clone();
-        const p = this._useLocalPosition ? this.worldToLocal(position) : position;
+        const color = this._color;
+        const p = this._useLocalPosition ? this.localToWorld(position) : position;
         this._renderer?.addCross(p, size, color, this._depthTest);
     }
 
@@ -453,8 +442,8 @@ class GizmosDebugDraw extends Component {
         segmentsX: number = 32,
         segmentsY: number = 8,
     ) {
-        const color = this._color.clone();
-        const p = this._useLocalPosition ? this.worldToLocal(position) : position;
+        const color = this._color;
+        const p = this._useLocalPosition ? this.localToWorld(position) : position;
         const transform = this.rotate(p, rot);
         this._renderer?.addCapsule(
             p,
@@ -480,7 +469,7 @@ class GizmosDebugDraw extends Component {
         wireFrame: boolean = true,
     ): void {
         if (!mesh || !this.ensureGeometryRenderer()) return;
-        const color = this._color.clone();
+        const color = this._color;
         const quat = new Quat();
         Quat.fromEuler(quat, rotation.x, rotation.y, rotation.z);
         const transform = new Mat4();
@@ -514,8 +503,8 @@ class GizmosDebugDraw extends Component {
     }
 
     public drawBox(position: Vec3, size: Vec3, rot: Vec3 = Vec3.ZERO, wireFrame: boolean = false) {
-        const color = this._color.clone();
-        const p = this._useLocalPosition ? this.worldToLocal(position) : position;
+        const color = this._color;
+        const p = this._useLocalPosition ? this.localToWorld(position) : position;
         const transform = this.rotate(p, rot);
         let box = geometry?.AABB.create(p.x, p.y, p.z, size.x, size.y, size.z);
         this._renderer?.addBoundingBox(box, color, wireFrame, this._depthTest, false, true, transform);
@@ -529,8 +518,8 @@ class GizmosDebugDraw extends Component {
         wireFrame: boolean = false,
         segments: number = 32,
     ) {
-        const color = this._color.clone();
-        const p = this._useLocalPosition ? this.worldToLocal(position) : position;
+        const color = this._color;
+        const p = this._useLocalPosition ? this.localToWorld(position) : position;
         const transform = this.rotate(p, rot);
         this._renderer?.addCylinder(
             p,
@@ -554,8 +543,8 @@ class GizmosDebugDraw extends Component {
         wireFrame: boolean = false,
         segments: number = 32,
     ) {
-        const color = this._color.clone();
-        const p = this._useLocalPosition ? this.worldToLocal(position) : position;
+        const color = this._color;
+        const p = this._useLocalPosition ? this.localToWorld(position) : position;
         const transform = this.rotate(p, rot);
         this._renderer?.addCone(p, radius, height, color, segments, wireFrame, this._depthTest, false, true, transform);
     }
@@ -568,11 +557,11 @@ class GizmosDebugDraw extends Component {
         rot: Vec3 = Vec3.ZERO,
         segments: number = 32,
     ) {
-        const color = this._color.clone();
-        const p1 = this._useLocalPosition ? this.worldToLocal(point1) : point1;
-        const p2 = this._useLocalPosition ? this.worldToLocal(point2) : point2;
-        const p3 = this._useLocalPosition ? this.worldToLocal(point3) : point3;
-        const p4 = this._useLocalPosition ? this.worldToLocal(point4) : point4;
+        const color = this._color;
+        const p1 = this._useLocalPosition ? this.localToWorld(point1) : point1;
+        const p2 = this._useLocalPosition ? this.localToWorld(point2) : point2;
+        const p3 = this._useLocalPosition ? this.localToWorld(point3) : point3;
+        const p4 = this._useLocalPosition ? this.localToWorld(point4) : point4;
         const transform = this.rotate(p1, rot);
         this._renderer?.addBezier(p1, p2, p3, p4, color, segments, this._depthTest, true, transform);
     }
@@ -583,8 +572,8 @@ class GizmosDebugDraw extends Component {
         knotSize = 0.5,
         segments: number = 32,
     ) {
-        const color = this._color.clone();
-        const knotsList = this._useLocalPosition ? knots.map((knot) => this.worldToLocal(knot)) : knots;
+        const color = this._color;
+        const knotsList = this._useLocalPosition ? knots.map((knot) => this.localToWorld(knot)) : knots;
         let spline = geometry?.Spline.create(mode, knotsList);
         this._renderer?.addSpline(spline, color, 0xffffffff, knotSize, segments, this._depthTest);
     }
