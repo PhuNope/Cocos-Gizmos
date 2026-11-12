@@ -3,6 +3,7 @@ import { Gizmos3D } from './Gizmos3D';
 import { GizmoHudText } from './GizmoPresentation';
 import { hudRowScreenPosition } from './GizmoHudControls';
 import { createSceneHudProjection, SceneHudCamera } from './GizmoHudProjection';
+import type { GizmoHudPlacement } from './GizmoHudLayout';
 
 function sceneCamera(): SceneHudCamera | null {
     const global = globalThis as any;
@@ -21,7 +22,11 @@ export class GizmoHudOverlay {
     private readonly colors = new Map<string, Color>();
     private drawn = 0;
 
-    public render(component: Component, items: readonly GizmoHudText[]): number {
+    public render(
+        component: Component,
+        items: readonly GizmoHudText[],
+        placement?: Pick<GizmoHudPlacement, 'namespace' | 'startRow'>,
+    ): number {
         const camera = sceneCamera();
         const node = component?.node;
         if (!camera || !node?.isValid || !items.length) return 0;
@@ -31,7 +36,8 @@ export class GizmoHudOverlay {
         let drawn = 0;
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
-            const screen = hudRowScreenPosition(projection.screen, i);
+            const screen = hudRowScreenPosition(projection.screen,
+                (placement?.startRow || 0) + i);
             let color = this.colors.get(item.color);
             if (!color) {
                 color = new Color(255, 255, 255, 255);
@@ -40,7 +46,9 @@ export class GizmoHudOverlay {
                 this.colors.set(item.color, color);
             }
             Gizmos3D.beginColor(node, color);
-            Gizmos3D.drawLabel(node, 'cocos-gizmos:hud:' + item.id, item.text,
+            const id = 'cocos-gizmos:hud:' +
+                (placement ? placement.namespace + ':' : '') + item.id;
+            Gizmos3D.drawLabel(node, id, item.text,
                 projection.worldAt(screen.x, screen.y), item.fontSize, projection.pixelSize);
             drawn++;
         }
