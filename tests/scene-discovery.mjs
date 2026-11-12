@@ -71,10 +71,12 @@ const sandbox = {
 vm.runInNewContext(compiled, sandbox, { filename: 'ExecuteGizmos.js' });
 const { start, stop } = sandbox.exports;
 const handleRefreshes = [];
+let clearedHandles = 0;
 sandbox.exports.setPositionHandleAdapter({
     refresh(components, selected, at) {
         handleRefreshes.push({ count: components.length, selectedCount: selected.size, at });
     },
+    clear() { clearedHandles++; },
 });
 try {
     start(); // Initial scan and render.
@@ -110,16 +112,16 @@ try {
     now += 16;
     beforeUpdate();
     assert.equal(scanCount, 4, 'Scene changes invalidate the registry');
+    assert.ok(clearedHandles >= 2, 'Scene switch must clear controllers immediately');
 
     scene = null;
     now += 16;
     beforeUpdate();
     assert.equal(sandbox.exports.status().components, 0);
-    const lastRefresh = handleRefreshes.at(-1);
-    assert.equal(lastRefresh.count, 0,
-        'Closing the Scene must release interactive Gizmos with an empty component registry');
-    assert.equal(lastRefresh.selectedCount, 0);
-    assert.equal(lastRefresh.at, now);
+    assert.ok(clearedHandles >= 3,
+        'Closing the Scene must clear active handles regardless of the 250ms discovery throttle');
+    assert.equal(handleRefreshes.at(-1).count, 0,
+        'The replacement Scene must have refreshed the component registry before closure');
 
     const beforeTimer = sandbox.exports.status().frames;
     now += 16;
