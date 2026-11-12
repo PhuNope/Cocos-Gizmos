@@ -18,7 +18,8 @@ const JS_OUT_FILE = path.join(ROOT, 'dist', 'Gizmos.js');
 const FILES = [
     { name: 'Define', ns: '_Define' },
     { name: 'Ext', ns: null },
-    { name: 'ExecuteGizmos', ns: '_ExecuteGizmos', relImports: { './Define': '_Define' } },
+    { name: 'SceneUpdateScheduler', ns: '_SceneUpdateScheduler' },
+    { name: 'ExecuteGizmos', ns: '_ExecuteGizmos', relImports: { './SceneUpdateScheduler': '_SceneUpdateScheduler' } },
     { name: 'DrawCommandBuffer2D', ns: '_DrawCommandBuffer2D' },
     { name: 'Gizmos2D', ns: '_Gizmos2D', relImports: { './DrawCommandBuffer2D': '_DrawCommandBuffer2D' } },
     { name: 'Gizmos3D', ns: '_Gizmos3D', relImports: { './Define': '_Define' } },
@@ -204,7 +205,7 @@ writeFileSync(OUT_FILE, bundledTypeScript, 'utf8');
  // Compile source modules separately; each module owns at most one Component.
  // Public Gizmos.js only imports the helpers and installs two global APIs.
  // 'cc' and 'cc/env' remain engine-provided imports.
-const runtimeModules = ['Define', 'ExecuteGizmos', 'DrawCommandBuffer2D', 'Gizmos2D', 'Gizmos3D'];
+const runtimeModules = ['Define', 'SceneUpdateScheduler', 'ExecuteGizmos', 'DrawCommandBuffer2D', 'Gizmos2D', 'Gizmos3D'];
 const compilerOptions = {
     target: ts.ScriptTarget.ES2017,
     module: ts.ModuleKind.ESNext,
@@ -241,6 +242,13 @@ function transpileRuntimeModule(name) {
             fail('Gizmos2D missing compiled DrawCommandBuffer2D import');
         }
     }
+    if (name === 'ExecuteGizmos') {
+        generated = generated.replaceAll("from './SceneUpdateScheduler'", "from './SceneUpdateScheduler.js'")
+                             .replaceAll('from "./SceneUpdateScheduler"', 'from "./SceneUpdateScheduler.js"');
+        if (!generated.includes('SceneUpdateScheduler.js')) {
+            fail('ExecuteGizmos missing compiled SceneUpdateScheduler import');
+        }
+    }
     writeFileSync(path.join(ROOT, 'dist', name + '.js'), generated, 'utf8');
 }
 
@@ -270,7 +278,7 @@ if (globalThis.Editor && globalThis.Editor.App && globalThis.Editor.App.path) {
     module.paths.push(require('node:path').join(globalThis.Editor.App.path, 'node_modules'));
 }
 `;
-for (const name of ['DrawCommandBuffer2D', 'Gizmos2D', 'Gizmos3D', 'ExecuteGizmos']) {
+for (const name of ['SceneUpdateScheduler', 'DrawCommandBuffer2D', 'Gizmos2D', 'Gizmos3D', 'ExecuteGizmos']) {
     const fileName = path.join(SRC_DIR, name + '.ts');
     const result = ts.transpileModule(readFileSync(fileName, 'utf8'), {
         fileName,
