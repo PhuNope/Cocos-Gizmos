@@ -22,6 +22,7 @@ export interface GizmoSmokeReport {
         hasShowComponentGizmo: boolean;
         cameraWorldToScreen: boolean;
         cameraScreenPointToRay: boolean;
+        cameraSource: 'direct' | 'wrapped' | 'missing';
         hasNativeControlBegin: boolean;
         hasNativeControlEnd: boolean;
         hasNativeControlCancel: boolean;
@@ -47,7 +48,10 @@ export function buildGizmoSmokeReport(
     const pool = safely<any>(() => cce?.Gizmo?._gizmoPool?._getPool?.('component'), null);
     const ctor = pool?.typeDefs?.['cc.BoxCollider'];
     const controller = ctor?.prototype;
-    const cam = cce?.Camera?.camera;
+    const cameraApi = cce?.Camera;
+    const cam = cameraApi?.camera || cameraApi?._camera?.camera;
+    const cameraSource = cameraApi?.camera ? 'direct' :
+        cameraApi?._camera?.camera ? 'wrapped' : 'missing';
     const report: GizmoSmokeReport = {
         scene: {
             updaterStarted: updater?.started === true,
@@ -65,6 +69,7 @@ export function buildGizmoSmokeReport(
             hasShowComponentGizmo: typeof cce?.Gizmo?.showComponentGizmo === 'function',
             cameraWorldToScreen: typeof cam?.worldToScreen === 'function',
             cameraScreenPointToRay: typeof cam?.screenPointToRay === 'function',
+            cameraSource,
             hasNativeControlBegin: typeof controller?.onControlBegin === 'function',
             hasNativeControlEnd: typeof controller?.onControlEnd === 'function',
             hasNativeControlCancel: typeof controller?.onControlCancel === 'function',
