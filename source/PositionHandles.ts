@@ -1,0 +1,449 @@
+import { Color, Component, director, Quat, Vec3 } from 'cc';
+import {
+    handlePlaneNormal,
+    intersectHandlePlane,
+    PositionDragSolver,
+} from './PositionDragSolver';
+
+type Point = { x: number; y: number; z: number };
+type Pointer = { x: number; y: number };
+type Field = NonNullable<ReturnType<NonNullable<Component['onGizmoHandles']>>>[number];
+type Entry = { field: Field; controller: any; key: string };
+type DragState = { entry: Entry; solver: PositionDragSolver; original: Point; changed: boolean };
+
+function cceNamespace(): any {
+    return (globalThis as any).cce || (globalThis as any).window?.cce || null;
+}
+
+function camera(): any {
+    return cceNamespace()?.Camera?.camera || null;
+}
+
+function validPoint(value: any): value is Point {
+    return !!value && Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.z);
+}
+
+function selectedKeys(component: Component): string[] {
+    const value: any = component;
+    return [...new Set([
+        value.__classname__,
+        value.constructor?.__classname__,
+        value.constructor?.name,
+    ].filter((key) => typeof key === 'string' && !!key))] as string[];
+}
+
+function pointer(event: any): Pointer | null {
+    for (const item of [event, event?.detail, event?.data, event?.mouse]) {
+        if (Number.isFinite(item?.x) && Number.isFinite(item?.y)) {
+            return { x: item.x, y: item.y };
+        }
+    }
+    return null;
+}
+
+function sceneRay(position: Pointer): { o: Point; d: Point } | null {
+    const view = camera();
+    if (typeof view?.screenPointToRay !== 'function') return null;
+    const ray = { o: new Vec3(), d: new Vec3() };
+    try {
+        const result = view.screenPointToRay(position.x, position.y, ray) || ray;
+        if (validPoint(result.o) && validPoint(result.d)) return result;
+    } catch (error) {
+        console.warn('[cocos-gizmos/handles] Unable to calculate Scene ray:', error);
+    }
+    return null;
+}
+
+function spaceFor(component: Component, field: Field): {
+    toLocal(point: Point): Point;
+    toWorld(point: Point): Point;
+} {
+    if (field.space === 'world') {
+        return {
+            toLocal: (point) => ({ ...point }),
+            toWorld: (point) => ({ ...point }),
+        };
+    }
+    return {
+        toLocal: (point) => {
+            const result = new Vec3();
+            component.node.inverseTransformPoint(result, new Vec3(point.x, point.y, point.z));
+            return { x: result.x, y: result.y, z: result.z };
+        },
+        toWorld: (point) => {
+            const result = new Vec3();
+            Vec3.transformMat4(result, new Vec3(point.x, point.y, point.z), component.node.worldMatrix);
+            return { x: result.x, y: result.y, z: result.z };
+        },
+    };
+}
+
+function readField(target: Component, field: Field): Point | null {
+    const raw: any = (target as any)[field.property];
+    const value = field.index === undefined ? raw : Array.isArray(raw) ? raw[field.index] : null;
+    return validPoint(value) ? { x: value.x, y: value.y, z: value.z } : null;
+}
+
+function writeField(target: Component, field: Field, value: Point): boolean {
+    const raw: any = (target as any)[field.property];
+    const point = new Vec3(value.x, value.y, value.z);
+    if (field.index === undefined) {
+        (target as any)[field.property] = point;
+        return true;
+    }
+    if (!Array.isArray(raw) || field.index < 0 || field.index >= raw.length) return false;
+    raw[field.index] = point;
+    return true;
+}
+
+function markerSize(world: Point): number {
+    const view = camera();
+    if (typeof view?.worldToScreen !== 'function') return 0.3;
+    const screen = new Vec3();
+    try {
+        view.worldToScreen(new Vec3(world.x, world.y, world.z), screen);
+        const a = sceneRay({ x: screen.x, y: screen.y });
+        const b = sceneRay({ x: screen.x + 1, y: screen.y });
+        if (!a || !b) return 0.3;
+        const normal = a.d;
+        const hitA = intersectHandlePlane(a, world, normal);
+        const hitB = intersectHandlePlane(b, world, normal);
+        if (!hitA || !hitB) return 0.3;
+        const pixel = Math.hypot(hitA.x - hitB.x, hitA.y - hitB.y, hitA.z - hitB.z);
+        if (Number.isFinite(pixel) && pixel > 0) return Math.max(0.01, Math.min(1000, pixel * 10));
+    } catch {
+        // Keep the default marker size if the camera is being replaced.
+    }
+    return 0.3;
+}
+
+function createEditorGizmo(base: any): any {
+    return class PositionHandleEditorGizmo extends base {
+        private entries: Entry[] = [];
+        private drag: DragState | null = null;
+        private shown = false;
+        private layout = '';
+
+        public init(): void {
+            this.shouldRegisterGizmoOperationEvent = true;
+            this.rebuild();
+            this._isInitialized = true;
+        }
+
+        private descriptors(): Field[] {
+            const component = this.target as Component;
+            const all = component?.onGizmoHandles?.();
+            if (!Array.isArray(all)) return [];
+            return all.filter((field) => field && typeof field.property === 'string' &&
+                /^(xy|xz|yz|view)$/.test(field.plane || 'xy') &&
+                (field.index === undefined || Number.isInteger(field.index) && field.index >= 0) &&
+                readField(component, field) !== null);
+        }
+
+        private signature(fields: Field[]): string {
+            return JSON.stringify(fields.map((field) => [
+                field.property, field.index, field.plane || 'xy',
+                field.space || 'local', field.axis, field.snap,
+                field.color, field.bounds,
+            ]));
+        }
+
+        private rebuild(): void {
+            this.clearEntries();
+            const fields = this.descriptors();
+            this.layout = this.signature(fields);
+            for (const field of fields) {
+                try {
+                    super.createController();
+                    const controller = this._controller;
+                    if (!controller) continue;
+                    const key = `position:${field.property}:${field.index ?? 'single'}`;
+                    const entry: Entry = { field, controller, key };
+                    const color = new Color();
+                    if (field.color && Color.fromHEX) Color.fromHEX(color, field.color);
+                    else color.set(255, 174, 66, 255);
+                    controller.setColor?.(color);
+                    controller.setEditHandlesColor?.(color);
+                    controller.initEditHandles?.();
+                    controller.showEditHandles?.();
+                    controller._wireFrameBoxNode && (controller._wireFrameBoxNode.active = false);
+                    if (controller._wireFrameBoxMeshRenderer) controller._wireFrameBoxMeshRenderer.enabled = false;
+                    if (controller._editHandlesShape) {
+                        controller._editHandlesShape.active = true;
+                        for (const child of controller._editHandlesShape.children || []) {
+                            child.active = child.name === 'y';
+                        }
+                    }
+                    controller.setHandleColor?.('y', color, 0);
+                    if (controller._cubeNode) {
+                        controller.initHandle?.(controller._cubeNode, key);
+                    }
+                    const down = (event: any) => this.begin(entry, event);
+                    const move = (event: any) => this.move(entry, event);
+                    const up = () => this.finish(false);
+                    controller.onControllerMouseDown = down;
+                    controller.onControllerMouseMove = move;
+                    controller.onControllerMouseUp = up;
+                    controller.onMouseDown = down;
+                    controller.onMouseMove = move;
+                    controller.onMouseUp = up;
+                    controller.registerEvents?.();
+                    this.entries.push(entry);
+                } catch (error) {
+                    console.warn('[cocos-gizmos/handles] Cannot initialize position controller:', error);
+                }
+            }
+            this.updateMarkers();
+        }
+
+        public refreshHandles(): void {
+            const next = this.descriptors();
+            if (this.signature(next) !== this.layout && !this.drag) this.rebuild();
+            else this.updateMarkers();
+        }
+
+        private updateMarkers(): void {
+            if (!this.shown && !this.drag) return;
+            const component = this.target as Component;
+            if (!component?.node?.isValid) return;
+            for (const entry of this.entries) {
+                const local = readField(component, entry.field);
+                if (!local) {
+                    entry.controller.hide?.();
+                    continue;
+                }
+                const world = spaceFor(component, entry.field).toWorld(local);
+                if (!validPoint(world)) continue;
+                entry.controller.setPosition?.(new Vec3(world.x, world.y, world.z));
+                entry.controller.setRotation?.(new Quat());
+                const size = markerSize(world);
+                entry.controller.updateSize?.(Vec3.ZERO, new Vec3(size, size, size));
+            }
+        }
+
+        private begin(entry: Entry, event: any): void {
+            if (!this.shown || this.drag) return;
+            if (event?.handleName && event.handleName !== 'y' && event.handleName !== entry.key) return;
+            const view = pointer(event);
+            const ray = view && sceneRay(view);
+            if (!ray) return;
+            const target = this.target as Component;
+            const original = readField(target, entry.field);
+            if (!original) return;
+            const transform = spaceFor(target, entry.field);
+            const forward = camera()?.node?.forward || ray.d;
+            const normal = handlePlaneNormal(entry.field.plane || 'xy', transform, original, forward);
+            if (!normal) return;
+            try {
+                const solver = new PositionDragSolver(original, transform, normal, entry.field);
+                if (!solver.begin(ray)) return;
+                this.drag = { entry, solver, original, changed: false };
+                this.onControlBegin?.(entry.field.property, entry.field.index);
+                target.onGizmoChanged?.(entry.field.property, 'begin', entry.field.index);
+            } catch (error) {
+                console.warn('[cocos-gizmos/handles] Unable to start position drag:', error);
+            }
+        }
+
+        private move(entry: Entry, event: any): void {
+            const drag = this.drag;
+            if (!drag || drag.entry !== entry) return;
+            const view = pointer(event);
+            const ray = view && sceneRay(view);
+            if (!ray) return;
+            const next = drag.solver.move(ray);
+            if (!next) return;
+            const target = this.target as Component;
+            if (!writeField(target, entry.field, next)) return;
+            drag.changed = true;
+            target.onGizmoChanged?.(entry.field.property, 'update', entry.field.index);
+            this.onControlUpdate?.(entry.field.property, entry.field.index);
+            this.onComponentChanged?.(target.node);
+            this.updateMarkers();
+            cceNamespace()?.Engine?.repaintInEditMode?.();
+        }
+
+        private finish(cancelled: boolean): void {
+            const drag = this.drag;
+            if (!drag) return;
+            this.drag = null;
+            const target = this.target as Component;
+            if (cancelled && drag.changed) {
+                writeField(target, drag.entry.field, drag.solver.cancel());
+                this.onComponentChanged?.(target.node);
+            }
+            target?.onGizmoChanged?.(
+                drag.entry.field.property, cancelled ? 'cancel' : 'end', drag.entry.field.index,
+            );
+            this.onControlEnd?.(drag.entry.field.property, drag.entry.field.index);
+            this.updateMarkers();
+        }
+
+        public onGizmoMouseDown(event: any): void {
+            const name = event?.handleName;
+            const entry = this.entries.find((item) => item.key === name);
+            if (entry) this.begin(entry, event);
+        }
+
+        public onGizmoMouseMove(event: any): void {
+            if (this.drag) this.move(this.drag.entry, event);
+        }
+
+        public onGizmoMouseUp(): void {
+            this.finish(false);
+        }
+
+        public onKeyDown(event: any): boolean | void {
+            if (this.drag && (event?.key === 'Escape' || event?.keyCode === 27)) {
+                this.finish(true);
+                return true;
+            }
+        }
+
+        public onShow(): void {
+            this.shown = true;
+            this.refreshHandles();
+            for (const { controller } of this.entries) {
+                controller.show?.();
+                controller.showEditHandles?.();
+                controller.registerEvents?.();
+            }
+        }
+
+        public onHide(): void {
+            this.finish(false);
+            this.shown = false;
+            for (const { controller } of this.entries) {
+                controller.unregisterEvents?.();
+                controller.hideEditHandles?.();
+                controller.hide?.();
+            }
+        }
+
+        public onTargetUpdate(): void { this.refreshHandles(); }
+        public onNodeChanged(): void { this.updateMarkers(); }
+        public updateControllerTransform(): void { this.updateMarkers(); }
+
+        private clearEntries(): void {
+            for (const { controller, key } of this.entries) {
+                controller.unregisterEvents?.();
+                controller.removeHandle?.(key);
+                controller.hideEditHandles?.();
+                controller.hide?.();
+            }
+            this.entries.length = 0;
+        }
+
+        public onDestroy(): void {
+            this.finish(false);
+            this.shown = false;
+            this.clearEntries();
+        }
+    };
+}
+
+export interface PositionHandleSceneAdapter {
+    refresh(components: readonly Component[], selected: ReadonlySet<string>, now: number): void;
+    dispose(): void;
+    status(): { registered: number; active: number; reason: string };
+}
+
+export function createPositionHandleAdapter(): PositionHandleSceneAdapter {
+    const registered = new Map<string, any>();
+    const active = new Map<Component, any>();
+    let gizmoConstructor: any = null;
+    let latestScan = -Infinity;
+    let reason = 'not-initialized';
+    let manager: any = null;
+    let typeDefs: any = null;
+
+    function initialize(): boolean {
+        const gizmo = cceNamespace()?.Gizmo;
+        const pool = gizmo?._gizmoPool?._getPool?.('component');
+        if (!pool?.typeDefs || typeof pool.typeDefs['cc.BoxCollider'] !== 'function') {
+            reason = 'component-gizmo-bridge-unavailable';
+            return false;
+        }
+        manager = gizmo;
+        typeDefs = pool.typeDefs;
+        if (!gizmoConstructor) gizmoConstructor = createEditorGizmo(typeDefs['cc.BoxCollider']);
+        reason = 'ready';
+        return true;
+    }
+
+    function show(component: Component): any {
+        let gizmo = (component as any).gizmo;
+        if (!(gizmo instanceof gizmoConstructor)) {
+            try {
+                manager.showComponentGizmo?.(component);
+                gizmo = (component as any).gizmo;
+            } catch {
+                // Use the component pool API when selection has no existing Gizmo.
+            }
+        }
+        if (!(gizmo instanceof gizmoConstructor) && typeof manager.createGizmo === 'function') {
+            for (const key of selectedKeys(component)) {
+                try {
+                    gizmo = manager.createGizmo(key, component) || (component as any).gizmo;
+                    if (gizmo instanceof gizmoConstructor) break;
+                } catch {
+                    // Some class keys are aliases that the pool does not register.
+                }
+            }
+        }
+        if (!(gizmo instanceof gizmoConstructor)) return null;
+        gizmo.show?.();
+        gizmo.refreshHandles?.();
+        return gizmo;
+    }
+
+    return {
+        refresh(components, selected, now) {
+            if (now - latestScan < 250) return;
+            latestScan = now;
+            if (!initialize()) return;
+            const wanted = new Set<Component>();
+            for (const component of components) {
+                if (!component?.isValid || !component.enabled || !component.node?.activeInHierarchy ||
+                    !selected.has(component.node.uuid) || typeof component.onGizmoHandles !== 'function') continue;
+                wanted.add(component);
+                let installed = false;
+                for (const key of selectedKeys(component)) {
+                    if (!typeDefs[key]) {
+                        typeDefs[key] = gizmoConstructor;
+                        registered.set(key, gizmoConstructor);
+                        installed = true;
+                    } else if (typeDefs[key] === gizmoConstructor) installed = true;
+                }
+                if (!installed) continue;
+                const previous = active.get(component);
+                if (previous) previous.refreshHandles?.();
+                else {
+                    const next = show(component);
+                    if (next) active.set(component, next);
+                }
+            }
+            for (const [component, gizmo] of active) {
+                if (!wanted.has(component)) {
+                    gizmo.hide?.();
+                    active.delete(component);
+                }
+            }
+        },
+        dispose() {
+            for (const gizmo of active.values()) gizmo.hide?.();
+            active.clear();
+            for (const [key, ctor] of registered) {
+                if (typeDefs?.[key] === ctor) delete typeDefs[key];
+            }
+            registered.clear();
+            manager = null;
+            typeDefs = null;
+            latestScan = -Infinity;
+            reason = 'disposed';
+        },
+        status() {
+            return { registered: registered.size, active: active.size, reason };
+        },
+    };
+}
