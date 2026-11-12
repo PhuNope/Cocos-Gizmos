@@ -12,6 +12,8 @@ const compile = (name) => ts.transpileModule(
 ).outputText;
 const solver = { exports: {} };
 vm.runInNewContext(compile('PositionDragSolver'), solver);
+const controls = { exports: {} };
+vm.runInNewContext(compile('GizmoHudControls'), controls);
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
 }
@@ -40,6 +42,7 @@ const sandbox = {
         if (id === './Gizmos3D') return { Gizmos3D: sink };
         if (id === './PositionDragSolver') return solver.exports;
         if (id === './GizmoPresentation') return {};
+        if (id === './GizmoHudControls') return controls.exports;
         throw new Error('unexpected module ' + id);
     },
 };
