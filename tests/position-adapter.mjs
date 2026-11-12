@@ -26,6 +26,15 @@ class Vec3 {
     }
 }
 Vec3.ZERO = new Vec3();
+const projection = { exports: {} };
+vm.runInNewContext(compile('GizmoHudProjection'), {
+    exports: projection.exports,
+    require(name) {
+        if (name === 'cc') return { Vec3 };
+        if (name === './PositionDragSolver') return math.exports;
+        throw new Error('Unknown projection import ' + name);
+    },
+});
 class Color {
     set() {}
     static fromHEX(color) { return color; }
@@ -69,8 +78,10 @@ const manager = {
     },
 };
 const cam = {
+    rays: 0,
     node: { forward: new Vec3(0, 0, -1) },
     screenPointToRay(x, y, out) {
+        this.rays++;
         out.o = new Vec3(x, y, 100);
         out.d = new Vec3(0, 0, -1);
         return out;
@@ -102,6 +113,7 @@ const sandbox = {
         if (name === './PositionDragSolver') return math.exports;
         if (name === './GizmoHudControls') return hud.exports;
         if (name === './GizmoPresentation') return presentation.exports;
+        if (name === './GizmoHudProjection') return projection.exports;
         throw new Error('Unknown import ' + name);
     },
 };
@@ -185,6 +197,20 @@ const toggle = hudGizmo.controllers[1];
 const checkbox = hudGizmo.controllers[2];
 const slider = hudGizmo.controllers[3];
 const button = hudGizmo.controllers[4];
+
+const raysBefore = cam.rays;
+hudGizmo.refreshHandles();
+assert.equal(cam.rays - raysBefore, 5,
+    'Four HUD controls share three rays; the position marker uses two');
+const controllersBeforeText = hudGizmo.controllers.length;
+const controlsBeforeText = component.onGizmoHudControls;
+component.onGizmoHudControls = () => controlsBeforeText().map(control => ({
+    ...control, text: control.text + '!',
+}));
+hudGizmo.refreshHandles();
+assert.equal(hudGizmo.controllers.length, controllersBeforeText,
+    'Changing HUD text must not recreate picking controllers');
+component.onGizmoHudControls = controlsBeforeText;
 
 toggle.onMouseDown({ handleName: 'hud:visibility', x: 10, y: 10 });
 assert.equal(component.visible, false, 'Toggle changes on pointer release');
