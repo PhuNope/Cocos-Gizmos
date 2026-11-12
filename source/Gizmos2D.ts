@@ -14,52 +14,39 @@ import {
     Vec2,
     Vec3,
 } from 'cc';
+import { DrawCommandBuffer2D } from './DrawCommandBuffer2D';
 
 const { ccclass, executeInEditMode } = _decorator;
 
 class GizmosRenderer {
-    private _graphic: Graphics;
-    private _drawCalls: ((graphic: Graphics) => void)[] = [];
+    public readonly commands = new DrawCommandBuffer2D();
+    private hasGeometry = false;
 
-    public addDrawCall(drawCall: (graphic: Graphics) => void) {
-        this._drawCalls.push(drawCall);
-    }
+    constructor(private readonly graphic: Graphics) {}
 
-    public addDrawTextCall(labelID: string, drawCall: () => void) {
-        this._drawCalls.push(() => drawCall());
-    }
+    public draw(): void {
+        if (this.commands.isEmpty) {
+            if (this.hasGeometry) {
+                this.graphic.clear();
+                this.hasGeometry = false;
+            }
+            return;
+        }
 
-    public addDrawSpriteCall(spriteID: string, drawCall: (sprite: Sprite) => void) {}
-
-    constructor(graphic: Graphics) {
-        this._graphic = graphic;
-    }
-
-    public clear() {
-        this._graphic.clear();
-    }
-
-    public setLayer(layer: Layers.Enum) {
-        this._graphic.node.layer = layer;
-    }
-
-    public draw() {
-        this._drawCalls.forEach((drawCall) => {
-            drawCall(this._graphic);
-        });
-
-        this._drawCalls = [];
+        this.graphic.clear();
+        this.commands.replay(this.graphic);
+        this.hasGeometry = true;
     }
 }
 
 @ccclass('Gizmos2D.GizmosDebugDraw')
 @executeInEditMode
 class GizmosDebugDraw extends Component {
-    private _renderers: Map<string, GizmosRenderer> = new Map();
-    private _labelMap: Map<string, Label> = new Map();
-    private _spriteMap: Map<string, Sprite> = new Map();
+    private readonly _renderers = new Map<string, GizmosRenderer>();
+    private readonly _labelMap = new Map<string, Label>();
+    private readonly _spriteMap = new Map<string, Sprite>();
     private _color: Color = Gizmos2D.DEFAULT_COLOR;
-    private _useLocalPosition: boolean = false;
+    private _useLocalPosition = false;
     private _layer: Layers.Enum = Gizmos2D.DEFAULT_LAYER;
     private _drawCallsNoneGeometry: (() => void)[] = [];
 
@@ -72,52 +59,50 @@ class GizmosDebugDraw extends Component {
             sprite.spriteFrame = null;
         });
 
-        this._renderers.forEach((renderer) => {
-            renderer.clear();
-            renderer.draw();
-        });
+        this._renderers.forEach((renderer) => renderer.draw());
 
-        this._drawCallsNoneGeometry.forEach((drawCall) => {
-            drawCall();
-        });
-
-        this._drawCallsNoneGeometry = [];
+        for (const drawCall of this._drawCallsNoneGeometry) drawCall();
+        this._drawCallsNoneGeometry.length = 0;
 
         this._color = Gizmos2D.DEFAULT_COLOR;
         this._useLocalPosition = false;
         this._layer = Gizmos2D.DEFAULT_LAYER;
     }
 
-    private createRenderer(color: Color) {
-        const hex = color.toHEX();
-        const g = new Node(`color ${hex}`).addComponent(Graphics);
-        g.lineWidth = 5;
-        g.strokeColor = color;
-        g.fillColor = color;
-        g.node.layer = this.node.layer;
-        g.node.parent = this.node;
-        g.node.setPosition(Vec3.ZERO);
-        const renderer = new GizmosRenderer(g);
-        return renderer;
+    private createRenderer(color: Color, layer: Layers.Enum): GizmosRenderer {
+        const node = new Node('Gizmo2DGraphics');
+        const graphic = node.addComponent(Graphics);
+        graphic.lineWidth = 5;
+        graphic.strokeColor = color.clone();
+        graphic.fillColor = color.clone();
+        node.layer = layer;
+        node.parent = this.node;
+        node.setPosition(Vec3.ZERO);
+        return new GizmosRenderer(graphic);
     }
 
     private getRenderer(color: Color): GizmosRenderer {
-        const hex = color.toHEX();
-        let renderer = this._renderers.get(hex);
+        // Color.toHEX() does not encode alpha, so keep all four channels.
+        const key = [color.r, color.g, color.b, color.a, this._layer].join(':');
+        let renderer = this._renderers.get(key);
         if (!renderer) {
-            renderer = this.createRenderer(color);
-            this._renderers.set(hex, renderer);
+            renderer = this.createRenderer(color, this._layer);
+            this._renderers.set(key, renderer);
         }
         return renderer;
     }
 
-    private worldToLocal(world: IVec2Like): IVec2Like {
+    private worldToLocal(point: IVec2Like): IVec2Like {
         const local = new Vec3();
-        this.node.inverseTransformPoint(local, new Vec3(world.x, world.y));
+        this.node.inverseTransformPoint(local, new Vec3(point.x, point.y));
         return local;
     }
 
-    private getSprite(id: string) {
+    private localPoint(point: IVec2Like): IVec2Like {
+        return this._useLocalPosition ? point : this.worldToLocal(point);
+    }
+
+    private getSprite(id: string): Sprite {
         let sprite = this._spriteMap.get(id);
         if (!sprite) {
             sprite = new Node('spriteID: ' + id).addComponent(Sprite);
@@ -125,7 +110,6 @@ class GizmosDebugDraw extends Component {
             sprite.node.layer = this.node.layer;
             sprite.node.setParent(this.node);
         }
-
         return sprite;
     }
 
@@ -137,19 +121,18 @@ class GizmosDebugDraw extends Component {
             label.node.layer = this.node.layer;
             label.node.setParent(this.node);
         }
-
         return label;
     }
 
-    public setColor(color: Color) {
+    public setColor(color: Color): void {
         this._color = color;
     }
 
-    public setUseLocalPosition(value: boolean) {
+    public setUseLocalPosition(value: boolean): void {
         this._useLocalPosition = value;
     }
 
-    public setLayer(layer: Layers.Enum) {
+    public setLayer(layer: Layers.Enum): void {
         this._layer = layer;
     }
 
@@ -159,25 +142,24 @@ class GizmosDebugDraw extends Component {
         position: IVec2Like,
         scale: Vec2 = Vec2.ONE,
         color: Color = Color.WHITE,
-    ) {
+    ): void {
         const sprite = this.getSprite(id);
+        const local = this._useLocalPosition;
         sprite.node.layer = this._layer;
         this._drawCallsNoneGeometry.push(() => {
             sprite.color = color;
             sprite.spriteFrame = spriteFrame;
             sprite.node.setScale(new Vec3(scale.x, scale.y));
             const p = new Vec3(position.x, position.y);
-            if (this._useLocalPosition) {
-                sprite.node.setPosition(p);
-            } else {
-                sprite.node.setWorldPosition(p);
-            }
+            if (local) sprite.node.setPosition(p);
+            else sprite.node.setWorldPosition(p);
         });
     }
 
-    public drawLabel(id: string, text: string, position: IVec2Like, fontSize: number = 40, scale: Vec2 = Vec2.ONE) {
-        const color = this._color.clone();
+    public drawLabel(id: string, text: string, position: IVec2Like, fontSize: number = 40, scale: Vec2 = Vec2.ONE): void {
         const label = this.getLabel(id);
+        const local = this._useLocalPosition;
+        const color = this._color.clone();
         label.node.layer = this._layer;
         this._drawCallsNoneGeometry.push(() => {
             label.color = color;
@@ -186,133 +168,86 @@ class GizmosDebugDraw extends Component {
             label.string = text;
             label.node.setScale(new Vec3(scale.x, scale.y));
             const p = new Vec3(position.x, position.y);
-            if (this._useLocalPosition) {
-                label.node.setPosition(p);
-            } else {
-                label.node.setWorldPosition(p);
-            }
+            if (local) label.node.setPosition(p);
+            else label.node.setWorldPosition(p);
         });
     }
 
-    public drawLine(point1: IVec2Like, point2: IVec2Like) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const p1 = this._useLocalPosition ? point1 : this.worldToLocal(point1);
-        const p2 = this._useLocalPosition ? point1 : this.worldToLocal(point2);
-        renderer.addDrawCall((g) => {
-            g.moveTo(p1.x, p1.y);
-            g.lineTo(p2.x, p2.y);
-            g.stroke();
-        });
+    public drawLine(start: IVec2Like, end: IVec2Like): void {
+        const a = this.localPoint(start);
+        const b = this.localPoint(end);
+        const commands = this.getRenderer(this._color).commands;
+        commands.moveTo(a.x, a.y);
+        commands.lineTo(b.x, b.y);
+        commands.stroke();
     }
 
-    public drawLineList(points: IVec2Like[], close: boolean = false) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const pointList = this._useLocalPosition ? points : points.map((p) => this.worldToLocal(p));
-        renderer.addDrawCall((g) => {
-            if (points.length > 0) {
-                const p0 = pointList[0];
-                g.moveTo(p0.x, p0.y);
-                for (let i = 1; i < pointList.length; i++) {
-                    const p = pointList[i];
-                    g.lineTo(p.x, p.y);
-                }
-                if (close) g.close();
-                g.stroke();
-            }
-        });
+    public drawLineList(points: IVec2Like[], close = false): void {
+        if (!points.length) return;
+        const commands = this.getRenderer(this._color).commands;
+        const first = this.localPoint(points[0]);
+        commands.moveTo(first.x, first.y);
+        for (let i = 1; i < points.length; i++) {
+            const p = this.localPoint(points[i]);
+            commands.lineTo(p.x, p.y);
+        }
+        if (close) commands.close();
+        commands.stroke();
     }
 
-    public drawCircle(center: IVec2Like, radius: number) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const c = this._useLocalPosition ? center : this.worldToLocal(center);
-        renderer.addDrawCall((g) => {
-            g.circle(c.x, c.y, radius);
-            g.stroke();
-        });
+    public drawCircle(center: IVec2Like, radius: number): void {
+        const c = this.localPoint(center);
+        const commands = this.getRenderer(this._color).commands;
+        commands.circle(c.x, c.y, radius);
+        commands.stroke();
     }
 
-    public drawSolidCircle(center: IVec2Like, radius: number) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const c = this._useLocalPosition ? center : this.worldToLocal(center);
-        renderer.addDrawCall((g) => {
-            g.circle(c.x, c.y, radius);
-            g.fill();
-        });
+    public drawSolidCircle(center: IVec2Like, radius: number): void {
+        const c = this.localPoint(center);
+        const commands = this.getRenderer(this._color).commands;
+        commands.circle(c.x, c.y, radius);
+        commands.fill();
     }
 
-    public drawRect(position: IVec2Like, width: number, height: number) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const p = this._useLocalPosition ? position : this.worldToLocal(position);
-        renderer.addDrawCall((g) => {
-            g.rect(p.x, p.y, width, height);
-            g.stroke();
-        });
+    public drawRect(position: IVec2Like, width: number, height: number): void {
+        const p = this.localPoint(position);
+        const commands = this.getRenderer(this._color).commands;
+        commands.rect(p.x, p.y, width, height);
+        commands.stroke();
     }
 
-    public drawSolidRect(position: IVec2Like, width: number, height: number) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const p = this._useLocalPosition ? position : this.worldToLocal(position);
-        const topLeft = {
-            x: p.x - width / 2,
-            y: p.y - height / 2,
-        };
-        renderer.addDrawCall((g) => {
-            g.rect(topLeft.x, topLeft.y, width, height);
-            g.fill();
-        });
+    public drawSolidRect(position: IVec2Like, width: number, height: number): void {
+        const p = this.localPoint(position);
+        const commands = this.getRenderer(this._color).commands;
+        commands.rect(p.x - width / 2, p.y - height / 2, width, height);
+        commands.fill();
     }
 
-    public drawSolidPolygon(points: IVec2Like[]) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const pointList = this._useLocalPosition ? points : points.map((p) => this.worldToLocal(p));
-        renderer.addDrawCall((g) => {
-            if (points.length > 0) {
-                const p0 = pointList[0];
-                g.moveTo(p0.x, p0.y);
-                for (let i = 1; i < pointList.length; i++) {
-                    const p = pointList[i];
-                    g.lineTo(p.x, p.y);
-                }
-                g.close();
-                g.fill();
-            }
-        });
+    public drawSolidPolygon(points: IVec2Like[]): void {
+        if (points.length < 3) return;
+        const commands = this.getRenderer(this._color).commands;
+        const first = this.localPoint(points[0]);
+        commands.moveTo(first.x, first.y);
+        for (let i = 1; i < points.length; i++) {
+            const p = this.localPoint(points[i]);
+            commands.lineTo(p.x, p.y);
+        }
+        commands.close();
+        commands.fill();
     }
 
-    public drawEllipse(center: IVec2Like, radiusX: number, radiusY: number) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const c = this._useLocalPosition ? center : this.worldToLocal(center);
-        renderer.addDrawCall((g) => {
-            g.ellipse(c.x, c.y, radiusX, radiusY);
-            g.stroke();
-        });
+    public drawEllipse(center: IVec2Like, radiusX: number, radiusY: number): void {
+        const c = this.localPoint(center);
+        const commands = this.getRenderer(this._color).commands;
+        commands.ellipse(c.x, c.y, radiusX, radiusY);
+        commands.stroke();
     }
 
-    public drawSolidEllipse(center: IVec2Like, radiusX: number, radiusY: number) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const c = this._useLocalPosition ? center : this.worldToLocal(center);
-        renderer.addDrawCall((g) => {
-            g.ellipse(c.x, c.y, radiusX, radiusY);
-            g.fill();
-        });
+    public drawSolidEllipse(center: IVec2Like, radiusX: number, radiusY: number): void {
+        const c = this.localPoint(center);
+        const commands = this.getRenderer(this._color).commands;
+        commands.ellipse(c.x, c.y, radiusX, radiusY);
+        commands.fill();
     }
 
     public drawArc(
@@ -320,16 +255,14 @@ class GizmosDebugDraw extends Component {
         radius: number,
         startAngle: number,
         endAngle: number,
-        counterclockwise: boolean = false,
-    ) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const c = this._useLocalPosition ? center : this.worldToLocal(center);
-        renderer.addDrawCall((g) => {
-            g.arc(c.x, c.y, radius, toRadian(startAngle), toRadian(endAngle), counterclockwise);
-            g.stroke();
-        });
+        counterclockwise = false,
+    ): void {
+        const c = this.localPoint(center);
+        const from = toRadian(startAngle);
+        const commands = this.getRenderer(this._color).commands;
+        commands.moveTo(c.x + Math.cos(from) * radius, c.y + Math.sin(from) * radius);
+        commands.arc(c.x, c.y, radius, from, toRadian(endAngle), counterclockwise);
+        commands.stroke();
     }
 
     public drawSolidArc(
@@ -337,46 +270,36 @@ class GizmosDebugDraw extends Component {
         radius: number,
         startAngle: number,
         endAngle: number,
-        counterclockwise: boolean = false,
-    ) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const c = this._useLocalPosition ? center : this.worldToLocal(center);
-        renderer.addDrawCall((g) => {
-            g.arc(c.x, c.y, radius, toRadian(startAngle), toRadian(endAngle), counterclockwise);
-            g.lineTo(c.x, c.y);
-            g.fill();
-        });
+        counterclockwise = false,
+    ): void {
+        const c = this.localPoint(center);
+        const from = toRadian(startAngle);
+        const commands = this.getRenderer(this._color).commands;
+        commands.moveTo(c.x + Math.cos(from) * radius, c.y + Math.sin(from) * radius);
+        commands.arc(c.x, c.y, radius, from, toRadian(endAngle), counterclockwise);
+        commands.lineTo(c.x, c.y);
+        commands.fill();
     }
 
-    public drawBezierCurves(point1: IVec2Like, point2: IVec2Like, point3: IVec2Like, point4: IVec2Like) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const p1 = this._useLocalPosition ? point1 : this.worldToLocal(point1);
-        const p2 = this._useLocalPosition ? point2 : this.worldToLocal(point2);
-        const p3 = this._useLocalPosition ? point3 : this.worldToLocal(point3);
-        const p4 = this._useLocalPosition ? point4 : this.worldToLocal(point4);
-        renderer.addDrawCall((g) => {
-            g.moveTo(p1.x, p1.y);
-            g.bezierCurveTo(p2.x, p2.y, p3.x, p3.y, p4.x, p4.y);
-            g.stroke();
-        });
+    public drawBezierCurves(a: IVec2Like, b: IVec2Like, c: IVec2Like, d: IVec2Like): void {
+        const first = this.localPoint(a);
+        const control1 = this.localPoint(b);
+        const control2 = this.localPoint(c);
+        const end = this.localPoint(d);
+        const commands = this.getRenderer(this._color).commands;
+        commands.moveTo(first.x, first.y);
+        commands.bezierCurveTo(control1.x, control1.y, control2.x, control2.y, end.x, end.y);
+        commands.stroke();
     }
 
-    public drawQuadraticCurve(point1: IVec2Like, point2: IVec2Like, point3: IVec2Like) {
-        const color = this._color.clone();
-        const renderer = this.getRenderer(color);
-        renderer.setLayer(this._layer);
-        const p1 = this._useLocalPosition ? point1 : this.worldToLocal(point1);
-        const p2 = this._useLocalPosition ? point2 : this.worldToLocal(point2);
-        const p3 = this._useLocalPosition ? point3 : this.worldToLocal(point3);
-        renderer.addDrawCall((g) => {
-            g.moveTo(p1.x, p1.y);
-            g.quadraticCurveTo(p2.x, p2.y, p3.x, p3.y);
-            g.stroke();
-        });
+    public drawQuadraticCurve(a: IVec2Like, b: IVec2Like, c: IVec2Like): void {
+        const first = this.localPoint(a);
+        const control = this.localPoint(b);
+        const end = this.localPoint(c);
+        const commands = this.getRenderer(this._color).commands;
+        commands.moveTo(first.x, first.y);
+        commands.quadraticCurveTo(control.x, control.y, end.x, end.y);
+        commands.stroke();
     }
 }
 
