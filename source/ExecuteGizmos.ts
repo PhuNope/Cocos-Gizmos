@@ -9,6 +9,16 @@ type UpdateStats = {
     engineFrames: number; fallbackFrames: number;
     timerSkips: number; reentrantSkips: number;
 };
+interface PositionHandleAdapter {
+    refresh(components: readonly Component[], selected: ReadonlySet<string>, now: number): void;
+}
+
+let positionHandles: PositionHandleAdapter | null = null;
+
+export function setPositionHandleAdapter(adapter: PositionHandleAdapter | null): void {
+    positionHandles = adapter;
+}
+
 let running: {
     stats: UpdateStats;
     scheduler: { stop(): void; tickOnce(): void };
@@ -53,7 +63,8 @@ function collectComponents(node: Node, out: Component[]): void {
     if (!node || !node.isValid || !node.active || !node.activeInHierarchy) return;
     for (const comp of node.components) {
         if (!comp || !comp.isValid || !comp.enabled) continue;
-        if (typeof comp.onDrawGizmos === 'function' || typeof comp.onDrawGizmosSelected === 'function') out.push(comp);
+        if (typeof comp.onDrawGizmos === 'function' || typeof comp.onDrawGizmosSelected === 'function' ||
+            typeof comp.onGizmoHandles === 'function') out.push(comp);
     }
     for (const child of node.children) collectComponents(child, out);
 }
@@ -128,6 +139,11 @@ export function start(): UpdateStats {
         }
         const selection = selectionCache.get(now);
         stats.selectionApi = selection.available;
+        try {
+            positionHandles?.refresh(components, selection.ids, now);
+        } catch (error) {
+            warnOnce('Position handles refresh failed', error);
+        }
         for (const comp of components) {
             if (!comp.isValid || !comp.enabled || !comp.node?.activeInHierarchy) continue;
             if (typeof comp.onDrawGizmos === 'function') {
