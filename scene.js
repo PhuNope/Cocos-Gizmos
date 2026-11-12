@@ -17,7 +17,7 @@ exports.load = function load() {
     updater.setPresentationAdapter(presentation);
     const { createPositionHandleAdapter } = require('./editor-runtime/PositionHandles.js');
     handles = createPositionHandleAdapter((component) =>
-        presentation.evaluate(component, true).hud);
+        presentation.evaluate(component, true).hud, presentation.getLayout());
     updater.setPositionHandleAdapter(handles);
     const status = updater.start();
     console.info('[cocos-gizmos] Scene runtime loaded; updater=' + status.started +
