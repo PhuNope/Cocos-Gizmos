@@ -18,6 +18,15 @@ const hud = { exports: {} };
 vm.runInNewContext(compile('GizmoHudControls'), hud);
 const presentation = { exports: {} };
 vm.runInNewContext(compile('GizmoPresentation'), presentation);
+const hudLayout = { exports: {} };
+vm.runInNewContext(compile('GizmoHudLayout'), {
+    exports: hudLayout.exports,
+    require(id) {
+        if (id === './GizmoHudControls') return hud.exports;
+        if (id === './GizmoPresentation') return presentation.exports;
+        throw new Error('Unknown HUD layout import ' + id);
+    },
+});
 const gizmoInput = { exports: {} };
 vm.runInNewContext(compile('SceneGizmoInput'), gizmoInput);
 const events = [];
@@ -419,6 +428,49 @@ assert.equal(hudAdapter.status().active, 1, 'Opening another Scene can reuse reg
 hudAdapter.clear();
 hudAdapter.dispose();
 assert.equal(componentPool.typeDefs.ProbePosition, undefined);
+// Two components on the same Node must receive different HUD picking rows.
+const { GizmoHudLayout } = hudLayout.exports;
+const sharedLayout = new GizmoHudLayout();
+function makeHudOwner(name) {
+    return {
+        __classname__: 'ProbePosition',
+        constructor: { name: 'ProbePosition' },
+        node, isValid: true, enabled: true, flag: false,
+        onGizmoHud() { return [{ id: 'title', text: name }]; },
+        onGizmoHudControls() {
+            return [{ type: 'checkbox', id: 'flag', text: 'Flag', property: 'flag' }];
+        },
+    };
+}
+const ownerA = makeHudOwner('A');
+const ownerB = makeHudOwner('B');
+sharedLayout.beginFrame([ownerA, ownerB], () => true);
+const multiAdapter = sandbox.exports.createPositionHandleAdapter(() => true, sharedLayout);
+multiAdapter.refresh([ownerA, ownerB], selected, 3100);
+assert.equal(multiAdapter.status().active, 2,
+    'Two components on the same selected Node get independent controllers');
+assert.equal(multiAdapter.status().hudControls, 2);
+const markerA = ownerA.gizmo.controllers[0];
+const markerB = ownerB.gizmo.controllers[0];
+assert.equal(markerA.position.y, 2, 'First HUD control is after first text row');
+assert.equal(markerB.position.y, -64,
+    'Second HUD control is after previous component and a spacer row');
+assert.ok(markerA.position.y - markerB.position.y >= 44,
+    'Picking hitboxes for separate components must not overlap');
+
+markerB.onMouseDown({ handleName: 'hud:flag', x: 10, y: -64 });
+markerB.onMouseUp();
+assert.equal(ownerA.flag, false);
+assert.equal(ownerB.flag, true, 'HUD action changes only its owning component');
+
+sharedLayout.beginFrame([ownerA, ownerB], comp => comp === ownerB);
+multiAdapter.refresh([ownerA, ownerB], selected, 3400);
+assert.equal(multiAdapter.status().hudControls, 1,
+    'Hidden component HUD does not retain its picking controller');
+assert.equal(ownerB.gizmo.controllers[0].position.y, 2,
+    'Remaining HUD moves to the first row when preceding HUD is hidden');
+multiAdapter.dispose();
+
 console.log('[hud-adapter] toggle/checkbox clicks, slider drag and cancel, button dispatch and cleanup OK');
 
 console.log('[position-adapter] selected handle, XY dragging, undo hooks, Escape and cleanup OK');
