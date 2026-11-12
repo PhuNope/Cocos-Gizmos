@@ -9,7 +9,7 @@
         "build": "tsc -p tsconfig.json --noEmit && node scripts/build.mjs && tsc -p tsconfig.assets.json --noEmit",
         "type": "npm run build && node scripts/type.mjs",
         "prepublishOnly": "npm run type",
-        "test": "npm run type && node scripts/verify-output.mjs && node tests/extension-types.mjs && node tests/optional-extension.mjs && node tests/scene-scheduler.mjs && node tests/scene-discovery.mjs && node tests/presentation.mjs && node tests/hud-overlay.mjs && node tests/hud-projection.mjs && node tests/hud-controls.mjs && node tests/panel-settings.mjs && node tests/gizmo-diagnostics.mjs && node tests/gizmo-edit-session.mjs && node tests/position-drag.mjs && node tests/position-adapter.mjs && node tests/draw-commands-2d.mjs && node tests/renderer-3d.mjs && node tests/editor-only.mjs && node tests/mesh-positions.mjs",
+        "test": "npm run type && node scripts/verify-output.mjs && node tests/extension-types.mjs && node tests/optional-extension.mjs && node tests/scene-scheduler.mjs && node tests/scene-discovery.mjs && node tests/presentation.mjs && node tests/hud-overlay.mjs && node tests/hud-projection.mjs && node tests/hud-controls.mjs && node tests/panel-settings.mjs && node tests/gizmo-diagnostics.mjs && node tests/gizmo-edit-session.mjs && node tests/position-drag.mjs && node tests/scene-gizmo-input.mjs && node tests/position-adapter.mjs && node tests/draw-commands-2d.mjs && node tests/renderer-3d.mjs && node tests/editor-only.mjs && node tests/mesh-positions.mjs",
         "pack": "npm run test && node scripts/pack.mjs"
     },
     "types": "dist/Gizmos.d.ts",
