@@ -137,6 +137,19 @@ function markerSize(world: Point): number {
     return 0.3;
 }
 
+/**
+ * Resize only the standalone picking marker. BoxController.updateSize()
+ * re-enters editable box handles and assumes their private topNode exists.
+ * These handles are not initialized by this Gizmo, so updateSize is unsafe.
+ */
+function setMarkerSize(controller: any, size: number): void {
+    const cube = controller?._cubeNode;
+    if (!cube || !Number.isFinite(size) || size <= 0) return;
+    const scale = new Vec3(size, size, size);
+    if (typeof cube.setScale === 'function') cube.setScale(scale);
+    else cube.scale = scale;
+}
+
 function createEditorGizmo(base: any, allowHud: (component: Component) => boolean): any {
     return class PositionHandleEditorGizmo extends base {
         private entries: Entry[] = [];
@@ -210,32 +223,20 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                     if (field.color && Color.fromHEX) Color.fromHEX(color, field.color);
                     else color.set(255, 174, 66, 255);
                     controller.setColor?.(color);
-                    controller.setEditHandlesColor?.(color);
                     controller.setOpacity?.(255);
-                    controller.editable = true;
-                    controller._edit = true;
-                    controller._editable = true;
-                    controller._defaultEditHandleSize = 0.08;
-                    controller.initEditHandles?.();
-                    controller.showEditHandles?.();
+                    // Use only the standalone cube. BoxController's editable face
+                    // handles require private topNode state and crash on 3.8.8.
                     if (controller._wireFrameBoxNode) controller._wireFrameBoxNode.active = false;
                     if (controller._wireFrameBoxMeshRenderer) controller._wireFrameBoxMeshRenderer.enabled = false;
-                    if (controller._editHandlesShape) {
-                        controller._editHandlesShape.active = true;
-                        applyGizmoLayer(controller._editHandlesShape);
-                        for (const child of controller._editHandlesShape.children || []) {
-                            child.active = child.name === 'y';
-                        }
+                    if (controller._editHandlesShape) controller._editHandlesShape.active = false;
+                    if (!controller._cubeNode || typeof controller.initHandle !== 'function') {
+                        throw new Error('Standalone position marker is unavailable');
                     }
                     applyGizmoLayer(controller._cubeNode);
-                    // The editable Y face handles Scene picking; the cube renders the point.
-                    controller.setHandleColor?.('y', color, 0);
-                    if (controller._cubeNode) {
-                        controller._cubeNode.active = true;
-                        if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
-                        if (controller._handleDataMap?.[key]) controller.removeHandle?.(key);
-                        controller.initHandle?.(controller._cubeNode, key);
-                    }
+                    controller._cubeNode.active = true;
+                    if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
+                    if (controller._handleDataMap?.[key]) controller.removeHandle?.(key);
+                    controller.initHandle(controller._cubeNode, key);
                     const down = (event: any) => this.begin(entry, event);
                     const move = (event: any) => this.move(entry, event);
                     const up = () => this.finish(false);
@@ -263,18 +264,16 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                     else color.set(58, 182, 255, 255);
                     controller.setColor?.(color);
                     controller.setOpacity?.(255);
-                    controller.editable = true;
-                    controller._edit = true;
-                    controller._editable = true;
                     if (controller._wireFrameBoxNode) controller._wireFrameBoxNode.active = false;
                     if (controller._wireFrameBoxMeshRenderer) controller._wireFrameBoxMeshRenderer.enabled = false;
                     if (controller._editHandlesShape) controller._editHandlesShape.active = false;
-                    if (controller._cubeNode) {
-                        applyGizmoLayer(controller._cubeNode);
-                        controller._cubeNode.active = true;
-                        if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
-                        controller.initHandle?.(controller._cubeNode, key);
+                    if (!controller._cubeNode || typeof controller.initHandle !== 'function') {
+                        throw new Error('Standalone HUD marker is unavailable');
                     }
+                    applyGizmoLayer(controller._cubeNode);
+                    controller._cubeNode.active = true;
+                    if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
+                    controller.initHandle(controller._cubeNode, key);
                     const down = (event: any) => this.beginHud(entry, event);
                     const move = (event: any) => this.moveHud(entry, event);
                     const up = () => this.finishHud(false);
@@ -316,7 +315,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                 entry.controller.setPosition?.(new Vec3(world.x, world.y, world.z));
                 entry.controller.setRotation?.(new Quat());
                 const size = markerSize(world);
-                entry.controller.updateSize?.(Vec3.ZERO, new Vec3(size, size, size));
+                setMarkerSize(entry.controller, size);
             }
             if (!this.hudEntries.length) return;
             const view = camera();
@@ -333,7 +332,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                 const row = hudRowScreenPosition(projection.screen, texts.length + entry.index);
                 const world = projection.worldAt(row.x - 14, row.y);
                 entry.controller.setPosition?.(world);
-                entry.controller.updateSize?.(Vec3.ZERO, new Vec3(size, size, size));
+                setMarkerSize(entry.controller, size);
             }
         }
 
@@ -573,6 +572,24 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             this.finishHud(false);
         }
 
+        // GizmoOperation dispatches these callbacks to every registered Gizmo
+        // on Creator 3.8.8, even when no controller was hit.
+        public onNotGizmoMouseDown(): void {
+            // A new click outside the Gizmo cancels an unfinished gesture.
+            this.finish(true);
+            this.finishHud(true);
+        }
+
+        public onNotGizmoMouseMove(): void {
+            // No pointer capture when the Scene operation is not dragging us.
+        }
+
+        public onNotGizmoMouseUp(): void {
+            // Releasing outside a handle commits drags but not button clicks.
+            this.finish(false);
+            this.finishHud(!this.hudDrag);
+        }
+
         public onKeyDown(event: any): boolean | void {
             if ((this.drag || this.hudDrag || this.pendingClick) &&
                 (event?.key === 'Escape' || event?.keyCode === 27)) {
@@ -587,7 +604,6 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             this.refreshHandles();
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 controller.show?.();
-                controller.showEditHandles?.();
                 controller.registerEvents?.();
             }
         }
@@ -598,7 +614,6 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             this.shown = false;
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 controller.unregisterEvents?.();
-                controller.hideEditHandles?.();
                 controller.hide?.();
             }
         }
@@ -627,7 +642,6 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             for (const { controller, key } of [...this.entries, ...this.hudEntries]) {
                 controller.unregisterEvents?.();
                 controller.removeHandle?.(key);
-                controller.hideEditHandles?.();
                 controller.hide?.();
             }
             this.entries.length = 0;
