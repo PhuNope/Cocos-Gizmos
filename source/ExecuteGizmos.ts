@@ -137,11 +137,18 @@ export function start(): UpdateStats {
         if (!root) {
             registry.clear();
             stats.components = 0;
+            try { positionHandles?.refresh([], new Set<string>(), now); }
+            catch (error) { warnOnce('Position handles cleanup failed', error); }
             return;
         }
         let components: readonly Component[];
         try { components = registry.get(root, now); }
-        catch (error) { warnOnce('Scene traversal failed', error); return; }
+        catch (error) {
+            warnOnce('Scene traversal failed', error);
+            try { positionHandles?.refresh([], new Set<string>(), now); }
+            catch (cleanupError) { warnOnce('Position handles cleanup failed', cleanupError); }
+            return;
+        }
         stats.components = components.length;
         if (components.length && !firstComponentLog) {
             firstComponentLog = true;
