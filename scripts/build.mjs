@@ -126,6 +126,12 @@ for (const file of FILES) {
         }
 
         if (ts.isExportDeclaration(statement) || ts.isExportAssignment(statement)) {
+            // An empty export marks the declaration-only Ext.ts as a module.
+            // Its global and cc augmentations are hoisted into the generated bundle.
+            if (file.name === 'Ext' && ts.isExportDeclaration(statement) &&
+                !statement.moduleSpecifier && statement.exportClause &&
+                ts.isNamedExports(statement.exportClause) &&
+                statement.exportClause.elements.length === 0) continue;
             fail(`${file.name}.ts: top-level export statements are not supported in the bundle`);
         }
 
