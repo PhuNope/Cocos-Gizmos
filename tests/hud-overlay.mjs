@@ -14,6 +14,9 @@ const solver = { exports: {} };
 vm.runInNewContext(compile('PositionDragSolver'), solver);
 const controls = { exports: {} };
 vm.runInNewContext(compile('GizmoHudControls'), controls);
+class Vec3 {
+    constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
+}
 const projection = { exports: {} };
 vm.runInNewContext(compile('GizmoHudProjection'), {
     exports: projection.exports,
@@ -23,9 +26,6 @@ vm.runInNewContext(compile('GizmoHudProjection'), {
         throw new Error('Unexpected projection import ' + id);
     },
 });
-class Vec3 {
-    constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
-}
 class Color {
     static created = 0;
     constructor() { Color.created++; }
