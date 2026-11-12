@@ -809,7 +809,8 @@ export function createPositionHandleAdapter(
                 if (!component?.isValid || !component.enabled || !component.node?.activeInHierarchy ||
                     !selected.has(component.node.uuid) ||
                     (typeof component.onGizmoHandles !== 'function' &&
-                     typeof component.onGizmoHudControls !== 'function')) continue;
+                     (typeof component.onGizmoHudControls !== 'function' ||
+                      (hudLayout && !hudLayout.get(component))))) continue;
                 wanted.add(component);
                 let installed = false;
                 for (const key of selectedKeys(component)) {
