@@ -46,8 +46,8 @@ export class GizmoPresentationService {
             normalizeHudItems(textCallback.call(component)) : [];
         if (typeof controlsCallback === 'function') {
             for (const control of normalizeHudControls(controlsCallback.call(component))) {
-                const value = control.type === 'slider' ?
-                    (component as any)[control.property] : undefined;
+                const value = control.type === 'button' ?
+                    undefined : (component as any)[control.property];
                 entries.push({
                     id: 'control:' + control.id,
                     text: formatHudControl(control, value),
