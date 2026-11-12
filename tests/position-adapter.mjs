@@ -155,8 +155,16 @@ assert.ok(events.includes('end:target'));
 assert.ok(events.includes('component-changed'));
 assert.equal(events.filter(value => value === 'native-begin:target').length, 1,
     'One position drag opens one controller transaction');
+assert.equal(events.filter(value => value === 'native-cancel:target').length, 1,
+    'A complete circle returning to its origin is a no-op and cancels its undo entry');
+
+ctrl.onMouseDown({ handleName: 'y', x: 150, y: 0 });
+ctrl.onMouseMove({ handleName: 'y', x: 180, y: 0 });
+ctrl.onMouseUp();
+assert.equal(component.target.x, 180);
 assert.equal(events.filter(value => value === 'native-end:target').length, 1,
-    'One position drag closes one controller transaction');
+    'A meaningful position drag closes a single native transaction');
+component.target = new Vec3(150, 0, 0);
 
 ctrl.onMouseDown({ handleName: 'y', x: 150, y: 0 });
 ctrl.onMouseMove({ handleName: 'y', x: -300, y: 250 });
