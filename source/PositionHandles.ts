@@ -601,6 +601,22 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             }
         }
 
+        public diagnosticState(): {
+            positionHandles: number;
+            hudControls: number;
+            draggingPosition: boolean;
+            draggingSlider: boolean;
+            pendingClick: boolean;
+        } {
+            return {
+                positionHandles: this.entries.length,
+                hudControls: this.hudEntries.length,
+                draggingPosition: !!this.drag,
+                draggingSlider: !!this.hudDrag,
+                pendingClick: !!this.pendingClick,
+            };
+        }
+
         public onTargetUpdate(): void { this.refreshHandles(); }
         public onNodeChanged(): void { this.updateMarkers(); }
         public updateControllerTransform(): void { this.updateMarkers(); }
@@ -628,7 +644,11 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
 export interface PositionHandleSceneAdapter {
     refresh(components: readonly Component[], selected: ReadonlySet<string>, now: number): void;
     dispose(): void;
-    status(): { registered: number; active: number; reason: string };
+    status(): {
+        registered: number; active: number; reason: string;
+        positionHandles: number; hudControls: number;
+        draggingPosition: number; draggingSlider: number; pendingClicks: number;
+    };
 }
 
 export function createPositionHandleAdapter(
@@ -730,7 +750,20 @@ export function createPositionHandleAdapter(
             reason = 'disposed';
         },
         status() {
-            return { registered: registered.size, active: active.size, reason };
+            const counts = {
+                positionHandles: 0, hudControls: 0,
+                draggingPosition: 0, draggingSlider: 0, pendingClicks: 0,
+            };
+            for (const gizmo of active.values()) {
+                const info = gizmo.diagnosticState?.();
+                if (!info) continue;
+                counts.positionHandles += info.positionHandles;
+                counts.hudControls += info.hudControls;
+                if (info.draggingPosition) counts.draggingPosition++;
+                if (info.draggingSlider) counts.draggingSlider++;
+                if (info.pendingClick) counts.pendingClicks++;
+            }
+            return { registered: registered.size, active: active.size, reason, ...counts };
         },
     };
 }
