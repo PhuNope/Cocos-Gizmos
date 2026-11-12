@@ -281,6 +281,18 @@ assert.equal(hudAdapter.status().active, 1);
 assert.equal(hudGizmo.controllers.length, 5, 'One position handle and four HUD controls');
 assert.ok(hudGizmo.controllers.every(c => c._cubeNode.scale?.x > 0),
     'Both position and HUD markers must avoid unsafe BoxController sizing');
+for (const control of hudGizmo.controllers.slice(1)) {
+    assert.ok(control._cubeNode.scale.x <= 14.01,
+        'HUD picking cubes should be about 14px, not 140px');
+    assert.ok(control._cubeNode.scale.x < 22,
+        'A picking cube must not overlap the next 22px HUD row');
+}
+for (let i = 2; i < hudGizmo.controllers.length; i++) {
+    const before = hudGizmo.controllers[i - 1].position.y;
+    const after = hudGizmo.controllers[i].position.y;
+    assert.ok(Math.abs(before - after) >= 22 - 1e-6,
+        'HUD picking marker centers must occupy distinct screen rows');
+}
 const toggle = hudGizmo.controllers[1];
 const checkbox = hudGizmo.controllers[2];
 const slider = hudGizmo.controllers[3];
