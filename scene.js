@@ -12,12 +12,13 @@ exports.load = function load() {
     installed = { Gizmos2D, Gizmos3D };
     Object.assign(globalThis, installed);
     updater = require('./editor-runtime/ExecuteGizmos.js');
-    const { createPositionHandleAdapter } = require('./editor-runtime/PositionHandles.js');
-    handles = createPositionHandleAdapter();
-    updater.setPositionHandleAdapter(handles);
     const { GizmoPresentationService } = require('./editor-runtime/GizmoPresentationService.js');
     presentation = new GizmoPresentationService();
     updater.setPresentationAdapter(presentation);
+    const { createPositionHandleAdapter } = require('./editor-runtime/PositionHandles.js');
+    handles = createPositionHandleAdapter((component) =>
+        presentation.evaluate(component, true).hud);
+    updater.setPositionHandleAdapter(handles);
     const status = updater.start();
     console.info('[cocos-gizmos] Scene runtime loaded; updater=' + status.started +
         ', Scene=' + (status.scene || '(not ready)'));
