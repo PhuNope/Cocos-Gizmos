@@ -8,9 +8,12 @@ import { HudControl, HudSliderDrag, hudRowScreenPosition, normalizeHudControls, 
 import { createSceneHudProjection } from './GizmoHudProjection';
 import { normalizeHudItems } from './GizmoPresentation';
 import { GizmoEditSession } from './GizmoEditSession';
+import {
+    GizmoInputDiagnostics, GizmoInputSnapshot, readSceneHandleName,
+    readScenePointer, ScenePointer,
+} from './SceneGizmoInput';
 
 type Point = { x: number; y: number; z: number };
-type Pointer = { x: number; y: number };
 type Field = GizmoHandleDescriptor;
 type Entry = { field: Field; controller: any; key: string };
 type DragState = { entry: Entry; solver: PositionDragSolver; session: GizmoEditSession<Point> };
@@ -52,16 +55,7 @@ function applyGizmoLayer(node: any): void {
     for (const child of node.children || []) applyGizmoLayer(child);
 }
 
-function pointer(event: any): Pointer | null {
-    for (const item of [event, event?.detail, event?.data, event?.mouse]) {
-        if (Number.isFinite(item?.x) && Number.isFinite(item?.y)) {
-            return { x: item.x, y: item.y };
-        }
-    }
-    return null;
-}
-
-function sceneRay(position: Pointer): { o: Point; d: Point } | null {
+function sceneRay(position: ScenePointer): { o: Point; d: Point } | null {
     const view = camera();
     if (typeof view?.screenPointToRay !== 'function') return null;
     const ray = { o: new Vec3(), d: new Vec3() };
@@ -150,7 +144,10 @@ function setMarkerSize(controller: any, size: number): void {
     else cube.scale = scale;
 }
 
-function createEditorGizmo(base: any, allowHud: (component: Component) => boolean): any {
+function createEditorGizmo(
+    base: any, allowHud: (component: Component) => boolean,
+    input: GizmoInputDiagnostics,
+): any {
     return class PositionHandleEditorGizmo extends base {
         private entries: Entry[] = [];
         private hudEntries: HudEntry[] = [];
@@ -159,6 +156,19 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         private pendingClick: HudEntry | null = null;
         private shown = false;
         private layout = '';
+        private readonly registeredControllers = new WeakSet<object>();
+
+        private registerController(controller: any): void {
+            if (!this.shown || !controller || this.registeredControllers.has(controller)) return;
+            controller.registerEvents?.();
+            this.registeredControllers.add(controller);
+        }
+
+        private unregisterController(controller: any): void {
+            if (!controller || !this.registeredControllers.has(controller)) return;
+            this.registeredControllers.delete(controller);
+            controller.unregisterEvents?.();
+        }
 
         private closeControl(property: string, index: number | undefined, cancelled: boolean): void {
             if (cancelled && typeof this.onControlCancel === 'function') {
@@ -237,16 +247,16 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                     if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
                     if (controller._handleDataMap?.[key]) controller.removeHandle?.(key);
                     controller.initHandle(controller._cubeNode, key);
-                    const down = (event: any) => this.begin(entry, event);
-                    const move = (event: any) => this.move(entry, event);
-                    const up = () => this.finish(false);
+                    const down = (event: any) => { input.record('controllerDown'); this.begin(entry, event); };
+                    const move = (event: any) => { input.record('controllerMove'); this.move(entry, event); };
+                    const up = () => { input.record('controllerUp'); this.finish(false); };
                     controller.onControllerMouseDown = down;
                     controller.onControllerMouseMove = move;
                     controller.onControllerMouseUp = up;
                     controller.onMouseDown = down;
                     controller.onMouseMove = move;
                     controller.onMouseUp = up;
-                    controller.registerEvents?.();
+                    this.registerController(controller);
                     this.entries.push(entry);
                 } catch (error) {
                     console.warn('[cocos-gizmos/handles] Cannot initialize position controller:', error);
@@ -274,16 +284,16 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
                     controller._cubeNode.active = true;
                     if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
                     controller.initHandle(controller._cubeNode, key);
-                    const down = (event: any) => this.beginHud(entry, event);
-                    const move = (event: any) => this.moveHud(entry, event);
-                    const up = () => this.finishHud(false);
+                    const down = (event: any) => { input.record('controllerDown'); this.beginHud(entry, event); };
+                    const move = (event: any) => { input.record('controllerMove'); this.moveHud(entry, event); };
+                    const up = () => { input.record('controllerUp'); this.finishHud(false); };
                     controller.onControllerMouseDown = down;
                     controller.onControllerMouseMove = move;
                     controller.onControllerMouseUp = up;
                     controller.onMouseDown = down;
                     controller.onMouseMove = move;
                     controller.onMouseUp = up;
-                    controller.registerEvents?.();
+                    this.registerController(controller);
                     this.hudEntries.push(entry);
                 } catch (error) {
                     console.warn('[cocos-gizmos/hud] Cannot initialize HUD controller:', error);
@@ -338,15 +348,17 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
 
         private beginHud(entry: HudEntry, event: any): void {
             if (!this.shown || this.drag || this.hudDrag || this.pendingClick) return;
-            if (event?.handleName && event.handleName !== entry.key && event.handleName !== 'y') return;
+            const handleName = readSceneHandleName(event);
+            if (handleName && handleName !== entry.key) return;
             const component = this.target as Component;
             if (entry.control.type !== 'slider') {
                 this.pendingClick = entry;
                 return;
             }
             const current = (component as any)[entry.control.property];
-            const at = pointer(event);
-            if (!at || !Number.isFinite(current)) return;
+            const at = readScenePointer(event);
+            if (!at) { input.record('missingPointer'); return; }
+            if (!Number.isFinite(current)) return;
             try {
                 const solver = new HudSliderDrag(entry.control, current, at.x);
                 const property = entry.control.property;
@@ -393,7 +405,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         private moveHud(entry: HudEntry, event: any): void {
             const drag = this.hudDrag;
             if (!drag || drag.entry !== entry || drag.entry.control.type !== 'slider') return;
-            const at = pointer(event);
+            const at = readScenePointer(event);
             if (!at) return;
             const next = drag.solver.move(at.x);
             if (next === null) return;
@@ -471,10 +483,11 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
 
         private begin(entry: Entry, event: any): void {
             if (!this.shown || this.drag || this.hudDrag || this.pendingClick) return;
-            if (event?.handleName && event.handleName !== 'y' && event.handleName !== entry.key) return;
-            const view = pointer(event);
+            const handleName = readSceneHandleName(event);
+            if (handleName && handleName !== entry.key) return;
+            const view = readScenePointer(event);
             const ray = view && sceneRay(view);
-            if (!ray) return;
+            if (!ray) { input.record('missingPointer'); return; }
             const target = this.target as Component;
             const original = readField(target, entry.field);
             if (!original) return;
@@ -535,7 +548,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         private move(entry: Entry, event: any): void {
             const drag = this.drag;
             if (!drag || drag.entry !== entry) return;
-            const view = pointer(event);
+            const view = readScenePointer(event);
             const ray = view && sceneRay(view);
             if (!ray) return;
             const next = drag.solver.move(ray);
@@ -555,7 +568,8 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         }
 
         public onGizmoMouseDown(event: any): void {
-            const name = event?.handleName;
+            input.record('gizmoDown');
+            const name = readSceneHandleName(event);
             const entry = this.entries.find((item) => item.key === name);
             if (entry) this.begin(entry, event);
             const hud = this.hudEntries.find((item) => item.key === name);
@@ -563,11 +577,13 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         }
 
         public onGizmoMouseMove(event: any): void {
+            input.record('gizmoMove');
             if (this.drag) this.move(this.drag.entry, event);
             if (this.hudDrag) this.moveHud(this.hudDrag.entry, event);
         }
 
         public onGizmoMouseUp(): void {
+            input.record('gizmoUp');
             this.finish(false);
             this.finishHud(false);
         }
@@ -575,6 +591,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         // GizmoOperation dispatches these callbacks to every registered Gizmo
         // on Creator 3.8.8, even when no controller was hit.
         public onNotGizmoMouseDown(): void {
+            input.record('outsideDown');
             // A new click outside the Gizmo cancels an unfinished gesture.
             this.finish(true);
             this.finishHud(true);
@@ -585,6 +602,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         }
 
         public onNotGizmoMouseUp(): void {
+            input.record('outsideUp');
             // Releasing outside a handle commits drags but not button clicks.
             this.finish(false);
             this.finishHud(!this.hudDrag);
@@ -604,7 +622,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             this.refreshHandles();
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 controller.show?.();
-                controller.registerEvents?.();
+                this.registerController(controller);
             }
         }
 
@@ -613,7 +631,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
             this.finishHud(true);
             this.shown = false;
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
-                controller.unregisterEvents?.();
+                this.unregisterController(controller);
                 controller.hide?.();
             }
         }
@@ -640,7 +658,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
 
         private clearEntries(): void {
             for (const { controller, key } of [...this.entries, ...this.hudEntries]) {
-                controller.unregisterEvents?.();
+                this.unregisterController(controller);
                 controller.removeHandle?.(key);
                 controller.hide?.();
             }
@@ -666,6 +684,7 @@ export interface PositionHandleSceneAdapter {
         registered: number; active: number; reason: string;
         positionHandles: number; hudControls: number;
         draggingPosition: number; draggingSlider: number; pendingClicks: number;
+        input: GizmoInputSnapshot;
     };
 }
 
@@ -677,6 +696,7 @@ export function createPositionHandleAdapter(
     let gizmoConstructor: any = null;
     let latestScan = -Infinity;
     let reason = 'not-initialized';
+    const input = new GizmoInputDiagnostics();
     let manager: any = null;
     let typeDefs: any = null;
 
@@ -689,7 +709,7 @@ export function createPositionHandleAdapter(
         }
         manager = gizmo;
         typeDefs = pool.typeDefs;
-        if (!gizmoConstructor) gizmoConstructor = createEditorGizmo(typeDefs['cc.BoxCollider'], allowHud);
+        if (!gizmoConstructor) gizmoConstructor = createEditorGizmo(typeDefs['cc.BoxCollider'], allowHud, input);
         reason = 'ready';
         return true;
     }
@@ -786,7 +806,8 @@ export function createPositionHandleAdapter(
                 if (info.draggingSlider) counts.draggingSlider++;
                 if (info.pendingClick) counts.pendingClicks++;
             }
-            return { registered: registered.size, active: active.size, reason, ...counts };
+            return { registered: registered.size, active: active.size, reason, ...counts,
+                input: input.snapshot() };
         },
     };
 }
