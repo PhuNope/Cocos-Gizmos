@@ -6,7 +6,8 @@ import { createSceneHudProjection, SceneHudCamera } from './GizmoHudProjection';
 
 function sceneCamera(): SceneHudCamera | null {
     const global = globalThis as any;
-    const view = global.cce?.Camera?.camera || global.window?.cce?.Camera?.camera;
+    const editorCamera = (global.window?.cce || global.cce)?.Camera;
+    const view = editorCamera?.camera || editorCamera?._camera?.camera;
     return view && typeof view.worldToScreen === 'function' &&
         typeof view.screenPointToRay === 'function' ? view as SceneHudCamera : null;
 }
