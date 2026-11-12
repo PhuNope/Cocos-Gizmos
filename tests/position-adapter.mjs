@@ -109,7 +109,7 @@ const component = {
 };
 const sandbox = {
     exports: {},
-    cce: { Camera: { camera: cam }, Gizmo: manager, Engine: { repaintInEditMode() {} } },
+    cce: { Camera: { _camera: { camera: cam } }, Gizmo: manager, Engine: { repaintInEditMode() {} } },
     console: { warn(...args) { throw new Error(args.join(' ')); } },
     require(name) {
         if (name === 'cc') return { Color, Vec3, Quat, Layers: { Enum: { GIZMOS: 4 } }, Component: class {} };
