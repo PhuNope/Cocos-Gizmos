@@ -11,6 +11,7 @@ type UpdateStats = {
 };
 interface PositionHandleAdapter {
     refresh(components: readonly Component[], selected: ReadonlySet<string>, now: number): void;
+    clear?(): void;
 }
 interface PresentationAdapter {
     evaluate(component: Component, selected: boolean): { draw: boolean; hud: boolean };
@@ -133,20 +134,26 @@ export function start(): UpdateStats {
         if (root !== activeScene) {
             activeScene = root;
             selectionCache.clear();
+            try { positionHandles?.clear?.(); }
+            catch (error) { warnOnce('Position handles cleanup failed', error); }
         }
         if (!root) {
             registry.clear();
             stats.components = 0;
-            try { positionHandles?.refresh([], new Set<string>(), now); }
-            catch (error) { warnOnce('Position handles cleanup failed', error); }
+            if (!positionHandles?.clear) {
+                try { positionHandles?.refresh([], new Set<string>(), now); }
+                catch (error) { warnOnce('Position handles cleanup failed', error); }
+            }
             return;
         }
         let components: readonly Component[];
         try { components = registry.get(root, now); }
         catch (error) {
             warnOnce('Scene traversal failed', error);
-            try { positionHandles?.refresh([], new Set<string>(), now); }
-            catch (cleanupError) { warnOnce('Position handles cleanup failed', cleanupError); }
+            try {
+                if (positionHandles?.clear) positionHandles.clear();
+                else positionHandles?.refresh([], new Set<string>(), now);
+            } catch (cleanupError) { warnOnce('Position handles cleanup failed', cleanupError); }
             return;
         }
         stats.components = components.length;
