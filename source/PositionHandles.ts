@@ -496,7 +496,7 @@ function createEditorGizmo(base: any, allowHud: (component: Component) => boolea
         }
 
         public onKeyDown(event: any): boolean | void {
-            if ((this.drag || this.hudDrag || this.pendingButton) &&
+            if ((this.drag || this.hudDrag || this.pendingClick) &&
                 (event?.key === 'Escape' || event?.keyCode === 27)) {
                 this.finish(true);
                 this.finishHud(true);
