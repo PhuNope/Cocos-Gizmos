@@ -57,9 +57,14 @@ const SELECTION_POLL_INTERVAL_MS = 32;
 
 class SelectedNodeCache {
     private previous = { ids: new Set<string>(), available: false };
+    private mainSelection: { ids: Set<string>; available: true } | null = null;
     private lastCheckedAt = -Infinity;
 
     public get(now: number): { ids: Set<string>; available: boolean } {
+        // Main-process selection events are authoritative once received.
+        // Scene Editor.Selection can report a stale empty array after the
+        // user clicks a selected node again, overriding a restored Gizmo.
+        if (this.mainSelection) return this.mainSelection;
         if (now - this.lastCheckedAt >= SELECTION_POLL_INTERVAL_MS) {
             this.previous = selectedNodes();
             this.lastCheckedAt = now;
@@ -68,11 +73,13 @@ class SelectedNodeCache {
     }
 
     public force(ids: string[]): void {
-        this.previous = { ids: new Set(ids), available: true };
+        this.mainSelection = { ids: new Set(ids), available: true };
+        this.previous = this.mainSelection;
         this.lastCheckedAt = Date.now();
     }
 
     public clear(): void {
+        this.mainSelection = null;
         this.previous = { ids: new Set<string>(), available: false };
         this.lastCheckedAt = -Infinity;
     }
