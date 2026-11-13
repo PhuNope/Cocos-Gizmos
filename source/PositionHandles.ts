@@ -112,23 +112,28 @@ function writeField(target: Component, field: Field, value: Point): boolean {
 
 function markerSize(world: Point): number {
     const view = camera();
-    if (typeof view?.worldToScreen !== 'function') return 0.3;
+    if (typeof view?.worldToScreen !== 'function') return 1.5;
     const screen = new Vec3();
     try {
         view.worldToScreen(new Vec3(world.x, world.y, world.z), screen);
         const a = sceneRay({ x: screen.x, y: screen.y });
         const b = sceneRay({ x: screen.x + 1, y: screen.y });
-        if (!a || !b) return 0.3;
+        if (!a || !b) return 1.5;
         const normal = a.d;
         const hitA = intersectHandlePlane(a, world, normal);
         const hitB = intersectHandlePlane(b, world, normal);
         if (!hitA || !hitB) return 0.3;
         const pixel = Math.hypot(hitA.x - hitB.x, hitA.y - hitB.y, hitA.z - hitB.z);
-        if (Number.isFinite(pixel) && pixel > 0) return Math.max(0.01, Math.min(1000, pixel * 10));
+        // Use a ~22px picking marker rather than a tiny 10px cube. The
+        // projection is evaluated again after every drag so the visible point
+        // keeps the same size across Scene zoom levels.
+        if (Number.isFinite(pixel) && pixel > 1e-10) {
+            return Math.max(0.015, Math.min(1000, pixel * 22));
+        }
     } catch {
         // Keep the default marker size if the camera is being replaced.
     }
-    return 0.3;
+    return 1.5;
 }
 
 /**
@@ -139,9 +144,20 @@ function markerSize(world: Point): number {
 function setMarkerSize(controller: any, size: number): void {
     const cube = controller?._cubeNode;
     if (!cube || !Number.isFinite(size) || size <= 0) return;
-    const scale = new Vec3(size, size, size);
-    if (typeof cube.setScale === 'function') cube.setScale(scale);
-    else cube.scale = scale;
+    // The built-in Controller may be attached beneath a transformed target
+    // Node. Setting *local* scale makes points vanish on scaled 2D canvases.
+    // World scale keeps the picking cube size independent of target scale.
+    if (typeof cube.setWorldScale === 'function') {
+        cube.setWorldScale(size, size, size);
+    } else {
+        const parent = cube.parent?.worldScale;
+        const parentX = parent?.x && Math.abs(parent.x) > 1e-8 ? Math.abs(parent.x) : 1;
+        const parentY = parent?.y && Math.abs(parent.y) > 1e-8 ? Math.abs(parent.y) : 1;
+        const parentZ = parent?.z && Math.abs(parent.z) > 1e-8 ? Math.abs(parent.z) : 1;
+        const scale = new Vec3(size / parentX, size / parentY, size / parentZ);
+        if (typeof cube.setScale === 'function') cube.setScale(scale);
+        else cube.scale = scale;
+    }
 }
 
 function createEditorGizmo(
