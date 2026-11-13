@@ -207,7 +207,15 @@ class Base {
         this._controller = {
             _cubeNode: cube,
             _cubeNodeMR: { enabled: true, isValid: true },
-            _editHandlesShape: { active: true },
+            _editHandlesShape: {
+                active: false,
+                children: [{ name: 'x', active: false }, { name: 'y', active: false }],
+            },
+            editInitCount: 0, editShowCount: 0,
+            initEditHandles() { this.editInitCount++; },
+            showEditHandles() { this.editShowCount++; },
+            setEditHandlesColor() {},
+            setHandleColor(name, color, opacity) { this.hitFace = { name, opacity }; },
             _wireFrameBoxNode: { active: true },
             _wireFrameBoxMeshRenderer: { enabled: true },
             shape: new Node('shape'),
@@ -374,10 +382,15 @@ assert.ok(dragSprite3D?.spriteFrame,
     '3D drag point must be visible through the same Sprite UI pipeline as HUD');
 assert.ok(dragSprite3D.node.listeners.get('mouse-down')?.length,
     'Marker Sprite must register actual Cocos Node mouse input');
-assert.equal(document.listeners.get('pointerdown')?.length, 1,
-    'Selected marker captures the Editor Scene canvas pointer independently');
-assert.equal(globalInput.count(MouseTypes.MOUSE_DOWN), 1,
-    'Selected 3D Gizmo must subscribe to a global mouse fallback');
+assert.equal(document.listeners.get('pointerdown')?.length || 0, 0,
+    'Native Scene drag does not install browser DOM listeners');
+assert.equal(globalInput.count(MouseTypes.MOUSE_DOWN), 0,
+    'Native Scene drag does not install Game View mouse listeners');
+assert.equal(dragController._editHandlesShape.active, true);
+assert.equal(dragController._editHandlesShape.children[1].active, true);
+assert.equal(dragController._editHandlesShape.children[0].active, false);
+assert.equal(dragController.hitFace?.name, 'y');
+assert.equal(dragController.hitFace?.opacity, 0);
 assert.equal(dragSprite3D.node.active, true);
 assert.equal(positionDisc.getComponent(MeshRenderer).enabled, false,
     'Mesh-only drag point is disabled when the UI sprite is available');
@@ -386,57 +399,34 @@ assert.equal(positionDisc.worldPosition.y, 100);
 assert.ok(positionDisc.worldScale.x > 0);
 assert.equal(dragController._cubeNode.active, true,
     'Native drag hit cube is re-activated separately from the point mesh');
-// Test real input event routing instead of calling Gizmo operation
-// callbacks directly (those may never run for visual UI Sprite nodes).
-globalInput.emit(MouseTypes.MOUSE_DOWN, {
-    getButton() { return 0; }, getLocation() { return { x: 100, y: 100 }; },
+// Creator Gizmo Kit works by dispatching the BoxController editable +Y
+// proxy through GizmoOperation. Exercise that same native path end-to-end.
+dragController.onControllerMouseDown({
+    handleName: 'y', getLocation() { return { x: 100, y: 100 }; },
 });
 assert.equal(dragGizmo.diagnosticState().draggingPosition, true,
-    'Global Cocos input begins drag when native BoxController misses a click');
-globalInput.emit(MouseTypes.MOUSE_MOVE, {
-    getLocation() { return { x: 121, y: 114 }; },
-});
-globalInput.emit(MouseTypes.MOUSE_UP, {
-    getLocation() { return { x: 121, y: 114 }; },
-});
+    'Native +Y face acquires a position drag');
+dragGizmo.onNotGizmoMouseDown({ x: 100, y: 100 });
+assert.equal(dragGizmo.diagnosticState().draggingPosition, true,
+    'Duplicate outside-down must not cause begin -> cancel');
+dragGizmo.onNotGizmoMouseMove({ x: 121, y: 114 });
+dragGizmo.onNotGizmoMouseUp();
 assert.equal(dragComponent.handlePosition.x, 121);
 assert.equal(dragComponent.handlePosition.y, 114);
 assert.equal(dragGizmo.diagnosticState().draggingPosition, false);
-// Embedded Creator Scene can expose DOM events even when cc.input is routed
-// to Game View. Verify the browser capture path with viewport-local coords.
-const pointDom = {
-    target: document.sceneCanvas, button: 0,
-    clientX: 121, clientY: 500 - 114,
-    preventDefault() { this.prevented = true; },
-    stopPropagation() { this.stopped = true; },
-};
-document.emit('pointerdown', pointDom);
-assert.equal(pointDom.prevented, true,
-    'Canvas pointer hit is intercepted before Scene selection steals the drag');
-assert.equal(dragGizmo.diagnosticState().draggingPosition, true);
-document.emit('pointermove', {
-    target: document.sceneCanvas, clientX: 140, clientY: 500 - 122,
-    preventDefault() {},
-});
-document.emit('pointerup', {
-    target: document.sceneCanvas, clientX: 140, clientY: 500 - 122,
-});
-assert.equal(dragComponent.handlePosition.x, 140);
-assert.equal(dragComponent.handlePosition.y, 122);
-assert.equal(dragGizmo.diagnosticState().draggingPosition, false);
+assert.equal(dragController.editInitCount, 1,
+    'Native edit face is not recreated during an active drag');
 
 dragAdapter.refresh([dragComponent], new Set(), 2100);
-assert.equal(globalInput.count(MouseTypes.MOUSE_DOWN), 0,
-    'Deselecting must remove global Scene input listeners');
-assert.equal(document.listeners.get('pointerdown')?.length, 0,
-    'Deselecting must detach all browser Scene mouse capture callbacks');
+assert.equal(dragController._editHandlesShape.active, false,
+    'Deselecting disables native +Y face without leaking event listeners');
 assert.equal(positionDisc.active, false,
     'Deselecting hides only the visible disc without destroying its mesh');
 dragAdapter.refresh([dragComponent], new Set([dragNode.uuid]), 2110);
-assert.equal(globalInput.count(MouseTypes.MOUSE_DOWN), 1,
-    'Reselect must register exactly one mouse listener');
-assert.equal(document.listeners.get('pointerdown')?.length, 1,
-    'Reselect adds a single DOM capture callback without leaking listeners');
+assert.equal(dragController._editHandlesShape.active, true,
+    'Reselect immediately restores native BoxController face');
+assert.equal(dragController.editInitCount, 1,
+    'Reselect keeps the native face mesh rather than rebuilding it');
 assert.equal(positionDisc.active, true,
     'Selected -> empty -> same node immediately restores visible drag disc');
 dragAdapter.dispose();
@@ -465,20 +455,23 @@ assert.equal(dragSprite2D.node.active, true);
 assert.ok(twoDDraws.length >= 2, 'Canvas 2D fallback still draws Graphics markers');
 assert.ok(dragSprite2D.node.listeners.get('mouse-down')?.length,
     'Canvas drag Sprite also receives native UI mouse input');
-dragSprite2D.node.emit('mouse-down', {
-    getButton() { return 0; }, getUILocation() { return { x: 50, y: 60 }; },
+const controller2D = drag2D.gizmo.controllers[0];
+assert.equal(controller2D._editHandlesShape.children[1].active, true,
+    'Canvas 2D also keeps native editable +Y face for Scene picking');
+controller2D.onControllerMouseDown({
+    handleName: 'y', getUILocation() { return { x: 50, y: 60 }; },
 });
 assert.equal(drag2D.gizmo.diagnosticState().draggingPosition, true,
-    'Direct Sprite MOUSE_DOWN starts a 2D position edit');
-globalInput.emit(MouseTypes.MOUSE_MOVE, {
-    getLocation() { return { x: 75, y: 70 }; },
-});
-globalInput.emit(MouseTypes.MOUSE_UP, {
-    getLocation() { return { x: 75, y: 70 }; },
-});
+    'Native 2D +Y face begins a position edit');
+drag2D.gizmo.onNotGizmoMouseDown({ x: 50, y: 60 });
+assert.equal(drag2D.gizmo.diagnosticState().draggingPosition, true,
+    '2D begin event is not cancelled by an outside-down notification');
+drag2D.gizmo.onNotGizmoMouseMove({ x: 75, y: 70 });
+drag2D.gizmo.onNotGizmoMouseUp();
+
 assert.equal(drag2D.handlePosition.x, 75);
 assert.equal(drag2D.handlePosition.y, 70);
 dragAdapter2D.dispose();
 
-console.log('[position-visual] independent 2D/3D selected point disc, native reselect and drag fallback OK');
+console.log('[position-visual] 2D/3D marker Sprite + native +Y BoxController drag proxy OK');
 console.log('[hud-picking-plane] exact native HUD quad geometry, zoom and click OK');
