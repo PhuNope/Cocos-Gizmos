@@ -219,7 +219,7 @@ writeFileSync(OUT_FILE, bundledTypeScript, 'utf8');
  // Compile source modules separately; each module owns at most one Component.
  // Public Gizmos.js only imports the helpers and installs two global APIs.
  // 'cc' and 'cc/env' remain engine-provided imports.
-const runtimeModules = ['Define', 'SceneUpdateScheduler', 'ExecuteGizmos', 'DrawCommandBuffer2D', 'GizmoHandlePresets', 'Gizmos2D', 'Gizmos3D'];
+const runtimeModules = ['Define', 'SceneUpdateScheduler', 'ExecuteGizmos', 'DrawCommandBuffer2D', 'GizmoHandlePresets', 'Gizmos2D', 'Gizmos3D', 'RegisterGizmos'];
 const compilerOptions = {
     target: ts.ScriptTarget.ES2017,
     module: ts.ModuleKind.ESNext,

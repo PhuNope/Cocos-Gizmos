@@ -6,7 +6,7 @@ import ts from 'typescript';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const fail = (message) => { throw new Error('[verify-output] ' + message); };
-const expected = ['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'GizmoHandlePresets.js', 'Gizmos2D.js', 'Gizmos3D.js'].sort();
+const expected = ['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'GizmoHandlePresets.js', 'Gizmos2D.js', 'Gizmos3D.js', 'RegisterGizmos.js', 'RegisterGizmos.d.ts'].sort();
 const actual = readdirSync(dist).sort();
 if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     fail('Expected runtime and type files, got: ' + actual.join(', '));
@@ -73,6 +73,14 @@ for (const module of ['Gizmos2D.js', 'Gizmos3D.js']) {
 }
 if (!read('Gizmos2D.js').includes("from './DrawCommandBuffer2D.js'")) {
     fail('Gizmos2D must import the shared 2D command buffer');
+}
+const decoratorJS = read('RegisterGizmos.js');
+const decoratorDTS = read('RegisterGizmos.d.ts');
+if (!decoratorJS.includes('EDITOR_NOT_IN_PREVIEW') ||
+    !decoratorJS.includes('registerGizmos') ||
+    !decoratorDTS.includes('interface IDrawGizmos') ||
+    !decoratorDTS.includes('registerGizmos')) {
+    fail('Editor-only registered drawer module or declarations missing');
 }
 const dts = read('Gizmos.d.ts');
 for (const line of ['export declare class Gizmos2D', 'export declare class Gizmos3D',

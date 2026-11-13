@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -9,6 +9,8 @@ const TYPES_ENTRY = path.join(ROOT, 'Types', 'cocos-types.d.ts');
 const TSCONFIG_ASSETS = path.join(ROOT, 'tsconfig.assets.json');
 const OUT_FILE = path.join(ROOT, 'dist', 'Gizmos.d.ts');
 const EDITOR_ASSET_FILE = path.join(ROOT, 'editor-assets', 'GizmosGlobal.ts');
+const DECORATOR_SOURCE = path.join(ROOT, 'source', 'RegisterGizmos.ts');
+const DECORATOR_TYPES = path.join(ROOT, 'dist', 'RegisterGizmos.d.ts');
 const TEST_FILES = [
     path.join(ROOT, 'tests', 'dts', 'positive.ts'),
     path.join(ROOT, 'tests', 'dts', 'negative.ts'),
@@ -351,6 +353,22 @@ function buildEditorAssetDeclarations(output) {
     );
     return asset;
 }
+
+// Generate a separate importable declaration for the opt-in Editor decorator.
+const decoratorDeclaration = ts.transpileDeclaration(readFileSync(DECORATOR_SOURCE, 'utf8'), {
+    fileName: DECORATOR_SOURCE,
+    compilerOptions: {
+        target: ts.ScriptTarget.ES2017,
+        module: ts.ModuleKind.ESNext,
+        declaration: true, emitDeclarationOnly: true,
+    },
+});
+const decoratorErrors = (decoratorDeclaration.diagnostics || [])
+    .filter(d => d.category === ts.DiagnosticCategory.Error);
+if (decoratorErrors.length)
+    fail('RegisterGizmos declaration: ' + formatDiagnostics(decoratorErrors));
+writeFileSync(DECORATOR_TYPES, decoratorDeclaration.outputText, 'utf8');
+console.log('[type] wrote dist/RegisterGizmos.d.ts');
 
 const emittedText = emitBundleDeclarations();
 const output = buildOutputText(emittedText);

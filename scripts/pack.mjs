@@ -10,7 +10,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const distDir = path.join(ROOT, 'dist');
 const globalTypesAsset = path.join(ROOT, 'editor-assets', 'GizmosGlobal.ts');
-const expectedDist = ['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'GizmoHandlePresets.js', 'Gizmos2D.js', 'Gizmos3D.js'].sort();
+const expectedDist = ['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'GizmoHandlePresets.js', 'Gizmos2D.js', 'Gizmos3D.js', 'RegisterGizmos.js', 'RegisterGizmos.d.ts'].sort();
 const actualDist = readdirSync(distDir).sort();
 if (JSON.stringify(actualDist) !== JSON.stringify(expectedDist)) {
   throw new Error(`dist/ must contain only ${expectedDist.join(', ')}; found ${actualDist.join(', ')}`);
@@ -127,6 +127,8 @@ const entries = [
   ['package.json', JSON.stringify(manifest, null, 2) + '\n'],
   ['README.md', usage],
   ['editor-assets/GizmosGlobal.ts', readFileSync(globalTypesAsset)],
+  ['editor-assets/RegisterGizmos.ts', readFileSync(path.join(ROOT, 'editor-assets', 'RegisterGizmos.ts'))],
+  ['editor-assets/RegisterGizmos.ts.meta', readFileSync(path.join(ROOT, 'editor-assets', 'RegisterGizmos.ts.meta'))],
   // These example Components belong to the mounted read-only Asset DB so the
   // user can drag a script straight from Assets > cocos-gizmos > Examples into
   // the Inspector. Checked-in .meta files give them stable UUIDs across builds.
@@ -164,6 +166,8 @@ const entries = [
   ['dist/package.json', JSON.stringify({ type: 'module', private: true }, null, 2) + '\n'],
   ['dist/Gizmos.js', readFileSync(path.join(distDir, 'Gizmos.js'))],
   ['dist/Gizmos.d.ts', readFileSync(path.join(distDir, 'Gizmos.d.ts'))],
+  ['dist/RegisterGizmos.js', readFileSync(path.join(distDir, 'RegisterGizmos.js'))],
+  ['dist/RegisterGizmos.d.ts', readFileSync(path.join(distDir, 'RegisterGizmos.d.ts'))],
   ...['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'GizmoHandlePresets.js', 'Gizmos2D.js', 'Gizmos3D.js']
     .map(name => ['dist/' + name, readFileSync(path.join(distDir, name))]),
 ];
