@@ -115,6 +115,20 @@ const entries = [
   ['package.json', JSON.stringify(manifest, null, 2) + '\n'],
   ['README.md', usage],
   ['editor-assets/GizmosGlobal.ts', readFileSync(globalTypesAsset)],
+  // These example Components belong to the mounted read-only Asset DB so the
+  // user can drag a script straight from Assets > cocos-gizmos > Examples into
+  // the Inspector. Checked-in .meta files give them stable UUIDs across builds.
+  ...[
+    'Examples.meta',
+    'Examples/CocosGizmos2DDemo.ts',
+    'Examples/CocosGizmos2DDemo.ts.meta',
+    'Examples/CocosGizmos3DDemo.ts',
+    'Examples/CocosGizmos3DDemo.ts.meta',
+    'Examples/CocosGizmosSmokeDemo.ts',
+    'Examples/CocosGizmosSmokeDemo.ts.meta',
+  ].map(relative => ['editor-assets/' + relative,
+    readFileSync(path.join(ROOT, 'editor-assets', relative))]),
+  // Keep editable copies for users who prefer their own project assets.
   ['examples/GizmoSmokeProbe.ts', readFileSync(path.join(ROOT, 'assets', 'GizmoSmokeProbe.ts'))],
   ['examples/Gizmos2DApiTest.ts', readFileSync(path.join(ROOT, 'assets', 'Gizmos2DApiTest.ts'))],
   ['examples/Gizmos3DApiTest.ts', readFileSync(path.join(ROOT, 'assets', 'Gizmos3DApiTest.ts'))],
