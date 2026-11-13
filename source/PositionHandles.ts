@@ -688,6 +688,8 @@ function createEditorGizmo(
             }
         }
 
+        public isHandleVisible(): boolean { return this.shown; }
+
         public onShow(): void {
             this.shown = true;
             this.refreshHandles();
@@ -769,6 +771,7 @@ export function createPositionHandleAdapter(
     const active = new Map<Component, any>();
     let gizmoConstructor: any = null;
     let latestScan = -Infinity;
+    let lastSelection = new Set<string>();
     let reason = 'not-initialized';
     const input = new GizmoInputDiagnostics();
     let manager: any = null;
@@ -810,13 +813,21 @@ export function createPositionHandleAdapter(
         }
         if (!(gizmo instanceof gizmoConstructor)) return null;
         gizmo.show?.();
+        // Some Editor Gizmo implementations do not dispatch onShow when
+        // reusing a previously hidden component Gizmo. Restore it explicitly.
+        if (gizmo.isHandleVisible?.() === false) gizmo.onShow?.();
         gizmo.refreshHandles?.();
         return gizmo;
     }
 
     return {
         refresh(components, selected, now) {
-            if (now - latestScan < 250) return;
+            const selectionChanged = selected.size !== lastSelection.size ||
+                [...selected].some((id) => !lastSelection.has(id));
+            // A rapid A -> B -> A selection must not be swallowed by the
+            // discovery throttle; selection is a lifecycle event, not a scan.
+            if (!selectionChanged && now - latestScan < 250) return;
+            lastSelection = new Set(selected);
             latestScan = now;
             if (!initialize()) return;
             const wanted = new Set<Component>();
@@ -837,8 +848,13 @@ export function createPositionHandleAdapter(
                 }
                 if (!installed) continue;
                 const previous = active.get(component);
-                if (previous) previous.refreshHandles?.();
-                else {
+                if (previous) {
+                    if (previous.isHandleVisible?.() === false) {
+                        const restored = show(component);
+                        if (restored) active.set(component, restored);
+                        else active.delete(component);
+                    } else previous.refreshHandles?.();
+                } else {
                     const next = show(component);
                     if (next) active.set(component, next);
                 }
@@ -853,6 +869,7 @@ export function createPositionHandleAdapter(
         clear() {
             for (const gizmo of active.values()) gizmo.hide?.();
             active.clear();
+            lastSelection.clear();
             latestScan = -Infinity;
         },
         dispose() {
@@ -862,6 +879,7 @@ export function createPositionHandleAdapter(
                 if (typeDefs?.[key] === ctor) delete typeDefs[key];
             }
             registered.clear();
+            lastSelection.clear();
             manager = null;
             typeDefs = null;
             latestScan = -Infinity;
