@@ -19,6 +19,7 @@ interface PresentationAdapter {
     planFrame?(components: readonly Component[], selected: ReadonlySet<string>,
         onError?: (component: Component, hook: string, error: unknown) => void): void;
     clearFrame?(): void;
+    finishFrame?(): void;
 }
 
 let positionHandles: PositionHandleAdapter | null = null;
@@ -211,6 +212,8 @@ export function start(): UpdateStats {
                 catch (error) { warnOnce('onGizmoHud (' + comp.constructor?.name + ')', error); }
             }
         }
+        try { presentation?.finishFrame?.(); }
+        catch (error) { warnOnce('Screen HUD flush failed', error); }
     }
     const scheduler = new SceneUpdateScheduler({
         now: () => Date.now(),
