@@ -405,6 +405,22 @@ assert.notEqual(component.gizmo, destroyedHandle,
 assert.equal(component.gizmo.isHandleVisible(), true);
 assert.ok(component.gizmo.controllers[0]._cubeNode.active,
     'Fresh picking marker is active after complete deselection');
+// Scene switch is stronger than selection change: every native +Y face
+// and editor-only gizmo pointer belongs to the *old* Scene and must be
+// destroyed, even if the next Scene reuses a component type/UUID.
+const oldSceneGizmo = component.gizmo;
+adapter.clear();
+assert.equal(adapter.status().active, 0);
+assert.equal(oldSceneGizmo.isHandleDisposed(), true,
+    'Scene transition destroys native BoxController from previous Scene');
+assert.equal(component.gizmo, null,
+    'Editor-only component.gizmo must not retain a destroyed Controller');
+adapter.refresh([component], selected, 1750);
+assert.ok(component.gizmo !== oldSceneGizmo,
+    'Returning to the previous Scene mounts a new native position Gizmo');
+assert.equal(component.gizmo.isHandleVisible(), true);
+assert.equal(component.gizmo.controllers[0]._editHandlesShape.children[1].active, true,
+    'Recovered Scene handle exposes the working +Y native hit proxy');
 adapter.dispose();
 assert.equal(adapter.status().reason, 'disposed');
 assert.equal(componentPool.typeDefs.ProbePosition, undefined,
