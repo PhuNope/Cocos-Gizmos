@@ -20,7 +20,8 @@ async function queryExampleAssets(editor) {
     try {
         // Present in Creator 3.8.8. Other patch versions may not expose it;
         // a missing query-ready message must not prevent trying actual assets.
-        databaseReady = (await request('query-ready')) === true;
+        const ready = await request('query-ready');
+        databaseReady = ready === true ? true : ready === false ? false : null;
     } catch {
         databaseReady = null;
     }
