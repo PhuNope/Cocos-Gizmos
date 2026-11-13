@@ -174,8 +174,8 @@ assert.equal(gizmo.controllers[0]._cubeNode.layer, 4, 'Point marker uses the Giz
 assert.equal(gizmo.controllers[0]._cubeNode.layer, 4,
     'Standalone cube is the only picking marker');
 assert.equal(gizmo.controllers[0]._wireFrameBoxMeshRenderer.enabled, false, 'Collider wireframe is hidden');
-assert.ok(gizmo.controllers[0]._cubeNode.scale.x > 0,
-    'Picking marker is resized directly, without BoxController.updateSize');
+assert.equal(gizmo.controllers[0]._cubeNode.scale.x, 22,
+    '2D picking marker is 22 screen pixels instead of the former 10px hitbox');
 assert.equal(typeof gizmo.onNotGizmoMouseDown, 'function');
 assert.equal(typeof gizmo.onNotGizmoMouseMove, 'function');
 assert.equal(typeof gizmo.onNotGizmoMouseUp, 'function');
@@ -216,6 +216,11 @@ ctrl.onMouseDown({ handleName: 'position:target:single', x: 150, y: 0 });
 ctrl.onMouseMove({ handleName: 'position:target:single', x: 180, y: 0 });
 ctrl.onMouseUp();
 assert.equal(component.target.x, 180);
+assert.equal(ctrl.position.x, 180,
+    'The marker follows the serialized property and remains aligned after drag');
+assert.equal(ctrl._cubeNode.active, true, 'Releasing a drag must not hide the point');
+assert.equal(ctrl._cubeNode.scale.x, 22,
+    'The point remains the same visible size after completing a drag');
 assert.equal(events.filter(value => value === 'native-end:target').length, 1,
     'A meaningful position drag closes a single native transaction');
 component.target = new Vec3(150, 0, 0);
