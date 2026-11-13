@@ -142,6 +142,7 @@ const entries = [
   ['examples/Gizmos2DApiTest.ts', readFileSync(path.join(ROOT, 'assets', 'Gizmos2DApiTest.ts'))],
   ['examples/Gizmos3DApiTest.ts', readFileSync(path.join(ROOT, 'assets', 'Gizmos3DApiTest.ts'))],
   ['docs/EDITOR_SMOKE_TEST.md', readFileSync(path.join(ROOT, 'docs', 'EDITOR_SMOKE_TEST.md'))],
+  ['docs/MOVE_GIZMO.md', readFileSync(path.join(ROOT, 'docs', 'MOVE_GIZMO.md'))],
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
   ['scene.js', readFileSync(path.join(ROOT, 'scene.js'))],
   ['panels/settings/index.js', readFileSync(path.join(ROOT, 'panels/settings/index.js'))],
