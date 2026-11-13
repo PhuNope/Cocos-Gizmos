@@ -473,6 +473,10 @@ assert.equal(cameraSwitchController._editHandlesShape.children[1].active, true);
 current3DGizmo.refreshSceneCamera();
 assert.equal(cameraSwitchController.showCount, previousShow + 1,
     'Camera orbit/repeated frames never reallocate native Gizmo faces');
+sandbox.cce.Camera._camera.camera = { ...switched, node: switched.node };
+current3DGizmo.refreshSceneCamera();
+assert.equal(cameraSwitchController.showCount, previousShow + 1,
+    'A fresh camera wrapper for the same Node must not remount every frame');
 sandbox.cce.Camera._camera.camera = oldCamera;
 adapter.dispose();
 assert.equal(adapter.status().reason, 'disposed');
