@@ -193,8 +193,8 @@ camera.height = 500;
 const previous = labels.length;
 overlay.render(component, entries, { namespace: 'dock', startRow: 0 });
 assert.ok(labels.length > previous);
-assert.ok(Math.abs(labels.at(-1).position.x + 7.2) < 1e-8,
-    'Docked HUD row uses Scene viewport left x=28 instead of the Node origin');
+assert.ok(Math.abs(labels.at(-1).position.x + 8.6) < 1e-8,
+    'Docked HUD fallback uses Scene viewport left x=14 instead of Node origin');
 camera.width = undefined;
 camera.height = undefined;
 
