@@ -190,6 +190,7 @@ const cc = {
 const solver = evaluate('PositionDragSolver');
 const planes = evaluate('PlaneHandleGeometry');
 const axes = evaluate('AxisHandleGeometry');
+const hit = evaluate('MoveHitGeometry');
 const edit = evaluate('GizmoEditSession');
 const commands = evaluate('GizmoMoveCommand', {
     './GizmoEditSession': edit, './PositionDragSolver': solver,
@@ -280,6 +281,7 @@ const sandbox = {
             } },
             './PositionDragSolver': solver,
             './PlaneHandleGeometry': planes, './AxisHandleGeometry': axes,
+            './MoveHitGeometry': hit,
             './GizmoMoveCommand': commands,
             './GizmoEditSession': edit,
             './GizmoHudControls': controls, './GizmoHudProjection': projection,
