@@ -141,7 +141,7 @@ Drawing callbacks remain available without a registration decorator.
 
 ## Move Gizmo 3D (Creator-like)
 
-Use `Gizmos3D.moveHandles('position', options)` inside `onGizmoHandles()`
+Use `Gizmos3D.move('position', options)` inside `onGizmoHandles()`
 to display **three color-coded X/Y/Z arrows and three small XY/XZ/YZ plane
 squares** around a single editable `Vec3`. Hover highlights the selected
 handle, clicking an arrow locks one axis, clicking a square locks its plane.
@@ -150,7 +150,7 @@ The position label is drawn above the object with a screen-size clamp.
 ```ts
 onGizmoHandles(): GizmoHandleList {
     return [
-        ...Gizmos3D.moveHandles('targetPosition', {
+        ...Gizmos3D.move('targetPosition', {
             space: 'local', snap: 0.25,
             axisSize: 86, pickSize: 28,
             planeSize: 24, planeOffset: 25,
