@@ -13,6 +13,7 @@ import { HudControl, HudSliderDrag, hudGrid, hudRowScreenPosition, hudControlScr
 import { createSceneHudProjection, createViewportHudProjection } from './GizmoHudProjection';
 import { normalizeHudItems } from './GizmoPresentation';
 import { GizmoEditSession } from './GizmoEditSession';
+import { planeHandleGeometry, PlaneHandleGeometry } from './PlaneHandleGeometry';
 import { GizmoHudLayout } from './GizmoHudLayout';
 import { resolveSceneCamera } from './SceneCameraBridge';
 import {
@@ -180,6 +181,51 @@ function isCanvas2D(node: any): boolean {
     return false;
 }
 
+/** Both rendering and native edit-face picking use this one geometry.
+ * The two axes come from the component's coordinate space, so rotated Nodes
+ * retain the correct movement plane without changing the target Vec3.
+ */
+function planePlacement(component: Component, field: Field,
+    local: Point, world: Point): PlaneHandleGeometry | null {
+    if (field.visual !== 'plane' || field.plane === 'view' || !field.plane) return null;
+    const space = spaceFor(component, field);
+    const basis = (axis: 'x' | 'y' | 'z'): Point => {
+        const next = { ...local, [axis]: local[axis] + 1 };
+        const point = space.toWorld(next);
+        return { x: point.x - world.x, y: point.y - world.y, z: point.z - world.z };
+    };
+    const pixel = markerSize(world) / 22;
+    return planeHandleGeometry(world, {
+        x: basis('x'), y: basis('y'), z: basis('z'),
+    }, field.plane, pixel,
+    field.planeSize ?? 36, field.planeOffset ?? 48);
+}
+
+/** Native BoxController +Y face is the only reliable Creator 3.8 hit proxy.
+ * Move/scale that private face to cover the plane tile in world space.
+ * Its event callbacks still run through the existing GizmoEditSession.
+ */
+function positionPlaneHitProxy(controller: any, plane: Field['plane'],
+    geometry: PlaneHandleGeometry): void {
+    const face = (controller?._editHandlesShape?.children || []).find(
+        (child: any) => child?.name === 'y');
+    if (!face || face.isValid === false) return;
+    const p = geometry.center;
+    face.setWorldPosition?.(new Vec3(p.x, p.y, p.z));
+    if (typeof face.setWorldScale === 'function')
+        face.setWorldScale(new Vec3(geometry.size, geometry.size, geometry.size));
+    if (typeof face.setWorldRotation === 'function' &&
+        typeof Quat.fromEuler === 'function') {
+        // Builtin +Y edit face lies in XZ. Rotate its normal onto +Z/+X
+        // for the XY/YZ squares, respectively.
+        const rotation = new Quat();
+        if (plane === 'xy') Quat.fromEuler(rotation, 90, 0, 0);
+        else if (plane === 'yz') Quat.fromEuler(rotation, 0, 0, -90);
+        else Quat.fromEuler(rotation, 0, 0, 0);
+        face.setWorldRotation(rotation);
+    }
+}
+
 /**
  * Draw the marker independently from BoxCollider's private cube mesh. Creator
  * may keep the picking Controller alive while its rendering mesh disappears
@@ -217,6 +263,17 @@ function drawSelectedPositionMarkers(component: Component): void {
             const color = new Color(255, 190, 40, 255);
             if (typeof field.color === 'string' && typeof Color.fromHEX === 'function') {
                 Color.fromHEX(color, field.color);
+            }
+            const plane = !onCanvas ? planePlacement(component, field, local, world) : null;
+            if (plane) {
+                const corners = plane.corners.map(p => new Vec3(p.x, p.y, p.z));
+                Gizmos3D.beginColor(node, new Color(color.r, color.g, color.b, 85));
+                Gizmos3D.drawQuad(node, corners[0], corners[1],
+                    corners[2], corners[3], false);
+                Gizmos3D.beginColor(node, color);
+                for (let i = 0; i < 4; i++)
+                    Gizmos3D.drawLine(node, corners[i], corners[(i + 1) % 4]);
+                continue;
             }
             if (onCanvas) {
                 const at = new Vec3();
@@ -629,7 +686,12 @@ function createEditorGizmo(
             return all.filter((field) => field && typeof field.property === 'string' &&
                 /^(xy|xz|yz|view)$/.test(field.plane || 'xy') &&
                 (field.index === undefined || Number.isInteger(field.index) && field.index >= 0) &&
-                readField(component, field) !== null);
+                readField(component, field) !== null &&
+                (field.visual !== 'plane' || field.plane !== 'view') &&
+                (field.planeSize === undefined || Number.isFinite(field.planeSize) &&
+                    field.planeSize >= 12 && field.planeSize <= 120) &&
+                (field.planeOffset === undefined || Number.isFinite(field.planeOffset) &&
+                    field.planeOffset >= 16 && field.planeOffset <= 180));
         }
 
         private hudDescriptors(): HudControl[] {
@@ -650,7 +712,8 @@ function createEditorGizmo(
                 fields: fields.map((field) => [
                     field.property, field.index, field.plane || 'xy',
                     field.space || 'local', field.axis, field.snap,
-                    field.color, field.bounds,
+                    field.color, field.bounds, field.id,
+                    field.visual || 'point', field.planeSize, field.planeOffset,
                 ]),
                 controls: hudControlLayoutSignature(controls),
             });
@@ -666,7 +729,8 @@ function createEditorGizmo(
                     super.createController();
                     const controller = this._controller;
                     if (!controller) continue;
-                    const key = `position:${field.property}:${field.index ?? 'single'}`;
+                    const key = `position:${field.property}:${field.index ?? 'single'}` +
+                        (field.id ? ':' + field.id : '');
                     const entry: Entry = { field, controller, key };
                     const color = new Color();
                     if (field.color && Color.fromHEX) Color.fromHEX(color, field.color);
@@ -845,10 +909,13 @@ function createEditorGizmo(
                 if (entry.field.color && Color.fromHEX)
                     Color.fromHEX(color, entry.field.color);
                 configurePositionHitProxy(entry.controller, color, true);
-                entry.controller.setPosition?.(new Vec3(world.x, world.y, world.z));
+                const tile = planePlacement(component, entry.field, local, world);
+                const center = tile?.center || world;
+                entry.controller.setPosition?.(new Vec3(center.x, center.y, center.z));
                 entry.controller.setRotation?.(new Quat());
-                const size = markerSize(world);
+                const size = tile?.size || markerSize(world);
                 setMarkerSize(entry.controller, size);
+                if (tile) positionPlaneHitProxy(entry.controller, entry.field.plane, tile);
                 if (!entry.visual?.node?.isValid) {
                     const color = new Color(255, 174, 66, 255);
                     if (entry.field.color && Color.fromHEX)
@@ -859,7 +926,7 @@ function createEditorGizmo(
                 if (entry.visual?.node?.isValid) {
                     const visible = entry.visual.node;
                     visible.active = true;
-                    visible.setWorldPosition(new Vec3(world.x, world.y, world.z));
+                    visible.setWorldPosition(new Vec3(center.x, center.y, center.z));
                     const rotation = camera()?.node?.worldRotation;
                     if (rotation) visible.setWorldRotation(rotation);
                     visible.setWorldScale(new Vec3(size * 0.8, size * 0.8, 1));
@@ -874,7 +941,7 @@ function createEditorGizmo(
                         if (view && projection) {
                             view.sync?.();
                             try {
-                                view.worldToScreen(new Vec3(world.x, world.y, world.z), screen);
+                                view.worldToScreen(new Vec3(center.x, center.y, center.z), screen);
                                 if (Number.isFinite(screen.x) && Number.isFinite(screen.y)) {
                                     const dot = entry.visual.sprite.node;
                                     dot.setWorldPosition(projection.worldAt(screen.x, screen.y));
@@ -1200,22 +1267,27 @@ function createEditorGizmo(
             const view = camera();
             if (!pointer || typeof view?.worldToScreen !== 'function') return null;
             let nearest: Entry | null = null;
-            let bestDistanceSquared = 18 * 18;
+            let bestDistanceSquared = Number.POSITIVE_INFINITY;
             for (const entry of this.entries) {
                 const local = readField(this.target as Component, entry.field);
                 if (!local) continue;
                 const world = spaceFor(this.target as Component, entry.field).toWorld(local);
                 if (!validPoint(world)) continue;
+                const tile = planePlacement(this.target as Component, entry.field, local, world);
+                const center = tile?.center || world;
                 const screen = new Vec3();
                 try {
-                    view.worldToScreen(new Vec3(world.x, world.y, world.z), screen);
+                    view.worldToScreen(new Vec3(center.x, center.y, center.z), screen);
                 } catch {
                     continue;
                 }
                 const dx = screen.x - pointer.x;
                 const dy = screen.y - pointer.y;
                 const distanceSquared = dx * dx + dy * dy;
-                if (Number.isFinite(distanceSquared) && distanceSquared < bestDistanceSquared) {
+                const radius = tile ? Math.max(20, entry.field.planeSize || 36) : 18;
+                if (Number.isFinite(distanceSquared) &&
+                    distanceSquared < radius * radius &&
+                    distanceSquared < bestDistanceSquared) {
                     nearest = entry;
                     bestDistanceSquared = distanceSquared;
                 }
