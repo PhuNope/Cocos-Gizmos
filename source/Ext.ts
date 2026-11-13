@@ -37,7 +37,7 @@ declare global {
          * For 'axis' set axis: 'x' | 'y' | 'z'. Three axis handles can
          * reference the same Vec3 property using distinct ids.
          */
-        visual?: 'point' | 'plane' | 'axis';
+        visual?: 'point' | 'plane' | 'axis' | 'box';
         /** Visible length of an axis arrow in Scene pixels (default 78). */
         axisSize?: number;
         /** Radius in Scene pixels used for easier axis/plane selection (default 23). */
@@ -50,6 +50,10 @@ declare global {
         showPositionLabel?: boolean;
         /** Label's vertical offset in screen pixels (default 92). */
         positionLabelOffset?: number;
+        /** Selectable 3D object box side length in WORLD/local units.
+         * Set on a move handle when the object already draws its own box.
+         */
+        boxSize?: number;
         /** Side length of the plane square in Scene pixels (default 36). */
         planeSize?: number;
         /** Offset of the square along its two axes in pixels (default 48). */
@@ -59,6 +63,8 @@ declare global {
     /** Settings for Gizmos3D.move(property, options). */
 
     interface GizmosMoveHandleOptions {
+        /** Optional 3D selectable object box, e.g. 0.7 in the example. */
+        boxSize?: number;
         space?: GizmoHandleSpace;
         snap?: number;
         axisSize?: number;
