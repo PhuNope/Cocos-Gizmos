@@ -831,6 +831,7 @@ const axisNode = { ...node, uuid: 'axis-ray-node' };
 const axisComponent = {
     ...component, node: axisNode, gizmo: null,
     moveObject: new Vec3(4, 2, 1),
+    onGizmoHud: undefined, onGizmoHudControls: undefined,
     onGizmoHandles() {
         return ['x', 'y', 'z'].map(axis => ({
             property: 'moveObject', id: 'axis-' + axis,
