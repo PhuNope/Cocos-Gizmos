@@ -1,5 +1,5 @@
 import { CCObject, Color, Component, director, Director, gfx, Layers,
-    ImageAsset, Material, Mesh, MeshRenderer, Node, Quat, RenderRoot2D,
+    ImageAsset, input, Input, Material, Mesh, MeshRenderer, Node, Quat, RenderRoot2D,
     Sprite, SpriteFrame, Texture2D, UITransform, utils, Vec3 } from 'cc';
 import { Gizmos2D } from './Gizmos2D';
 import { Gizmos3D } from './Gizmos3D';
@@ -491,6 +491,50 @@ function createEditorGizmo(
         private shown = false;
         private destroyed = false;
         private beforeDrawRegistered = false;
+        private globalMouseRegistered = false;
+        /** Cocos input is independent of private Scene BoxController picking.
+         * Only initiate gestures inside the selected screen-space drag disc.
+         * Never swallow the event: the standard Editor transform tool works
+         * normally for every click outside the custom handles.
+         */
+        private readonly onGlobalMouseDown = (event: any): void => {
+            if (!this.shown || this.destroyed || this.drag || this.hudDrag ||
+                this.pendingClick || !event) return;
+            if (typeof event.getButton === 'function' &&
+                event.getButton() !== 0) return;
+            if (this.hudEntryAt(event)) return;
+            const entry = this.positionEntryAt(event);
+            if (entry) this.begin(entry, event);
+        };
+        private readonly onGlobalMouseMove = (event: any): void => {
+            if (this.drag && event) this.move(this.drag.entry, event);
+        };
+        private readonly onGlobalMouseUp = (_event: any): void => {
+            if (this.drag) this.finish(false);
+        };
+        private registerGlobalMouse(): void {
+            const events = Input?.EventType;
+            if (this.globalMouseRegistered || !events || typeof input?.on !== 'function') return;
+            try {
+                input.on(events.MOUSE_DOWN, this.onGlobalMouseDown, this);
+                input.on(events.MOUSE_MOVE, this.onGlobalMouseMove, this);
+                input.on(events.MOUSE_UP, this.onGlobalMouseUp, this);
+                this.globalMouseRegistered = true;
+            } catch (error) {
+                // Different Creator builds expose different input backends.
+                console.warn('[cocos-gizmos/handles] Global input fallback unavailable:', error);
+                this.unregisterGlobalMouse();
+            }
+        }
+        private unregisterGlobalMouse(): void {
+            if (typeof input?.off === 'function' && Input?.EventType) {
+                input.off(Input.EventType.MOUSE_DOWN, this.onGlobalMouseDown, this);
+                input.off(Input.EventType.MOUSE_MOVE, this.onGlobalMouseMove, this);
+                input.off(Input.EventType.MOUSE_UP, this.onGlobalMouseUp, this);
+            }
+            this.globalMouseRegistered = false;
+        }
+
         private readonly beforeDraw = (): void => {
             if (!this.shown || this.destroyed) return;
             // Re-project during Scene scroll, before native controller raycast.
@@ -631,6 +675,7 @@ function createEditorGizmo(
                     controller.initHandle(controller._cubeNode, key);
                     repairNativeHandleColors(controller, key, color);
                     entry.visual = createPositionVisual(color);
+                    this.registerVisualMouse(entry);
                     const down = (event: any) => { input.record('controllerDown'); this.begin(entry, event); };
                     const move = (event: any) => { input.record('controllerMove'); this.move(entry, event); };
                     const up = () => {
@@ -723,6 +768,38 @@ function createEditorGizmo(
             } else this.updateMarkers();
         }
 
+        /** UI Sprite mouse events are dispatched through a separate
+         * Cocos UI hit-test path in Scene View. Register directly on the
+         * point, which is what the user actually clicks, not BoxCollider.
+         */
+        private registerVisualMouse(entry: Entry): void {
+            const node = entry.visual?.sprite?.node;
+            if (!node || typeof node.on !== 'function' || !Node?.EventType) return;
+            const types = Node.EventType;
+            node.on(types.MOUSE_DOWN, (event: any) => {
+                if (!this.shown || this.destroyed || this.drag) return;
+                if (typeof event?.getButton === 'function' && event.getButton() !== 0) return;
+                this.begin(entry, event);
+            });
+            node.on(types.MOUSE_MOVE, (event: any) => {
+                if (this.drag?.entry === entry) this.move(entry, event);
+            });
+            node.on(types.MOUSE_UP, () => {
+                if (this.drag?.entry === entry) this.finish(false);
+            });
+            node.on(types.TOUCH_START, (event: any) => {
+                if (this.shown && !this.drag) this.begin(entry, event);
+            });
+            node.on(types.TOUCH_MOVE, (event: any) => {
+                if (this.drag?.entry === entry) this.move(entry, event);
+            });
+            node.on(types.TOUCH_END, () => {
+                if (this.drag?.entry === entry) this.finish(false);
+            });
+            // All callbacks are owned by the visual Node and automatically
+            // released when its owning Gizmo destroys the visual.
+        }
+
         private updateMarkers(): void {
             if (!this.shown && !this.drag) return;
             const component = this.target as Component;
@@ -749,6 +826,7 @@ function createEditorGizmo(
                     if (entry.field.color && Color.fromHEX)
                         Color.fromHEX(color, entry.field.color);
                     entry.visual = createPositionVisual(color);
+                    this.registerVisualMouse(entry);
                 }
                 if (entry.visual?.node?.isValid) {
                     const visible = entry.visual.node;
@@ -1224,6 +1302,7 @@ function createEditorGizmo(
         public onShow(): void {
             if (this.destroyed) return;
             this.shown = true;
+            this.registerGlobalMouse();
             if (!this.beforeDrawRegistered && typeof director?.on === 'function') {
                 director.on(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
                 this.beforeDrawRegistered = true;
@@ -1244,6 +1323,7 @@ function createEditorGizmo(
         }
 
         public onHide(): void {
+            this.unregisterGlobalMouse();
             if (this.beforeDrawRegistered) {
                 director.off(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
                 this.beforeDrawRegistered = false;
@@ -1310,6 +1390,7 @@ function createEditorGizmo(
         }
 
         public onDestroy(): void {
+            this.unregisterGlobalMouse();
             if (this.beforeDrawRegistered) {
                 director.off(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
                 this.beforeDrawRegistered = false;
