@@ -130,7 +130,36 @@ exports.load = function load() {
 
 exports.unload = function unload() {};
 
+/**
+ * Creator's main process receives reliable selection:select/unselect events;
+ * Scene Selection polling alone can miss the empty -> same-node transition.
+ */
+async function syncSceneSelection() {
+    const editor = globalThis.Editor;
+    const selected = editor?.Selection?.getSelected?.('node') || [];
+    return editor?.Message?.request?.('scene', 'execute-scene-script', {
+        name: 'cocos-gizmos',
+        method: 'gizmosSelectionChanged',
+        args: [Array.isArray(selected) ? selected : []],
+    });
+}
+async function onSelectionSelect(type) {
+    if (type !== 'node') return;
+    try { await syncSceneSelection(); }
+    catch (error) { console.warn('[cocos-gizmos/selection] select sync:', error); }
+}
+async function onSelectionUnselect(type) {
+    if (type !== 'node') return;
+    // Native Editor emits unselect before select when changing A -> B.
+    // Read the final selection next turn, including the empty case.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    try { await syncSceneSelection(); }
+    catch (error) { console.warn('[cocos-gizmos/selection] unselect sync:', error); }
+}
+
 exports.methods = {
+    onSelectionSelect,
+    onSelectionUnselect,
     openSettings() {
         return globalThis.Editor?.Panel?.open?.('cocos-gizmos.settings');
     },
