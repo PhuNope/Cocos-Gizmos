@@ -20,6 +20,19 @@ the automated TypeScript and Node.js regression suite.
    directory and copy those files into your own project's `assets/`.
    The extension does not automatically copy any files to your project assets.
 
+Before dragging, open **Extensions → Gizmos Settings → Check example assets**.
+Each demo should report `imported`. If it reports `database-not-ready`,
+finish the import and check again. `missing` or `query-failed` suggests the
+extension mount or Asset Database query did not succeed; check that the
+extension is enabled and inspect the Creator Console. `uuid-mismatch`,
+`invalid`, or `wrong-importer` means the mounted script metadata was not
+recognized as expected. Restart Creator after replacing the ZIP and capture
+the complete report if the error persists.
+
+This diagnostic checks script asset import registration only. Even when all
+three scripts show `imported`, confirm that Inspector accepts the script and
+does not display **Missing Script**, then test actual Scene handles.
+
 Do not edit project source or delete a Prefab override automatically as part
 of this test. Use a disposable Scene/Prefab and commit or back up your project
 before testing Undo/Redo.
