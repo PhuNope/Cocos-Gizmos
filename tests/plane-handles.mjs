@@ -55,8 +55,45 @@ const localXY = planeHandleGeometry(origin, rotated, 'xy', 0.01);
 assert.ok(Math.abs(localXY.normal.z - 1) < 1e-8,
     'Local rotated Node plane remains orthogonal to rotated basis');
 const sample = readFileSync(path.join(root, 'editor-assets/Examples/CocosGizmos3DDemo.ts'), 'utf8');
-for (const id of ['move-xy', 'move-xz', 'move-yz'])
+for (const id of ['axis-x', 'axis-y', 'axis-z'])
     assert.ok(sample.includes(`id: '${id}'`));
-assert.equal((sample.match(/property: 'moveObject'/g) || []).length, 4,
-    'One object exposes center + three plane drag regions');
-console.log('[plane-handles] XY/XZ/YZ geometry, zoom, local rotation and demo handles OK');
+assert.equal((sample.match(/property: 'moveObject'/g) || []).length, 3,
+    'One object now exposes exactly three short XYZ rays, no center dot');
+assert.equal((sample.match(/visual: 'axis'/g) || []).length, 3);
+assert.ok(!sample.includes("visual: 'plane'"),
+    'Three plane tiles are replaced, not drawn on top of the axis arrows');
+
+const axisSource = readFileSync(path.join(root, 'source/AxisHandleGeometry.ts'), 'utf8');
+const axisJs = ts.transpileModule(axisSource, {
+    compilerOptions: { target: ts.ScriptTarget.ES2017,
+        module: ts.ModuleKind.CommonJS },
+}).outputText;
+const axes = { exports: {} };
+vm.runInNewContext(axisJs, axes);
+const { axisHandleGeometry, axisSegmentDistanceSquared, axisDragNormal } = axes.exports;
+const rays = ['x', 'y', 'z'].map(axis =>
+    axisHandleGeometry(origin, {
+        x: { x: 1, y: 0, z: 0 },
+        y: { x: 0, y: 1, z: 0 },
+        z: { x: 0, y: 0, z: 1 },
+    }, axis, 0.01, 78));
+assert.ok(rays.every(Boolean));
+assert.deepEqual(rays.map(r => Math.round((r.end.x - origin.x) * 100)),
+    [78, 0, 0]);
+assert.equal(rays[0].size, 0.24);
+assert.equal(rays[1].center.y, origin.y + 0.78 * 0.57);
+assert.equal(rays[2].end.z, origin.z + 0.78);
+assert.ok(Math.abs(axisHandleGeometry(origin, {
+    x: { x: 1, y: 0, z: 0 }, y: { x: 0, y: 1, z: 0 },
+    z: { x: 0, y: 0, z: 1 },
+}, 'x', 0.02).size / rays[0].size - 2) < 1e-8,
+'Ray keeps constant apparent pixel size while zooming');
+assert.equal(axisSegmentDistanceSquared({ x: 30, y: 4 },
+    { x: 10, y: 0 }, { x: 78, y: 0 }), 16);
+assert.equal(axisSegmentDistanceSquared({ x: 30, y: 40 },
+    { x: 10, y: 0 }, { x: 78, y: 0 }), 1600);
+assert.ok(axisDragNormal({ x: 1, y: 0, z: 0 },
+    { x: 0, y: 0, z: -1 }).z < -0.99);
+assert.ok(axisDragNormal({ x: 1, y: 0, z: 0 },
+    { x: 1, y: 0, z: 0 }), 'Camera looking along X still gets a fallback plane');
+console.log('[plane-handles] compact XYZ rays, pixel scaling, segment picking and locked axis drag OK');
