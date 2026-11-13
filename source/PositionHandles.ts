@@ -1014,29 +1014,44 @@ function createEditorGizmo(
                     const key = `position:${field.property}:${field.index ?? 'single'}` +
                         (field.id ? ':' + field.id : '');
                     const entry: Entry = { field, controller, key };
+                    // Reuse the working native HUD quad picking mechanism for
+                    // 3D Move arrows, plane squares and the optional body box.
+                    // It is the actual registered controller hit target,
+                    // while drawSelectedPositionMarkers provides the visuals.
+                    entry.picking = isMoveHandle(field) ?
+                        createHudPickingQuad('Move') : null;
                     const color = new Color();
                     if (field.color && Color.fromHEX) Color.fromHEX(color, field.color);
                     else color.set(255, 174, 66, 255);
                     controller.setColor?.(color);
-                    controller.setOpacity?.(255);
+                    controller.setOpacity?.(entry.picking ? 0 : 255);
                     controller._hoverColor = color;
                     controller.hoverColor = color;
-                    // BoxController's editable +Y hit face, not the Sprite,
-                    // is what Creator's Scene GizmoOperation can raycast.
-                    configurePositionHitProxy(controller, color, true);
+                    // Registered transparent quads eliminate the native +Y
+                    // handle glyph entirely for Move Gizmos. Only standalone
+                    // point handles retain the native +Y fallback.
+                    if (entry.picking) {
+                        if (controller._editHandlesShape)
+                            controller._editHandlesShape.active = false;
+                    } else configurePositionHitProxy(controller, color, true);
                     if (controller._wireFrameBoxNode) controller._wireFrameBoxNode.active = false;
                     if (controller._wireFrameBoxMeshRenderer) controller._wireFrameBoxMeshRenderer.enabled = false;
                     if (!controller._cubeNode || typeof controller.initHandle !== 'function') {
                         throw new Error('Standalone position marker is unavailable');
                     }
                     applyGizmoLayer(controller._cubeNode);
-                    controller._cubeNode.active = true;
-                    if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
+                    controller._cubeNode.active = !entry.picking;
+                    if (controller._cubeNodeMR)
+                        controller._cubeNodeMR.enabled = !entry.picking;
                     if (controller._handleDataMap?.[key]) controller.removeHandle?.(key);
-                    controller.initHandle(controller._cubeNode, key);
+                    controller.initHandle(entry.picking?.node || controller._cubeNode, key);
                     repairNativeHandleColors(controller, key, color);
-                    entry.visual = createPositionVisual(color);
-                    this.registerVisualMouse(entry);
+                    if (entry.picking && controller.shape)
+                        controller.shape.active = true;
+                    if (!isMoveHandle(field)) {
+                        entry.visual = createPositionVisual(color);
+                        this.registerVisualMouse(entry);
+                    }
                     const down = (event: any) => {
                         input.record('controllerDown');
                         if (!isPrimaryScenePointer(event)) return;
