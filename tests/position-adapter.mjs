@@ -52,7 +52,11 @@ vm.runInNewContext(compile('GizmoHudProjection'), {
     },
 });
 class Color {
-    set() {}
+    constructor(r = 255, g = 255, b = 255, a = 255) {
+        Object.assign(this, { r, g, b, a });
+    }
+    set(r, g, b, a = 255) { Object.assign(this, { r, g, b, a }); }
+    clone() { return new Color(this.r, this.g, this.b, this.a); }
     static fromHEX(color) { return color; }
 }
 class Quat {}
@@ -69,17 +73,34 @@ class Base {
             setColor() {}, setEditHandlesColor() {}, setHandleColor() {}, setOpacity() {},
             initEditHandles() { throw new Error('topNode: unsafe initEditHandles'); },
             showEditHandles() { throw new Error('topNode: unsafe showEditHandles'); },
-            initHandle() {},
+            _handleDataMap: {},
+            initHandle(node, key) {
+                // Creator 3.8.8 sometimes records incomplete original color
+                // snapshots on a custom MeshRenderer's HUD picking handle.
+                this._handleDataMap[key] = {
+                    rendererNodes: [node],
+                    oriColors: [undefined],
+                    oriOpacities: [undefined],
+                };
+            },
             registerCount: 0, unregisterCount: 0, showCount: 0, hideCount: 0,
             registerEvents() { this.registerCount++; },
             unregisterEvents() { this.unregisterCount++; },
             hideEditHandles() { throw new Error('topNode: unsafe hideEditHandles'); },
-            hide() { this.hideCount++; },
+            hide() {
+                this.hideCount++;
+                for (const data of Object.values(this._handleDataMap)) {
+                    for (const original of data.oriColors) {
+                        if (!Number.isFinite(original?.a))
+                            throw new TypeError("Cannot read properties of undefined (reading 'a')");
+                    }
+                }
+            },
             show() { this.showCount++; },
             setPosition(v) { this.position = v; },
             setRotation() {},
             updateSize() { throw new Error('topNode: unsafe BoxController.updateSize'); },
-            removeHandle() {},
+            removeHandle(key) { delete this._handleDataMap[key]; },
         };
         this._controller = c;
         this.controllers.push(c);
@@ -193,6 +214,11 @@ assert.equal(typeof gizmo.onNotGizmoMouseMove, 'function');
 assert.equal(typeof gizmo.onNotGizmoMouseUp, 'function');
 assert.equal(gizmo.shouldRegisterGizmoOperationEvent, true);
 const ctrl = gizmo.controllers[0];
+const handleSnapshot = ctrl._handleDataMap['position:target:single'];
+assert.ok(handleSnapshot.oriColors[0] && Number.isFinite(handleSnapshot.oriColors[0].a),
+    'The Creator native handle always gets a valid RGBA color snapshot');
+assert.equal(handleSnapshot.oriOpacities[0], 255,
+    'The Creator native handle always gets a valid opacity snapshot');
 assert.equal(ctrl.registerCount, 1, 'Controller registers only once on first show');
 gizmo.onShow();
 assert.equal(ctrl.registerCount, 1, 'Repeated onShow does not register duplicate listeners');
@@ -405,6 +431,11 @@ hudGizmo.refreshHandles();
 hudGizmo.refreshHandles();
 assert.equal(button.hideCount, initialHide,
     'Missing camera must not call unsafe native BoxController.hide()');
+for (const controller of hudGizmo.controllers) {
+    for (const data of Object.values(controller._handleDataMap))
+        assert.ok(data.oriColors.every(color => Number.isFinite(color?.a)),
+            'All active native HUD/position render handles have valid RGBA snapshots');
+}
 assert.equal(button._cubeNode.active, false,
     'Missing camera disables picking volume without resetting private handle colors');
 assert.equal(button.unregisterCount, initialUnregister + 1,
