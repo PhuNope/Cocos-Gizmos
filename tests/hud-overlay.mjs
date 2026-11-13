@@ -62,7 +62,7 @@ const sink = {
     },
 };
 const sink2D = {
-    beginLayer(node, layer) { assert.equal(layer, 4); },
+    beginLayer(node, layer) { assert.equal(layer, 16); },
     beginLocalPosition() {},
     endLocalPosition() {},
     beginColor(node, color) { assert.equal(node.uuid, 'hud-owner'); assert.ok(color); },
@@ -79,7 +79,7 @@ const sandbox = {
             Color, Vec3, Vec2: class Vec2 {
                 constructor(x = 0, y = 0) { Object.assign(this, { x, y }); }
             },
-            Layers: { Enum: { GIZMOS: 4 } }, RenderRoot2D,
+            Layers: { Enum: { GIZMOS: 4, UI_2D: 16 } }, RenderRoot2D,
         };
         if (id === './Gizmos3D') return { Gizmos3D: sink };
         if (id === './Gizmos2D') return { Gizmos2D: sink2D };
