@@ -191,6 +191,7 @@ const sandbox = {
             drawQuad(...args) { visibleDots.scene3d.push(args); },
             drawLine() {},
         } };
+        if (name === './PlaneHandleGeometry') return planes.exports;
         if (name === './PositionDragSolver') return math.exports;
         if (name === './GizmoEditSession') return edits.exports;
         if (name === './GizmoHudControls') return hud.exports;
