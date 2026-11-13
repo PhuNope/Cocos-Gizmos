@@ -1,5 +1,44 @@
 # Cocos-Gizmos
 
+## Decorator - registerGizmos (Editor-only)
+
+To keep all Scene drawing outside a game Component, opt in to a separate
+TypeScript drawer implementing `IDrawGizmos<CompA>`:
+
+```ts
+import { _decorator, Component, Vec3, Color } from 'cc';
+import { registerGizmos, type IDrawGizmos }
+    from '../extensions/cocos-gizmos/dist/RegisterGizmos';
+const { ccclass, property } = _decorator;
+
+class MyDrawer implements IDrawGizmos<MyComponent> {
+    constructor(public readonly component: MyComponent) {}
+    onGizmoHandles(): GizmoHandleList {
+        return [...Gizmos3D.move('position')];
+    }
+    onDrawGizmos(): void {
+        Gizmos3D.beginColor(this.component.node, Color.CYAN);
+        Gizmos3D.drawSphere(this.component.node,
+            this.component.node.worldPosition, 0.5);
+    }
+}
+@ccclass('MyComponent')
+@registerGizmos(MyDrawer)
+export class MyComponent extends Component {
+    @property({ type: Vec3 }) position = new Vec3();
+}
+```
+
+The import is a **hard dependency**: use the *Project* installation of
+Cocos-Gizmos and adjust the relative path from your `assets/` script to
+`extensions/cocos-gizmos/dist/RegisterGizmos`. In Global-only installation
+this relative path does not exist. The decorator is a no-op in game/Preview;
+only Editor Scene installs callback forwarding, with a cached drawer per
+Component instance. Define the drawer before the decorated class, and use
+normal class methods rather than arrow-function fields. For a ready-to-drag
+example, use **Assets → cocos-gizmos → Examples → CocosGizmosDecoratorDemo**.
+Browse **Gizmos → OpenDoc → Decorators** for examples and the binding diagram.
+
 ## API reference inside Cocos Creator
 
 Open **Gizmos → OpenDoc** (next to **Reset Gizmos**) to browse the dockable

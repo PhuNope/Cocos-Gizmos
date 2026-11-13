@@ -9,6 +9,7 @@ const drawings = {
     handles2d: '<svg viewBox="0 0 480 174" role="img" aria-label="Editable points on a 2D polyline" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="174" rx="12" fill="#192335"/><path d="M67 117L168 52L284 101L394 37" fill="none" stroke="#79d6f7" stroke-width="3"/><g stroke="#e9fcff" stroke-width="3"><circle cx="67" cy="117" r="10" fill="#0acbd1"/><circle cx="168" cy="52" r="10" fill="#fbd76e"/><circle cx="284" cy="101" r="10" fill="#0acbd1"/><circle cx="394" cy="37" r="10" fill="#0acbd1"/></g><circle cx="168" cy="52" r="22" fill="none" stroke="#ffd770" stroke-dasharray="5 5" opacity=".65"/><text x="162" y="96" fill="#fbd76e" font-size="13" font-family="Arial,sans-serif">Drag</text></svg>',
     hud: '<svg viewBox="0 0 480 174" role="img" aria-label="Scene HUD with text, slider, toggle, checkbox and button" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="174" rx="12" fill="#142031"/><rect x="20" y="17" width="440" height="140" rx="8" fill="#253248" stroke="#5f7795"/><text x="37" y="42" fill="#fff4a5" font-family="Arial,sans-serif" font-size="17" font-weight="700">Gizmos HUD</text><text x="37" y="74" fill="#dfebff" font-family="Arial,sans-serif" font-size="13">Radius</text><rect x="120" y="64" width="206" height="6" rx="3" fill="#50637a"/><rect x="120" y="64" width="134" height="6" rx="3" fill="#63b3ff"/><rect x="250" y="59" width="9" height="16" rx="2" fill="#e3efff"/><text x="337" y="73" fill="#dfebff" font-size="13">45</text><rect x="37" y="90" width="36" height="19" rx="9" fill="#4dd18a"/><circle cx="62" cy="99.5" r="7" fill="#fff"/><text x="85" y="103" fill="#dfebff" font-size="13">Visible</text><rect x="218" y="91" width="17" height="17" rx="2" fill="#63b3ff"/><path d="M222 99l4 4 6-9" stroke="#11233c" stroke-width="2" fill="none"/><text x="242" y="104" fill="#dfebff" font-size="13">Labels</text><rect x="37" y="119" width="106" height="26" rx="4" fill="#49617d"/><text x="58" y="137" fill="#fff" font-size="13">Reset</text></svg>',
     callbackFlow: '<svg viewBox="0 0 480 174" role="img" aria-label="Gizmo callback workflow: configure and draw then begin, update, end or cancel" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="174" rx="12" fill="#172235"/><g font-family="Arial,sans-serif" text-anchor="middle" font-size="12" font-weight="700"><rect x="19" y="22" width="132" height="36" rx="8" fill="#365279" stroke="#7cbafe"/><text x="85" y="45" fill="#e9f8ff">Setup / Draw</text><rect x="179" y="22" width="94" height="36" rx="8" fill="#4a466e" stroke="#bcabff"/><text x="226" y="45" fill="#f2eeff">begin</text><rect x="303" y="22" width="156" height="36" rx="8" fill="#265f60" stroke="#7de5cb"/><text x="381" y="45" fill="#dcfff5">update × N</text><rect x="264" y="111" width="96" height="35" rx="7" fill="#306b48" stroke="#88e3a5"/><text x="312" y="134" fill="#e2ffeb">end</text><rect x="365" y="111" width="94" height="35" rx="7" fill="#764652" stroke="#fd9da8"/><text x="412" y="134" fill="#ffeef0">cancel</text></g><g stroke="#b7cbdf" stroke-width="2.5" fill="none" stroke-linecap="round"><path d="M151 40h26"/><path d="M273 40h28"/><path d="M381 58v18h-69v33"/><path d="M425 58v51"/><path d="M381 22v-11h-45v11" stroke-dasharray="5 5"/></g><path d="M177 40l-7 -5v10zM301 40l-7 -5v10zM312 109l-5 -8h10zM425 109l-5 -8h10z" fill="#d5e7ff"/><text x="239" y="91" fill="#bad0e5" font-size="11" font-family="Arial,sans-serif">Mouse up</text><text x="372" y="159" fill="#bad0e5" font-size="10" font-family="Arial,sans-serif">Esc / hide</text></svg>',
+    decorator: '<svg viewBox="0 0 480 174" role="img" aria-label="Component decorated with registerGizmos binds one custom drawer per instance in Scene Editor" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="174" rx="12" fill="#172334"/><g font-family="Arial,sans-serif" font-size="13" text-anchor="middle"><rect x="14" y="30" width="125" height="70" rx="10" fill="#234b68" stroke="#64baf0"/><text x="76" y="60" fill="#e0f4ff">CompA</text><text x="76" y="82" fill="#c7def8" font-size="11">Component</text><rect x="175" y="30" width="135" height="70" rx="10" fill="#51435c" stroke="#d4a9f4"/><text x="242" y="59" fill="#fbeeff">registerGizmos</text><text x="242" y="81" fill="#e7c8fb" font-size="11">Editor only</text><rect x="348" y="30" width="117" height="70" rx="10" fill="#27604d" stroke="#7ee3ad"/><text x="406" y="60" fill="#e1fff0">IDrawGizmos</text><text x="406" y="82" fill="#b7f2d3" font-size="11">CustomDrawer</text><path d="M139 65h33M310 65h35" fill="none" stroke="#c9e3f7" stroke-width="3"/><path d="M172 65l-9 -6v12zM345 65l-9 -6v12z" fill="#c9e3f7"/><text x="242" y="132" fill="#9ed6fd" font-weight="700">draw · handles · HUD · callbacks</text><text x="242" y="152" fill="#c3d6e8" font-size="11">Preview / Game: không gắn callback</text></g></svg>',
     labels: '<svg viewBox="0 0 480 174" role="img" aria-label="Position label and sprite annotation above a scene object" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="174" rx="12" fill="#142233"/><g stroke="#7b91aa" stroke-width="2" fill="none"><path d="M36 141l186 -84 218 83M222 57v89"/><path d="M78 140l164 -72 151 72"/></g><circle cx="222" cy="117" r="10" fill="#ffda7c"/><path d="M222 105v-28" stroke="#e7f3ff" stroke-dasharray="4 4"/><rect x="132" y="26" width="219" height="31" rx="7" fill="#344e70" stroke="#80b9fa"/><text x="146" y="46" fill="#f1f8ff" font-size="14" font-family="Arial,sans-serif">Pos X: 1.25  Y: 2  Z: 3</text></svg>',
 };
 const examples = Object.freeze([
@@ -325,7 +326,52 @@ const examples = Object.freeze([
             "}",
         ].join('\n'),
     },
-]);
+    {
+        id: 'decorator', group: 'decorators',
+        heading: '@registerGizmos(CustomDrawer): tách logic Editor khỏi Component',
+        summary: 'Một drawer TypeScript implement IDrawGizmos<T> được tạo riêng cho từng Component khi callback đầu tiên chạy. Các method được bind vào Component trong Scene Editor; Preview/game không cài callback.',
+        apis: ['registerGizmos', 'IDrawGizmos', 'EDITOR_NOT_IN_PREVIEW', 'Gizmos3D.move', 'onGizmoChanged'],
+        figure: 'decorator',
+        caption: 'Component → decorator → drawer theo từng instance (chỉ Scene Editor)',
+        notes: [
+            'Cài extension ở Project rồi import từ extensions/cocos-gizmos/dist/RegisterGizmos (đổi đường dẫn tương đối theo script). Đây là phụ thuộc BẮT BUỘC.',
+            'Định nghĩa class Drawer trước Component vì decorator được thực thi ngay khi khai báo class.',
+            'Mỗi Component được khởi tạo một drawer khi cần; drawer.component trỏ đúng Component đó.',
+            'Drawer dùng class methods (không dùng arrow fields). Các callback còn trên Component sẽ được giữ nếu Drawer không triển khai.',
+            'Không có side-effect trên Preview hoặc game vì module kiểm tra EDITOR_NOT_IN_PREVIEW.',
+        ],
+        code: [
+            "import { _decorator, Component, Vec3, Color } from 'cc';",
+            "import { registerGizmos, type IDrawGizmos }",
+            "  from '../extensions/cocos-gizmos/dist/RegisterGizmos';",
+            "const { ccclass, property } = _decorator;",
+            "",
+            "class CompADrawer implements IDrawGizmos<CompA> {",
+            "  constructor(public readonly component: CompA) {}",
+            "  onGizmoHandles(): GizmoHandleList {",
+            "    return [...Gizmos3D.move('targetPosition')];",
+            "  }",
+            "  onDrawGizmos(): void {",
+            "    const c = this.component;",
+            "    Gizmos3D.beginColor(c.node, Color.CYAN);",
+            "    Gizmos3D.drawSphere(c.node, c.node.worldPosition, 0.25);",
+            "  }",
+            "  onGizmoChanged(name: string, phase: GizmoHandlePhase): void {",
+            "    if (name === 'targetPosition' && phase === 'update') {",
+            "      // c.targetPosition đã chứa vị trí mới",
+            "    }",
+            "  }",
+            "}",
+            "",
+            "@ccclass('CompA')",
+            "@registerGizmos(CompADrawer)",
+            "export class CompA extends Component {",
+            "  @property({ type: Vec3 })",
+            "  targetPosition = new Vec3(1, 0, 0);",
+            "}",
+        ].join('\n'),
+    },
+]); 
 const groups = [
     ['all', 'Tất cả'],
     ['start', 'Bắt đầu'],
@@ -334,6 +380,7 @@ const groups = [
     ['handles', 'Move / Points'],
     ['callbacks', 'Callbacks'],
     ['hud', 'HUD'],
+    ['decorators', 'Decorators'],
 ];
 function html(value) {
     return String(value).replace(/[&<>"']/g, ch => ({

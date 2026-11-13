@@ -16,8 +16,8 @@ assert.match(doc.template, /Gizmos2D\.point/);
 assert.match(doc.template, /onGizmoHudControls/);
 assert.match(doc.template, /<svg[^>]+role="img"/);
 assert.match(doc.style, /cg-api-card/);
-assert.equal((doc.template.match(/class="cg-api-card"/g) || []).length, 12,
-    'OpenDoc ships twelve API cards, including four callback examples');
+assert.equal((doc.template.match(/class="cg-api-card"/g) || []).length, 13,
+    'OpenDoc ships thirteen API cards, including decorator and callback examples');
 for (const callback of ['onGizmoChanged', 'onGizmoHudChanged', 'onGizmoHudAction',
     'onRestore', 'GizmoHandlePhase']) {
     assert.ok(doc.template.includes(callback), 'OpenDoc documents ' + callback);
@@ -28,6 +28,9 @@ for (const phase of ['begin', 'update', 'end', 'cancel']) {
 }
 assert.match(doc.template, /data-doc-group="callbacks"/,
     'Callback cards are filterable in their own category');
+assert.match(doc.template, /@registerGizmos\(CustomDrawer\)/);
+assert.match(doc.template, /IDrawGizmos/);
+assert.match(doc.template, /data-doc-group="decorators"/);
 assert.match(doc.template, /index === undefined/,
     'Array handle callbacks document missing indices');
 assert.match(doc.template, /setWorldPosition/,
@@ -64,7 +67,7 @@ try {
         { dataset: { docGroup: 'hud', docSearch: 'onGizmoHud slider toggle' }, hidden: false },
         { dataset: { docGroup: 'callbacks', docSearch: 'onGizmoChanged phase update cancel' }, hidden: false },
     ];
-    const tabs = ['all', 'start', '2d', '3d', 'handles', 'callbacks', 'hud'].map(id => {
+    const tabs = ['all', 'start', '2d', '3d', 'handles', 'callbacks', 'hud', 'decorators'].map(id => {
         const node = target();
         node.dataset.docTab = id;
         return node;

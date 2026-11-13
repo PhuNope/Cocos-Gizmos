@@ -75,5 +75,14 @@ assert.match(entries.get('panels/docs/index.js') || '', /onGizmoChanged/);
 assert.match(entries.get('panels/docs/index.js') || '', /onGizmoHudChanged/);
 assert.match(entries.get('panels/docs/index.js') || '', /onGizmoHudAction/);
 assert.match(entries.get('panels/docs/index.js') || '', /onRestore/);
+assert.match(entries.get('panels/docs/index.js') || '', /@registerGizmos/);
+assert.match(entries.get('dist/RegisterGizmos.js') || '', /EDITOR_NOT_IN_PREVIEW/,
+    'Installed module must be gated to Editor only');
+assert.match(entries.get('dist/RegisterGizmos.d.ts') || '', /IDrawGizmos/);
+assert.match(entries.get('editor-assets/RegisterGizmos.ts') || '', /registerGizmos/);
+assert.match(entries.get('editor-assets/Examples/CocosGizmosDecoratorDemo.ts') || '',
+    /@registerGizmos\(CustomDrawer\)/);
+assert.match(entries.get('examples/GizmosDecoratorTest.ts') || '',
+    /@registerGizmos\(CustomDrawer\)/);
 assert.ok(!installed.contributions.messages['selection:select'].methods.includes('onSelectionUnselect'));
 console.log('[packaged-selection] extracted ZIP manifest, Scene event bridge, fullscreen HUD & native reentry OK');
