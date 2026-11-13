@@ -23,8 +23,14 @@ const FILES = [
          './SceneUpdateScheduler': '_SceneUpdateScheduler', './Gizmos2D': '_Gizmos2D',
      } },
     { name: 'DrawCommandBuffer2D', ns: '_DrawCommandBuffer2D' },
-    { name: 'Gizmos2D', ns: '_Gizmos2D', relImports: { './DrawCommandBuffer2D': '_DrawCommandBuffer2D' } },
-    { name: 'Gizmos3D', ns: '_Gizmos3D', relImports: { './Define': '_Define' } },
+    { name: 'GizmoHandlePresets', ns: '_GizmoHandlePresets' },
+    { name: 'Gizmos2D', ns: '_Gizmos2D', relImports: {
+        './DrawCommandBuffer2D': '_DrawCommandBuffer2D',
+        './GizmoHandlePresets': '_GizmoHandlePresets',
+    } },
+    { name: 'Gizmos3D', ns: '_Gizmos3D', relImports: {
+        './Define': '_Define', './GizmoHandlePresets': '_GizmoHandlePresets',
+    } },
 ];
 
 /**
@@ -213,7 +219,7 @@ writeFileSync(OUT_FILE, bundledTypeScript, 'utf8');
  // Compile source modules separately; each module owns at most one Component.
  // Public Gizmos.js only imports the helpers and installs two global APIs.
  // 'cc' and 'cc/env' remain engine-provided imports.
-const runtimeModules = ['Define', 'SceneUpdateScheduler', 'ExecuteGizmos', 'DrawCommandBuffer2D', 'Gizmos2D', 'Gizmos3D'];
+const runtimeModules = ['Define', 'SceneUpdateScheduler', 'ExecuteGizmos', 'DrawCommandBuffer2D', 'GizmoHandlePresets', 'Gizmos2D', 'Gizmos3D'];
 const compilerOptions = {
     target: ts.ScriptTarget.ES2017,
     module: ts.ModuleKind.ESNext,
@@ -262,6 +268,13 @@ function transpileRuntimeModule(name) {
             fail('ExecuteGizmos missing compiled Gizmos2D import');
         }
     }
+    if (name === 'Gizmos2D' || name === 'Gizmos3D') {
+        generated = generated.replaceAll("from './GizmoHandlePresets'", "from './GizmoHandlePresets.js'")
+                             .replaceAll('from "./GizmoHandlePresets"', 'from "./GizmoHandlePresets.js"');
+        if (!generated.includes('GizmoHandlePresets.js')) {
+            fail(name + ' must import compiled GizmoHandlePresets.js');
+        }
+    }
     writeFileSync(path.join(ROOT, 'dist', name + '.js'), generated, 'utf8');
 }
 
@@ -291,7 +304,7 @@ if (globalThis.Editor && globalThis.Editor.App && globalThis.Editor.App.path) {
     module.paths.push(require('node:path').join(globalThis.Editor.App.path, 'node_modules'));
 }
 `;
-for (const name of ['GizmoDiagnostics', 'GizmoExampleClassDiagnostics', 'SceneGizmoInput', 'GizmoEditSession', 'GizmoPresentation', 'GizmoHudControls', 'GizmoHudLayout', 'GizmoHudProjection', 'SceneCameraBridge', 'GizmoHudOverlay', 'GizmoPresentationService', 'PositionDragSolver', 'PlaneHandleGeometry', 'AxisHandleGeometry', 'PositionHandles', 'SceneUpdateScheduler', 'DrawCommandBuffer2D', 'Gizmos2D', 'Gizmos3D', 'ExecuteGizmos']) {
+for (const name of ['GizmoDiagnostics', 'GizmoExampleClassDiagnostics', 'SceneGizmoInput', 'GizmoEditSession', 'GizmoPresentation', 'GizmoHudControls', 'GizmoHudLayout', 'GizmoHudProjection', 'SceneCameraBridge', 'GizmoHudOverlay', 'GizmoPresentationService', 'GizmoMoveCommand', 'GizmoHandlePresets', 'PositionDragSolver', 'PlaneHandleGeometry', 'AxisHandleGeometry', 'PositionHandles', 'SceneUpdateScheduler', 'DrawCommandBuffer2D', 'Gizmos2D', 'Gizmos3D', 'ExecuteGizmos']) {
     const fileName = path.join(SRC_DIR, name + '.ts');
     const result = ts.transpileModule(readFileSync(fileName, 'utf8'), {
         fileName,
