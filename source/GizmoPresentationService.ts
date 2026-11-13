@@ -31,7 +31,7 @@ export class GizmoPresentationService {
         onError?: (component: Component, hook: string, error: unknown) => void,
     ): void {
         this.planned = true;
-        this.overlay.beginFrame();
+        this.overlay.beginFrame?.();
         this.layout.beginFrame(
             components,
             (component) => this.evaluate(component, selected.has(component.node.uuid)).hud,
@@ -40,13 +40,13 @@ export class GizmoPresentationService {
     }
 
     public finishFrame(): void {
-        this.overlay.finishFrame(this.layout.totalRows);
+        this.overlay.finishFrame?.(this.layout.totalRows);
     }
 
     public clearFrame(): void {
         this.planned = false;
         this.layout.clear();
-        this.overlay.clearFrame();
+        this.overlay.clearFrame?.();
     }
 
 
