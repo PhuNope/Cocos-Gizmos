@@ -22,21 +22,28 @@ class GizmosRenderer {
     public readonly commands = new DrawCommandBuffer2D();
     private readonly previous: number[] = [];
     private hasGeometry = false;
+    private lastSubmittedAt = -Infinity;
+    // Editor Scene tabs restored from an unsaved Scene can skip this
+    // component's lateUpdate even while the external Scene updater runs.
+    // Keep the most recent geometry over idle watchdog gaps (250ms).
+    private static readonly GEOMETRY_GRACE_MS = 750;
 
     constructor(private readonly graphic: Graphics) {}
 
-    public draw(): void {
+    public draw(now: number = Date.now()): void {
         if (this.commands.isEmpty) {
-            if (this.hasGeometry) {
+            if (this.hasGeometry &&
+                now - this.lastSubmittedAt > GizmosRenderer.GEOMETRY_GRACE_MS) {
                 this.graphic.clear();
                 this.hasGeometry = false;
+                this.previous.length = 0;
             }
-            this.previous.length = 0;
             return;
         }
 
         if (this.hasGeometry && this.commands.equals(this.previous)) {
             this.commands.reset();
+            this.lastSubmittedAt = now;
             return;
         }
 
@@ -45,6 +52,7 @@ class GizmosRenderer {
             this.graphic.clear();
             this.commands.replay(this.graphic);
             this.hasGeometry = true;
+            this.lastSubmittedAt = now;
         } catch (error) {
             this.previous.length = 0;
             this.hasGeometry = false;
@@ -67,7 +75,11 @@ class GizmosDebugDraw extends Component {
     private readonly _lastLabelUsed = new Map<string, number>();
     private readonly _lastSpriteUsed = new Map<string, number>();
 
-    protected lateUpdate(dt: number): void {
+    /** Flush both geometry and non-geometry draw calls. Can run explicitly
+     * after Editor Scene callbacks, even if this component's lateUpdate is
+     * not scheduled after an unsaved Scene is restored.
+     */
+    public flushFrame(): void {
         // The Scene updater can render at 250ms intervals during idle editing.
         // Clearing 2D Labels/Sprites every engine frame hides them immediately.
         const now = Date.now();
@@ -84,7 +96,7 @@ class GizmosDebugDraw extends Component {
             }
         });
 
-        this._renderers.forEach((renderer) => renderer.draw());
+        this._renderers.forEach((renderer) => renderer.draw(now));
 
         for (const drawCall of this._drawCallsNoneGeometry) drawCall();
         this._drawCallsNoneGeometry.length = 0;
@@ -92,6 +104,10 @@ class GizmosDebugDraw extends Component {
         this._color = Gizmos2D.DEFAULT_COLOR;
         this._useLocalPosition = false;
         this._layer = Gizmos2D.DEFAULT_LAYER;
+    }
+
+    protected lateUpdate(_dt: number): void {
+        this.flushFrame();
     }
 
     private createRenderer(color: Color, layer: Layers.Enum): GizmosRenderer {
@@ -396,10 +412,35 @@ export class Gizmos2D {
     public static readonly DEFAULT_COLOR = Color.BLUE;
     public static readonly DEFAULT_LAYER = Layers.Enum.GIZMOS;
     private static readonly _debugNodes = new WeakMap<Node, GizmosDebugDraw>();
+    // Only pending components are held strongly, and only until this Scene
+    // updater frame finishes. Never retain old unsaved Scene nodes forever.
+    private static readonly _pendingFrame = new Set<GizmosDebugDraw>();
+
+    /** Flush the Editor Scene's 2D command buffers synchronously.
+     * Editor tabs can keep a GizmosDebugDraw node but stop dispatching
+     * its Component.lateUpdate after reloading an unsaved Scene.
+     */
+    public static flushEditorFrame(): void {
+        const pending = [...this._pendingFrame];
+        this._pendingFrame.clear();
+        for (const debug of pending) {
+            if (debug?.isValid === false || debug?.node?.isValid === false) continue;
+            try { debug.flushFrame(); }
+            catch (error) {
+                console.warn('[cocos-gizmos/2d] Cannot flush restored Scene Graphics:', error);
+            }
+        }
+    }
+
+    /** Release any pending references before switching or resetting Scene. */
+    public static clearPendingFrame(): void {
+        this._pendingFrame.clear();
+    }
 
     private static getDebugNode(node: Node) {
         const cached = this._debugNodes.get(node);
         if (cached && cached.isValid !== false && cached.node?.isValid !== false && cached.node?.parent === node) {
+            this._pendingFrame.add(cached);
             return cached;
         }
         let debugNode = node.getComponentInChildren(GizmosDebugDraw);
@@ -411,6 +452,7 @@ export class Gizmos2D {
             debugNode.node.setPosition(Vec3.ZERO);
         }
         this._debugNodes.set(node, debugNode);
+        this._pendingFrame.add(debugNode);
         return debugNode;
     }
 
