@@ -140,12 +140,15 @@ const entries = [
     'Examples/CocosGizmos3DDemo.ts.meta',
     'Examples/CocosGizmosSmokeDemo.ts',
     'Examples/CocosGizmosSmokeDemo.ts.meta',
+    'Examples/CocosGizmosDecoratorDemo.ts',
+    'Examples/CocosGizmosDecoratorDemo.ts.meta',
   ].map(relative => ['editor-assets/' + relative,
     readFileSync(path.join(ROOT, 'editor-assets', relative))]),
   // Keep editable copies for users who prefer their own project assets.
   ['examples/GizmoSmokeProbe.ts', readFileSync(path.join(ROOT, 'assets', 'GizmoSmokeProbe.ts'))],
   ['examples/Gizmos2DApiTest.ts', readFileSync(path.join(ROOT, 'assets', 'Gizmos2DApiTest.ts'))],
   ['examples/Gizmos3DApiTest.ts', readFileSync(path.join(ROOT, 'assets', 'Gizmos3DApiTest.ts'))],
+  ['examples/GizmosDecoratorTest.ts', readFileSync(path.join(ROOT, 'assets', 'GizmosDecoratorTest.ts'))],
   // docs/ lives in the repository only. Installed users browse APIs through OpenDoc.
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
   ['scene.js', readFileSync(path.join(ROOT, 'scene.js'))],

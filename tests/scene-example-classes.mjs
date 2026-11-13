@@ -43,7 +43,7 @@ vm.runInNewContext(script, {
 assert.equal(typeof scene.exports.methods.gizmosExampleClassStatus, 'function');
 const registered = scene.exports.methods.gizmosExampleClassStatus();
 assert.equal(registered.registryAvailable, true);
-assert.equal(registered.classes.length, 3);
+assert.equal(registered.classes.length, 4);
 assert.ok(registered.classes.every((entry) => entry.status === 'registered'));
 assert.deepEqual(calls,
     ['./editor-runtime/GizmoExampleClassDiagnostics.js', 'cc'],

@@ -9,6 +9,7 @@ const EXAMPLE_ASSETS = Object.freeze([
     { name: 'CocosGizmos2DDemo', uuid: '79b61d2e-c131-4ae7-8be4-54aa7becc30a' },
     { name: 'CocosGizmos3DDemo', uuid: '1f0a6e38-ffb9-4f95-9f39-ef443ba2e6d8' },
     { name: 'CocosGizmosSmokeDemo', uuid: 'c9f57ebd-36ce-4b24-a7bf-47a350c2d9db' },
+    { name: 'CocosGizmosDecoratorDemo', uuid: '5c7b9b5e-3c33-42cd-b09d-5de039e8cbee' },
 ]);
 
 async function queryExampleAssets(editor) {

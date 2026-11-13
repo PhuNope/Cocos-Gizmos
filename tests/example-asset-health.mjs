@@ -9,6 +9,7 @@ const uuids = {
     CocosGizmos2DDemo: '79b61d2e-c131-4ae7-8be4-54aa7becc30a',
     CocosGizmos3DDemo: '1f0a6e38-ffb9-4f95-9f39-ef443ba2e6d8',
     CocosGizmosSmokeDemo: 'c9f57ebd-36ce-4b24-a7bf-47a350c2d9db',
+    CocosGizmosDecoratorDemo: '5c7b9b5e-3c33-42cd-b09d-5de039e8cbee',
 };
 const names = Object.keys(uuids);
 
@@ -42,7 +43,7 @@ function setEditor(query, isReady = true, classState = 'registered') {
                     return isReady;
                 }
                 assert.equal(message, 'query-asset-info');
-                assert.match(url, /^db:\/\/cocos-gizmos\/Examples\/CocosGizmos(?:2DDemo|3DDemo|SmokeDemo)\.ts$/);
+                assert.match(url, /^db:\/\/cocos-gizmos\/Examples\/CocosGizmos(?:2DDemo|3DDemo|SmokeDemo|DecoratorDemo)\.ts$/);
                 const name = url.split('/').at(-1).replace(/\.ts$/, '');
                 return query(name);
             },
@@ -61,8 +62,8 @@ try {
     assert.deepEqual(healthy.examples.map((e) => e.name), names);
     assert.ok(healthy.examples.every((e) => e.status === 'imported'));
     assert.ok(healthy.examples.every((e) => e.url.startsWith('db://cocos-gizmos/Examples/')));
-    assert.equal(calls.length, 5,
-        'One readiness query, three exact asset lookups, and one Scene registry query');
+    assert.equal(calls.length, 6,
+        'One readiness query, four exact asset lookups, and one Scene registry query');
     assert.equal(healthy.sceneRegistry, 'available');
     assert.ok(healthy.examples.every((entry) => entry.classStatus === 'registered'));
     assert.ok(healthy.guidance.includes('Confirm drag-and-drop'),
@@ -84,7 +85,7 @@ try {
     const incomplete = await extension.methods.getExampleAssets();
     assert.equal(incomplete.databaseReady, null, 'Unsupported readiness API must not abort actual checks');
     assert.deepEqual(incomplete.examples.map((e) => e.status),
-        ['missing', 'uuid-mismatch', 'not-imported']);
+        ['missing', 'uuid-mismatch', 'not-imported', 'not-imported']);
 
     setEditor((name) => name === names[0] ?
         { uuid: uuids[name], importer: 'typescript', invalid: true } :
@@ -92,7 +93,7 @@ try {
         { uuid: uuids[name], importer: 'typescript', imported: true });
     const bad = await extension.methods.getExampleAssets();
     assert.deepEqual(bad.examples.map((e) => e.status),
-        ['invalid', 'wrong-importer', 'imported']);
+        ['invalid', 'wrong-importer', 'imported', 'imported']);
 
     setEditor((name) => {
         if (name === names[0]) throw new Error('importer unavailable');
@@ -106,10 +107,10 @@ try {
 
     setEditor((name) => ({
         uuid: uuids[name], importer: 'typescript', imported: true,
-    }), true, ['registered', 'not-registered', 'not-component']);
+    }), true, ['registered', 'not-registered', 'not-component', 'registered']);
     const noClasses = await extension.methods.getExampleAssets();
     assert.deepEqual(noClasses.examples.map((entry) => entry.classStatus),
-        ['registered', 'not-registered', 'not-component']);
+        ['registered', 'not-registered', 'not-component', 'registered']);
     assert.ok(noClasses.guidance.includes('not registered as Components'));
     assert.ok(noClasses.examples.every((entry) => entry.status === 'imported'),
         'Asset import must remain independent from Component registration');
@@ -138,7 +139,7 @@ try {
     delete globalThis.Editor;
     await assert.rejects(extension.methods.getExampleAssets(), /Editor Message API is unavailable/);
 
-    console.log('[example-asset-health] 3 mounted scripts, DB readiness, import errors, stable UUIDs and privacy OK');
+    console.log('[example-asset-health] 4 mounted scripts, DB readiness, import errors, stable UUIDs and privacy OK');
 } finally {
     if (originalEditor === undefined) delete globalThis.Editor;
     else globalThis.Editor = originalEditor;

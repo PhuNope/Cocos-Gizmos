@@ -27,6 +27,7 @@ const exampleIds = {
     CocosGizmos2DDemo: '79b61d2e-c131-4ae7-8be4-54aa7becc30a',
     CocosGizmos3DDemo: '1f0a6e38-ffb9-4f95-9f39-ef443ba2e6d8',
     CocosGizmosSmokeDemo: 'c9f57ebd-36ce-4b24-a7bf-47a350c2d9db',
+    CocosGizmosDecoratorDemo: '5c7b9b5e-3c33-42cd-b09d-5de039e8cbee',
 };
 globalThis.Editor = {
     Panel: { open: (id) => { assert.equal(id, 'cocos-gizmos.settings'); return true; } },
@@ -115,6 +116,7 @@ try {
         /CocosGizmos2DDemo: imported \| Scene class: registered/);
     assert.match(host.$.examplesResult.textContent, /CocosGizmos3DDemo: imported/);
     assert.match(host.$.examplesResult.textContent, /CocosGizmosSmokeDemo: imported/);
+    assert.match(host.$.examplesResult.textContent, /CocosGizmosDecoratorDemo: imported/);
     assert.equal(host.$.examplesRun.disabled, false);
     assert.match(host.$.examplesResult.textContent,
         /CocosGizmosSmokeDemo: imported \| Scene class: registered/);

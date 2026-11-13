@@ -14,7 +14,7 @@ const module = { exports: {} };
 vm.runInNewContext(code, module, { filename: 'GizmoExampleClassDiagnostics.js' });
 const { EXAMPLE_CLASS_NAMES, inspectGizmoExampleClasses } = module.exports;
 const names = Array.from(EXAMPLE_CLASS_NAMES);
-assert.deepEqual(names, ['CocosGizmos2DDemo', 'CocosGizmos3DDemo', 'CocosGizmosSmokeDemo']);
+assert.deepEqual(names, ['CocosGizmos2DDemo', 'CocosGizmos3DDemo', 'CocosGizmosSmokeDemo', 'CocosGizmosDecoratorDemo']);
 
 class Component {}
 class Demo extends Component {}
@@ -31,7 +31,7 @@ const engine = {
     },
 };
 const registered = inspectGizmoExampleClasses(engine);
-assert.equal(lookups, 3);
+assert.equal(lookups, 4);
 assert.equal(registered.registryAvailable, true);
 assert.ok(registered.classes.every((entry) => entry.status === 'registered'));
 
@@ -39,7 +39,7 @@ ctors.delete(names[0]);
 ctors.set(names[1], NotComponent);
 const mixed = inspectGizmoExampleClasses(engine);
 assert.deepEqual(Array.from(mixed.classes, (entry) => entry.status),
-    ['not-registered', 'not-component', 'registered']);
+    ['not-registered', 'not-component', 'registered', 'registered']);
 
 const unavailable = inspectGizmoExampleClasses(null);
 assert.equal(unavailable.registryAvailable, false);
@@ -50,7 +50,7 @@ const noHelper = inspectGizmoExampleClasses({
     js: { getClassByName: (name) => name === names[0] ? Demo : NotComponent },
 });
 assert.deepEqual(Array.from(noHelper.classes, (entry) => entry.status),
-    ['registered', 'not-component', 'not-component'],
+    ['registered', 'not-component', 'not-component', 'not-component'],
     'Use prototype inheritance when isChildClassOf is unavailable');
 
 const failures = inspectGizmoExampleClasses({
@@ -61,11 +61,11 @@ const failures = inspectGizmoExampleClasses({
     } },
 });
 assert.deepEqual(Array.from(failures.classes, (entry) => entry.status),
-    ['registered', 'lookup-error', 'registered']);
+    ['registered', 'lookup-error', 'registered', 'registered']);
 assert.match(failures.classes[1].error, /registry busy/);
 assert.equal(failures.classes[1].name, names[1]);
 assert.equal(failures.classes[1].error.includes('C:\\'), false);
-assert.equal(failures.classes.length, 3,
+assert.equal(failures.classes.length, 4,
     'Class diagnostic must be read-only and never add or instantiate Components');
 
 console.log('[example-class-diagnostics] live Scene component registration, absent classes and detached registry OK');

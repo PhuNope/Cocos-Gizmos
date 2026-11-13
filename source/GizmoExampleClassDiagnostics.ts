@@ -20,6 +20,7 @@ export const EXAMPLE_CLASS_NAMES = [
     'CocosGizmos2DDemo',
     'CocosGizmos3DDemo',
     'CocosGizmosSmokeDemo',
+    'CocosGizmosDecoratorDemo',
 ] as const;
 
 export function inspectGizmoExampleClasses(engine: any): GizmoExampleClassReport {

@@ -35,6 +35,12 @@ const samples = [
         name: 'CocosGizmosSmokeDemo',
         uuid: 'c9f57ebd-36ce-4b24-a7bf-47a350c2d9db',
     },
+    {
+        src: 'assets/GizmosDecoratorTest.ts',
+        oldName: 'GizmosDecoratorTest',
+        name: 'CocosGizmosDecoratorDemo',
+        uuid: '5c7b9b5e-3c33-42cd-b09d-5de039e8cbee',
+    },
 ];
 const seenUuids = new Set();
 const directory = JSON.parse(read('editor-assets/Examples.meta'));
@@ -49,7 +55,8 @@ for (const { src, oldName, name, uuid } of samples) {
     const original = read(src);
     const expected = original.replace("@ccclass('" + oldName + "')",
         "@ccclass('" + name + "')").replace('class ' + oldName + ' extends Component',
-        'class ' + name + ' extends Component');
+        'class ' + name + ' extends Component')
+        .replace("from '../dist/RegisterGizmos'", "from '../RegisterGizmos'");
     assert.equal(mounted.endsWith(expected), true,
         name + ' must stay in sync with its corresponding project example');
     assert.match(mounted, /import\s*{[^}]*Component[^}]*}\s*from\s*['"]cc['"]/s);
@@ -62,8 +69,9 @@ for (const { src, oldName, name, uuid } of samples) {
     const ast = ts.createSourceFile(relative, mounted, ts.ScriptTarget.ES2017, true, ts.ScriptKind.TS);
     assert.equal(ast.parseDiagnostics.length, 0, name + ' must parse as TypeScript');
     const classes = ast.statements.filter(ts.isClassDeclaration);
-    assert.equal(classes.length, 1, 'One Cocos component class per asset');
-    assert.equal(classes[0].name?.text, name);
+    const componentClasses = classes.filter(type => type.name?.text === name);
+    assert.equal(componentClasses.length, 1, 'One Cocos Component class per asset');
+    assert.ok(classes.length <= 2, 'One ordinary TypeScript drawer class is allowed');
 
     const meta = JSON.parse(read(relative + '.meta'));
     assert.equal(meta.importer, 'typescript');
@@ -80,6 +88,6 @@ for (const { src, oldName, name, uuid } of samples) {
     assert.ok(packer.includes("'" + 'Examples/' + name + '.ts.meta' + "'"),
         'Mounted script metadata must ship in the extension ZIP');
 }
-assert.equal(seenUuids.size, 4);
+assert.equal(seenUuids.size, 5);
 
-console.log('[mounted-examples] 3 drag-and-drop Components, distinct classes and stable Cocos UUIDs OK');
+console.log('[mounted-examples] 4 drag-and-drop Components, distinct classes and stable Cocos UUIDs OK');
