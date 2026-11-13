@@ -22,6 +22,16 @@ while (offset + 30 <= zip.length && zip.readUInt32LE(offset) === 0x04034b50) {
 }
 const installed = JSON.parse(entries.get('package.json') || '{}');
 assert.equal(installed.name, 'cocos-gizmos');
+assert.ok(installed.contributions.menu.some(item =>
+    item.path === 'Gizmos' && item.label === 'Reset Gizmos' &&
+    item.message === 'reset-gizmos'),
+    'Actual installable extension ZIP must expose top-level Gizmos reset menu');
+assert.deepEqual(installed.contributions.messages['reset-gizmos'].methods,
+    ['resetGizmos']);
+assert.match(entries.get('main.js') || '', /resetGizmos/);
+assert.match(entries.get('scene.js') || '', /gizmosReset/);
+assert.match(entries.get('editor-runtime/PlaneHandleGeometry.js') || '',
+    /planeHandleGeometry/);
 for (const [event, method] of [
     ['selection:select', 'onSelectionSelect'],
     ['selection:unselect', 'onSelectionUnselect'],
