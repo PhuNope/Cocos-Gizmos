@@ -127,6 +127,28 @@ ensure that old Gizmo instances and operation listeners are no longer active.
 If the errors remain, copy the full Scene Console stack trace and the results
 from **Extensions → Gizmos Settings → Check Scene integration**.
 
+## Zoom, UI layers, drag-point and Sprite sizing regression
+
+- **HUD and Labels:** With the demo Node selected, zoom extremely close and
+  zoom far away in both Scene 2D and 3D. Text should remain legible and must
+  not disappear after one engine frame. UI overlay nodes render on the
+  camera-visible `UI_3D | GIZMOS` mask. Recheck **Check Scene integration**
+  and note `scene.hudDrawn` if informational HUD lines are still absent.
+- **Position points in 2D:** Each cube picking marker should occupy roughly
+  **22 screen pixels** regardless of zoom or Node scale. Drag each
+  `point`/`waypoints` marker, release and verify that the cube stays aligned
+  with its Inspector value. The 2D example intentionally constrains each
+  editable point to x = -600…600 and y = -450…450 in local coordinates.
+  If a previous test left a point off-screen, reset its Inspector value to
+  (0, 0, 0) or reset the demo component before retrying.
+- **3D Sprite:** Assign a large SpriteFrame (e.g., 1024 × 1024). The demo now
+  fits its longest image side to about **1.5 world units**, instead of
+  multiplying a texture's native pixels by a hard-coded 0.4 scale.
+- **Idle Editor Scene:** Leave the pointer idle while labels are visible for
+  a few seconds. 2D and 3D Label/Sprite caches now tolerate up to 750ms
+  without a drawing callback so Creator's 250ms watchdog does not cause
+  flicker. Removing a label may take at most this grace period.
+
 ## Diagnose missing HUD and point handles (Creator 3.8.8)
 
 The Scene Editor may expose `cce.Camera._camera.camera`, a
