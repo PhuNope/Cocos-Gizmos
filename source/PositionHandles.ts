@@ -1684,7 +1684,19 @@ function createEditorGizmo(
                     const distance = distanceToSegmentSquared(pointer,
                         projected.axis.start, projected.axis.end);
                     const radius = entry.field.pickSize ?? 28;
-                    if (distance <= radius * radius && distance < axisDistance) {
+                    const dx = projected.axis.end.x - projected.axis.start.x;
+                    const dy = projected.axis.end.y - projected.axis.start.y;
+                    const lenSq = dx * dx + dy * dy;
+                    const along = lenSq > 1e-5 ?
+                        ((pointer.x - projected.axis.start.x) * dx +
+                            (pointer.y - projected.axis.start.y) * dy) / lenSq : -1;
+                    // Keep an unambiguous center area for clicking the box.
+                    // Without it, a generous arrow radius steals clicks from
+                    // the object body even before the visible shaft starts.
+                    const centerClearance = this.entries.some(item =>
+                        item.field.visual === 'box') ? 0.15 : -0.1;
+                    if (along >= centerClearance &&
+                        distance <= radius * radius && distance < axisDistance) {
                         axis = entry;
                         axisDistance = distance;
                     }
