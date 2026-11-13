@@ -191,8 +191,8 @@ try {
         'Closing the Scene must clear active handles regardless of the 250ms discovery throttle');
     assert.ok(clearedHudFrames >= 2,
         'Scene switching and closing must invalidate the previous component HUD layout');
-    assert.equal(handleRefreshes.at(-1).count, 0,
-        'The replacement Scene must have refreshed the component registry before closure');
+    assert.equal(handleRefreshes.at(-1).count, 1,
+        'The recovered unsaved Scene refreshed its own Components before closure');
 
     const beforeTimer = sandbox.exports.status().frames;
     now += 16;
