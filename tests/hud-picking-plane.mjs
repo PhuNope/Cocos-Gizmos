@@ -277,7 +277,8 @@ const sandbox = {
             } },
             './Gizmos3D': { Gizmos3D: {
                 DEFAULT_COLOR: {}, setDepTest() {}, beginColor() {},
-                drawSphere() {},
+                drawSphere() {}, drawLine() {}, drawQuad() {},
+                drawPositionLabel() {},
             } },
             './PositionDragSolver': solver,
             './PlaneHandleGeometry': planes, './AxisHandleGeometry': axes,
