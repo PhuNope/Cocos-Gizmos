@@ -31,6 +31,8 @@ export function makeMoveGizmo(
     const pickSize = size(options.pickSize, 28, 12, 72, 'pickSize');
     const planeSize = size(options.planeSize, 24, 12, 120, 'planeSize');
     const planeOffset = size(options.planeOffset, 25, 16, 180, 'planeOffset');
+    const boxSize = options.boxSize === undefined ? null :
+        size(options.boxSize, 0.7, 0.01, 1000, 'boxSize');
     if (options.snap !== undefined && (!Number.isFinite(options.snap) || options.snap <= 0)) {
         throw new RangeError('snap must be positive');
     }
@@ -59,6 +61,12 @@ export function makeMoveGizmo(
             ...shared, id: 'plane-' + plane, visual: 'plane',
             plane, planeSize, planeOffset, color,
         })),
+        // Opt-in box picking is not enabled for every Move Gizmo: it
+        // corresponds to a box already drawn by its owning Component.
+        ...(boxSize === null ? [] : [{
+            ...shared, id: 'move-body', visual: 'box' as const,
+            plane: 'view' as const, boxSize, color: '#ffb94a',
+        }]),
     ];
 }
 
