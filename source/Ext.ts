@@ -52,8 +52,12 @@ declare global {
         text: string;
         /** Order within the component HUD. */
         order?: number;
-        /** Font size in screen pixels. */
+        /** Preferred font height in screen pixels (default 14). */
         fontSize?: number;
+        /** Minimum screen font height while zooming (default 12 pixels). */
+        minSize?: number;
+        /** Maximum screen font height while zooming (default 24 pixels). */
+        maxSize?: number;
         /** RGBA hexadecimal color for the text. */
         color?: string;
     }
