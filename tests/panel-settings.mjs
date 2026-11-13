@@ -13,13 +13,21 @@ assert.equal(manifest.panels.settings.main, './panels/settings/index.js');
 assert.equal(manifest.contributions.messages['get-settings'].methods[0], 'getSettings');
 assert.equal(manifest.contributions.messages['set-settings'].methods[0], 'setSettings');
 assert.equal(manifest.contributions.messages['get-diagnostics'].methods[0], 'getDiagnostics');
+assert.equal(manifest.contributions.messages['get-example-assets'].methods[0], 'getExampleAssets');
 assert.match(panel.template, /Gizmo display/);
 assert.match(panel.template, /HUD labels/);
 assert.match(panel.template, /Check Scene integration/);
+assert.match(panel.template, /Check example assets/);
 
 const originalEditor = globalThis.Editor;
 const forwarded = [];
 let allowScene = true;
+let allowExamples = true;
+const exampleIds = {
+    CocosGizmos2DDemo: '79b61d2e-c131-4ae7-8be4-54aa7becc30a',
+    CocosGizmos3DDemo: '1f0a6e38-ffb9-4f95-9f39-ef443ba2e6d8',
+    CocosGizmosSmokeDemo: 'c9f57ebd-36ce-4b24-a7bf-47a350c2d9db',
+};
 globalThis.Editor = {
     Panel: { open: (id) => { assert.equal(id, 'cocos-gizmos.settings'); return true; } },
     Message: {
@@ -28,7 +36,16 @@ globalThis.Editor = {
                 if (message === 'get-settings') return main.methods.getSettings();
                 if (message === 'set-settings') return main.methods.setSettings(args);
                 if (message === 'get-diagnostics') return main.methods.getDiagnostics();
+                if (message === 'get-example-assets') return main.methods.getExampleAssets();
                 throw new Error('unexpected settings message');
+            }
+            if (service === 'asset-db') {
+                if (!allowExamples) throw new Error('Asset Database not responding');
+                if (message === 'query-ready') return true;
+                assert.equal(message, 'query-asset-info');
+                const name = args.split('/').at(-1).replace(/\.ts$/, '');
+                assert.ok(name in exampleIds, 'Only bundled examples are queried');
+                return { uuid: exampleIds[name], importer: 'typescript', imported: true };
             }
             assert.equal(service, 'scene');
             assert.equal(message, 'execute-scene-script');
@@ -73,6 +90,8 @@ try {
             feedback: { textContent: '' },
             diagnosticsRun: makeSelect(''),
             diagnosticsResult: { textContent: '' },
+            examplesRun: makeSelect(''),
+            examplesResult: { textContent: '' },
         },
     };
     await panel.ready.call(host);
@@ -82,6 +101,11 @@ try {
     await host.$.diagnosticsRun.click();
     assert.match(host.$.diagnosticsResult.textContent, /SampleScene/);
     assert.ok(host.$.diagnosticsResult.textContent.includes('Ctrl+Z'));
+    await host.$.examplesRun.click();
+    assert.match(host.$.examplesResult.textContent, /CocosGizmos2DDemo: imported/);
+    assert.match(host.$.examplesResult.textContent, /CocosGizmos3DDemo: imported/);
+    assert.match(host.$.examplesResult.textContent, /CocosGizmosSmokeDemo: imported/);
+    assert.equal(host.$.examplesRun.disabled, false);
 
     host.$.display.value = 'selected';
     host.$.hud.value = 'off';
@@ -99,10 +123,15 @@ try {
     assert.match(host.$.feedback.textContent, /Cannot update Scene View/);
     await host.$.diagnosticsRun.click();
     assert.match(host.$.diagnosticsResult.textContent, /Scene diagnostics unavailable/);
+    allowExamples = false;
+    await host.$.examplesRun.click();
+    assert.match(host.$.examplesResult.textContent, /readiness not reported/);
+    assert.match(host.$.examplesResult.textContent, /query-failed/);
     panel.close.call(host);
     assert.equal(host.$.display.listenerCount(), 0);
     assert.equal(host.$.hud.listenerCount(), 0);
     assert.equal(host.$.diagnosticsRun.listenerCount(), 0);
+    assert.equal(host.$.examplesRun.listenerCount(), 0);
 
     console.log('[settings-panel] manifest, scene messaging, update rollback and cleanup OK');
 } finally {
