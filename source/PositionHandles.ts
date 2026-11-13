@@ -6,8 +6,8 @@ import { Gizmos3D } from './Gizmos3D';
 import {
     handlePlaneNormal,
     intersectHandlePlane,
-    PositionDragSolver,
 } from './PositionDragSolver';
+import { GizmoMoveCommand } from './GizmoMoveCommand';
 import { HudControl, HudSliderDrag, hudGrid, hudRowScreenPosition, hudControlScreenRect,
     hudSliderScreenTrack, normalizeHudControls, hudControlLayoutSignature } from './GizmoHudControls';
 import { createSceneHudProjection, createViewportHudProjection } from './GizmoHudProjection';
@@ -33,7 +33,7 @@ type PositionVisual = {
 type Entry = { field: Field; controller: any; key: string; visual?: PositionVisual | null };
 /** Editor-only hover state (never serialized onto user components). */
 const selectedHover = new WeakMap<Component, string>();
-type DragState = { entry: Entry; solver: PositionDragSolver; session: GizmoEditSession<Point> };
+type DragState = { entry: Entry; command: GizmoMoveCommand };
 type HudPickingQuad = { node: Node; renderer: MeshRenderer; material: Material; mesh: Mesh };
 type HudEntry = { control: HudControl; controller: any; key: string; index: number;
     picking?: HudPickingQuad | null };
@@ -1351,7 +1351,8 @@ function createEditorGizmo(
             const drag = this.hudDrag;
             this.hudDrag = null;
             if (!drag || drag.entry.control.type !== 'slider') return;
-            drag.session.finish(cancelled);
+            if (cancelled) drag.command.cancel();
+            else drag.command.end();
         }
 
         private begin(entry: Entry, event: any): void {
@@ -1379,16 +1380,18 @@ function createEditorGizmo(
                 handlePlaneNormal(entry.field.plane || 'xy', transform, original, forward);
             if (!normal) return;
             try {
-                const solver = new PositionDragSolver(original, transform, normal, entry.field);
-                if (!solver.begin(ray)) return;
                 const property = entry.field.property;
                 const index = entry.field.index;
-                const session = new GizmoEditSession<Point>(
-                    () => readField(target, entry.field) as Point,
-                    (value) => {
-                        if (!writeField(target, entry.field, value)) {
-                            throw new Error('Position handle property is no longer editable');
-                        }
+                // Application command contains all gesture/constraint/undo
+                // orchestration; this adapter only binds Cocos callbacks.
+                const command = new GizmoMoveCommand(
+                    original, transform, normal, entry.field,
+                    {
+                        read: () => readField(target, entry.field) as Point,
+                        write: (value) => {
+                            if (!writeField(target, entry.field, value))
+                                throw new Error('Position handle property is no longer editable');
+                        },
                     },
                     {
                         begin: () => {
@@ -1421,8 +1424,8 @@ function createEditorGizmo(
                         },
                     },
                 );
-                session.begin();
-                this.drag = { entry, solver, session };
+                if (!command.begin(ray)) return;
+                this.drag = { entry, command };
                 this.setHover(entry);
             } catch (error) {
                 console.warn('[cocos-gizmos/handles] Unable to start position drag:', error);
@@ -1435,9 +1438,7 @@ function createEditorGizmo(
             const view = readScenePointer(event);
             const ray = view && sceneRay(view);
             if (!ray) return;
-            const next = drag.solver.move(ray);
-            if (!next) return;
-            try { drag.session.apply(next); }
+            try { drag.command.update(ray); }
             catch (error) {
                 try { this.finish(true); }
                 finally { console.warn('[cocos-gizmos/handles] Position edit cancelled:', error); }
