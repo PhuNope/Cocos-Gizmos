@@ -32,6 +32,13 @@ assert.match(entries.get('main.js') || '', /resetGizmos/);
 assert.match(entries.get('scene.js') || '', /gizmosReset/);
 assert.match(entries.get('editor-runtime/PlaneHandleGeometry.js') || '',
     /planeHandleGeometry/);
+assert.match(entries.get('editor-runtime/MoveHitGeometry.js') || '',
+    /insideProjectedPlane/, 'Native installer must contain Move screen hit math');
+assert.match(entries.get('editor-runtime/PositionHandles.js') || '',
+    /updateMovePickingQuad/, 'Installer must bind transparent Move pick quads');
+assert.doesNotMatch(entries.get('editor-runtime/PositionHandles.js') || '',
+    /moveTo\(20, 32\)/,
+    'Point marker sprite must not draw the old center plus sign');
 for (const [event, method] of [
     ['selection:select', 'onSelectionSelect'],
     ['selection:unselect', 'onSelectionUnselect'],
