@@ -1722,6 +1722,19 @@ export function createPositionHandleAdapter(
             lastSelection = new Set(selected);
             latestScan = now;
             if (!initialize()) return;
+            // The Editor can reconstruct unsaved Scene Components without
+            // dispatching BEFORE_SCENE_LAUNCH. Their old JS objects disappear
+            // from the traversal but their native gizmos stay in the pool.
+            // Reclaim them during the existing 250ms discovery pass.
+            const present = new Set(components);
+            for (const [component, gizmo] of owned) {
+                if (!present.has(component) || !component.isValid ||
+                    component.node?.isValid === false) {
+                    releaseGizmo(component, gizmo);
+                    owned.delete(component);
+                    active.delete(component);
+                }
+            }
             const wanted = new Set<Component>();
             for (const component of components) {
                 if (!component?.isValid || !component.enabled || !component.node?.activeInHierarchy ||
