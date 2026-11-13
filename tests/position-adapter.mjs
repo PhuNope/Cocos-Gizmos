@@ -825,6 +825,51 @@ cam.panX = 0;
 cam.panY = 0;
 panGizmo.refreshHandles();
 panAdapter.dispose();
+// Three ray controls share exactly one serialized Vec3. Each must acquire
+// the working Creator +Y face, remain compact, and lock unrelated axes.
+const axisNode = { ...node, uuid: 'axis-ray-node' };
+const axisComponent = {
+    ...component, node: axisNode, gizmo: null,
+    moveObject: new Vec3(4, 2, 1),
+    onGizmoHandles() {
+        return ['x', 'y', 'z'].map(axis => ({
+            property: 'moveObject', id: 'axis-' + axis,
+            visual: 'axis', plane: 'view', axis, axisSize: 78,
+            space: 'local', snap: 0.25,
+        }));
+    },
+};
+const rayAdapter = sandbox.exports.createPositionHandleAdapter();
+rayAdapter.refresh([axisComponent], new Set([axisNode.uuid]), 3650);
+const rayGizmo = axisComponent.gizmo;
+assert.equal(rayGizmo.controllers.length, 3,
+    'One object has only three XYZ axis controllers');
+assert.ok(rayGizmo.controllers.every(ctrl =>
+    ctrl._cubeNode.active === false && ctrl._cubeNodeMR.enabled === false),
+    'Ray Gizmo hides every chunky native BoxController point');
+assert.ok(rayGizmo.controllers.every(ctrl =>
+    ctrl._editHandlesShape.children[1].active === true),
+    'All three rays keep a native +Y face for reliable Scene picking');
+const xRay = rayGizmo.controllers[0];
+xRay.onControllerMouseDown({ button: 0, handleName: 'y', x: 45, y: 2 });
+assert.equal(rayGizmo.diagnosticState().draggingPosition, true);
+xRay.onControllerMouseMove({ button: 0, x: 67, y: 19 });
+xRay.onControllerMouseUp({ button: 0 });
+assert.equal(axisComponent.moveObject.x, 26,
+    'X ray moves only X even when mouse also moves vertically');
+assert.equal(axisComponent.moveObject.y, 2);
+assert.equal(axisComponent.moveObject.z, 1);
+const yRay = rayGizmo.controllers[1];
+yRay.onControllerMouseDown({ button: 0, handleName: 'y', x: 26, y: 45 });
+yRay.onControllerMouseMove({ button: 0, x: 43, y: 61 });
+yRay.onControllerMouseUp({ button: 0 });
+assert.equal(axisComponent.moveObject.x, 26);
+assert.equal(axisComponent.moveObject.y, 18,
+    'Y ray changes only Y independent of cursor X motion');
+assert.equal(axisComponent.moveObject.z, 1);
+rayAdapter.dispose();
+console.log('[axis-rays] three compact native pick proxies, X/Y axis locks and shared Vec3 OK');
+
 console.log('[pan-regression] middle pan does not capture drag, left/native drag recover after camera pan OK');
 
 console.log('[hud-adapter] toggle/checkbox clicks, slider drag and cancel, button dispatch and cleanup OK');
