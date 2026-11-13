@@ -1378,6 +1378,7 @@ function createEditorGizmo(
         }
 
         public onHide(): void {
+            if (this.destroyed) return;
             // Mark hidden *before* cancelling an in-flight edit. Session's
             // end/rollback callback calls updateMarkers(); if shown is still
             // true, it re-activates the native +Y hit proxy while deselecting.
@@ -1449,6 +1450,7 @@ function createEditorGizmo(
         }
 
         public onDestroy(): void {
+            if (this.destroyed) return;
             if (this.beforeDrawRegistered) {
                 director.off(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
                 this.beforeDrawRegistered = false;
@@ -1538,6 +1540,37 @@ export function createPositionHandleAdapter(
         return gizmo;
     }
 
+    /** Scene root changes destroy and replace the Cocos Node tree.
+     * Disposing the old native controllers prevents the Editor's Gizmo pool
+     * from reusing invalid +Y picking faces on the next scene.
+     * Each instance is isolated: a destroyed component must not prevent
+     * remaining controllers from being released.
+     */
+    function releaseForSceneChange(): void {
+        for (const [component, gizmo] of active) {
+            try { gizmo.hide?.(); }
+            catch (error) {
+                console.warn('[cocos-gizmos/handles] Could not hide old Scene controller:', error);
+                try { gizmo.onHide?.(); }
+                catch { /* old scene already destroyed */ }
+            }
+            try { gizmo.onDestroy?.(); }
+            catch (error) {
+                console.warn('[cocos-gizmos/handles] Old Scene controller cleanup:', error);
+            }
+            try {
+                if ((component as any).gizmo === gizmo) {
+                    // The editor-only Component.gizmo pointer is not serialized.
+                    // Never carry a disposed Gizmo into another Scene.
+                    (component as any).gizmo = null;
+                }
+            } catch { /* Component is already invalid */ }
+        }
+        active.clear();
+        lastSelection.clear();
+        latestScan = -Infinity;
+    }
+
     return {
         refresh(components, selected, now) {
             const selectionChanged = selected.size !== lastSelection.size ||
@@ -1603,14 +1636,10 @@ export function createPositionHandleAdapter(
             }
         },
         clear() {
-            for (const gizmo of active.values()) gizmo.hide?.();
-            active.clear();
-            lastSelection.clear();
-            latestScan = -Infinity;
+            releaseForSceneChange();
         },
         dispose() {
-            for (const gizmo of active.values()) gizmo.hide?.();
-            active.clear();
+            releaseForSceneChange();
             for (const [key, ctor] of registered) {
                 if (typeDefs?.[key] === ctor) delete typeDefs[key];
             }
