@@ -231,11 +231,15 @@ assert.equal(graphics[2].node.layer, cc.Layers.Enum.GIZMOS);
 assert.equal(graphics[3].node.layer, cc.Layers.Enum.DEFAULT);
 
 const beforeClears = graphics.map((g) => g.clearCount);
-debug.lateUpdate(0); // One empty frame clears previous commands.
+debug.lateUpdate(0);
+assert.deepEqual(graphics.map((g) => g.clearCount), beforeClears,
+    'A lateUpdate immediately after the explicit Scene flush must not erase graphics');
+now += 751;
+debug.lateUpdate(0); // Renderer clears only after the idle grace interval.
 const afterClears = graphics.map((g) => g.clearCount);
 assert.equal(afterClears[0], beforeClears[0], 'Inactive renderer should not clear repeatedly');
 assert.ok(afterClears.slice(1).every((value, index) => value === beforeClears[index + 1] + 1));
-debug.lateUpdate(0); // Subsequent idle frames do not clear again.
+debug.lateUpdate(0);
 assert.deepEqual(graphics.map((g) => g.clearCount), afterClears);
 
 // Scene updates may fall back to 250ms. Labels/Sprites should not be erased
@@ -305,4 +309,43 @@ debug.lateUpdate(0);
 assert.ok(Math.abs(zoomLabel.node.scale[0].y - 0.012) < 1e-8,
     '2D label bounds use active Scene camera rather than stale private render camera');
 
-console.log('[draw-commands-2d] 164 paths/one stroke, local/world endpoints, render-state partitioning, idle reuse OK');
+// Regression: after switching away from an unsaved Scene and restoring its
+// tab, Cocos Creator may stop dispatching GizmosDebugDraw.lateUpdate while the
+// extension still dispatches onDrawGizmosSelected() on the correct Component.
+// The draggable cyan handle tracks the new Vec3, but its yellow line keeps
+// old geometry until we explicitly flush the frame from Scene updater.
+const restored = new Node('unsaved Scene restored');
+const submitRestoredLine = (endX) => {
+    Gizmos2D.beginLocalPosition(restored);
+    Gizmos2D.drawLine(restored, { x: 0, y: 0 }, { x: endX, y: -175 });
+    Gizmos2D.endLocalPosition(restored);
+};
+submitRestoredLine(130);
+Gizmos2D.flushEditorFrame(); // Deliberately DO NOT call lateUpdate.
+const rendererNode = restored.children[0];
+const oldSceneGraphic = rendererNode.children[0].components[0];
+assert.equal(count(oldSceneGraphic, 'lineTo'), 1);
+assert.deepEqual(oldSceneGraphic.calls.at(-2), ['lineTo', 130, -175],
+    'Old shape is painted even if component lateUpdate is unavailable');
+const previousGraphicClears = oldSceneGraphic.clearCount;
+submitRestoredLine(175);
+Gizmos2D.flushEditorFrame();
+assert.equal(oldSceneGraphic.clearCount, previousGraphicClears + 1,
+    'New waypoint coordinates cause Graphics to be rebuilt synchronously');
+assert.deepEqual(oldSceneGraphic.calls.at(-2), ['lineTo', 175, -175],
+    'Yellow line follows dragged point after an unsaved Scene tab is restored');
+const restoredClearCount = oldSceneGraphic.clearCount;
+rendererNode.components[0].lateUpdate(0);
+assert.equal(oldSceneGraphic.clearCount, restoredClearCount,
+    'lateUpdate cannot immediately clear geometry submitted in Scene frame');
+now += 300;
+rendererNode.components[0].lateUpdate(0);
+assert.equal(oldSceneGraphic.clearCount, restoredClearCount,
+    '250ms watchdog gaps cannot make selected lines flicker');
+now += 451;
+rendererNode.components[0].lateUpdate(0);
+assert.equal(oldSceneGraphic.clearCount, restoredClearCount + 1,
+    'Abandoned Scene geometry eventually clears to prevent ghost lines');
+Gizmos2D.clearPendingFrame();
+
+console.log('[draw-commands-2d] buffered Graphics refresh even when restored Scene skips lateUpdate OK');
