@@ -444,6 +444,47 @@ components before shipping. Disabling/uninstalling the extension can make
 existing sample-component references appear as Missing Script. These are
 different from the extension's Editor-only Scene Script.
 
+### HUD on Canvas, reselecting Handles and bounded Label pixels
+
+The Scene HUD now renders through the **existing 2D Canvas RenderRoot2D**
+when its owner belongs to a 2D UI tree. This avoids relying on an extra 3D
+overlay root for UI Labels. Scene 3D nodes continue to use the 3D overlay.
+
+Changing the selected Node bypasses the Position Handle adapter's 250ms
+discovery throttle. Re-selecting a 2D Node re-shows an existing hidden Gizmo
+and restores its controllers, even when the Editor hid that Gizmo directly.
+
+HUD text is sized in **screen pixels**, with default minimum **12px** and
+maximum **24px**, regardless of Scene zoom. For each entry you can override
+the bounds:
+
+```ts
+onGizmoHud(): GizmoHudItem[] {
+    return [{
+        id: 'title', text: 'Editable point',
+        fontSize: 18, minSize: 12, maxSize: 26,
+    }];
+}
+```
+
+For ordinary manual labels you may additionally provide screen-space
+minimum/maximum values as the last two arguments. Without these arguments
+the old world-space scaling behavior remains unchanged:
+
+```ts
+Gizmos2D.drawLabel(node, 'point', 'Drag point',
+    new Vec2(0, 0), 20, Vec2.ONE, 12, 26);
+Gizmos3D.drawLabel(node, 'title', '3D label',
+    new Vec3(0, 2, 0), 18, 0.15, 12, 26);
+```
+
+For troubleshooting HUD that still does not display in the real Editor,
+**Extensions → Gizmos Settings → Check Scene integration** now includes
+`hud.drawn2D`, `hud.drawn3D`, `hud.lastPath`,
+`hud.cameraMissing`, and `hud.projectionFailed`, alongside
+`scene.hudDrawn`. These count submitted Labels and projection failures;
+they do not independently prove visible UI or successful mouse picking.
+
 ### Scene View overlays, zoom and 2D drag stability
 
 The Editor Scene viewer can draw geometry while failing to render UI text if
