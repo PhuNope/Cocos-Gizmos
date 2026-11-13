@@ -272,11 +272,32 @@ assert.equal(adapter.status().active, 1, 'Reselecting a Node restores its Gizmo 
 assert.equal(gizmo.isHandleVisible(), true);
 assert.equal(ctrl.registerCount, 3, 'Reselection reinstalls the owning controller listener');
 assert.equal(ctrl._cubeNode.active, true);
+// Cocos Editor may hide the picking MeshRenderer without calling onHide.
+ctrl._cubeNode.active = false;
+ctrl._cubeNodeMR.enabled = false;
+gizmo.refreshHandles();
+assert.equal(ctrl._cubeNode.active, true, 'Hidden picking cube is restored on refresh');
+assert.equal(ctrl._cubeNodeMR.enabled, true, 'Marker MeshRenderer is re-enabled');
+ctrl._cubeNode.active = false;
+gizmo.onShow();
+assert.equal(ctrl._cubeNode.active, true, 'Repeated show restores the native marker');
+
 gizmo.hide(); // Cocos may hide a Gizmo directly on a Scene selection event.
 assert.equal(gizmo.isHandleVisible(), false);
 adapter.refresh([component], selected, 1600);
 assert.equal(gizmo.isHandleVisible(), true, 'Refresh restores a Gizmo hidden by native Editor selection');
 assert.equal(adapter.status().active, 1);
+// Native Editor may replace component.gizmo on the same Component.
+const previousGizmo = component.gizmo;
+const replacement = new componentPool.typeDefs.ProbePosition();
+replacement.target = component;
+replacement.init();
+component.gizmo = replacement;
+adapter.refresh([component], selected, 1602);
+assert.equal(adapter.status().active, 1);
+assert.equal(component.gizmo, replacement);
+assert.equal(replacement.isHandleVisible(), true,
+    'Adapter adopts replacement native Gizmo instance after Scene selection');
 const restoredListeners = ctrl.registerCount;
 adapter.refresh([component], selected, 1616);
 assert.equal(ctrl.registerCount, restoredListeners,
