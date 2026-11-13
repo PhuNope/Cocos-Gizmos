@@ -107,6 +107,7 @@ class Node {
         if (parent) parent.children.push(this);
     }
     get parent() { return this._parent; }
+    setParent(parent) { this.parent = parent; }
     addComponent(Type) {
         const component = new Type();
         component.node = this;
