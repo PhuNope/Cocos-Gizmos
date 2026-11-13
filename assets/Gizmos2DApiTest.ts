@@ -150,8 +150,10 @@ export default class Gizmos2DApiTest extends Component {
         // Persistent label and sprite IDs exercise their cache.
         if (this.showLabels) {
             Gizmos2D.beginColor(n, Color.WHITE);
-            Gizmos2D.drawLabel(n, 'api2d-title', 'Gizmos2D | Scene API', v(-260, 260), 20);
-            Gizmos2D.drawLabel(n, 'api2d-bottom', 'Drag the 3 points when selected', v(-160, -250), 16);
+            Gizmos2D.drawLabel(n, 'api2d-title', 'Gizmos2D | Scene API',
+                v(-260, 260), 20, Vec2.ONE, 12, 26);
+            Gizmos2D.drawLabel(n, 'api2d-bottom', 'Drag the 3 points when selected',
+                v(-160, -250), 16, Vec2.ONE, 11, 22);
         }
         if (this.showSprite && this.testSprite) {
             Gizmos2D.drawSprite(n, 'api2d-sprite', this.testSprite,
