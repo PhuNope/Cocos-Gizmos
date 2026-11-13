@@ -114,14 +114,14 @@ class ScreenHudMesh {
                 },
             });
             renderer.setMaterial(material, 0);
-            (renderer as any).priority = 32770;
+            (renderer as any).priority = 32767;
             // A depth-disabled material alone does not guarantee that the HUD
             // is drawn after other GIZMOS meshes. Match Creator Gizmo Kit's
             // renderer sorting order, so HUD stays above other 2D/3D gizmos.
             const Sorting = (cocos as any).Sorting;
             if (typeof Sorting === 'function') {
                 const sorting: any = node.addComponent(Sorting);
-                if (sorting) sorting.sortingOrder = 32770;
+                if (sorting) sorting.sortingOrder = 32767;
             }
             this.root = root;
             this.renderer = renderer;
