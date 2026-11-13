@@ -331,6 +331,19 @@ ctrl.onMouseDown({ handleName: 'position:target:single' });
 assert.equal(adapter.status().input.missingPointer, missingBefore + 1,
     'Missing Cocos pointer coordinates are explicitly diagnosed');
 gizmo.onHide();
+// Creator can destroy the native instance when selection becomes empty.
+// The same Node must get a fresh Controller when selected again.
+adapter.refresh([component], selected, 1700);
+const destroyedHandle = component.gizmo;
+destroyedHandle.onDestroy();
+assert.equal(destroyedHandle.isHandleDisposed(), true);
+adapter.refresh([component], new Set(), 1710);
+adapter.refresh([component], selected, 1720);
+assert.notEqual(component.gizmo, destroyedHandle,
+    'Empty -> same-node reentry recreates a native Gizmo destroyed by the Editor');
+assert.equal(component.gizmo.isHandleVisible(), true);
+assert.ok(component.gizmo.controllers[0]._cubeNode.active,
+    'Fresh picking marker is active after complete deselection');
 adapter.dispose();
 assert.equal(adapter.status().reason, 'disposed');
 assert.equal(componentPool.typeDefs.ProbePosition, undefined,
