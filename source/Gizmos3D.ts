@@ -147,8 +147,13 @@ class GizmosDebugDraw extends Component {
     private _labelMap: Map<string, Label> = new Map();
     private _spriteMap: Map<string, Sprite> = new Map();
     private _root2D: Node;
-    private readonly _usedLabelIds = new Set<string>();
-    private readonly _usedSpriteIds = new Set<string>();
+    // Scene Gizmos can be refreshed on a 250ms watchdog while the renderer
+    // lateUpdate still runs every engine frame. A one-frame used-ID reset
+    // makes labels flicker (or appear completely invisible). Keep overlays
+    // until at least two watchdog intervals have elapsed since last draw.
+    private static readonly OVERLAY_GRACE_MS = 750;
+    private readonly _lastLabelUsed = new Map<string, number>();
+    private readonly _lastSpriteUsed = new Map<string, number>();
 
     private static get overlayLayer(): number {
         // A 3D-space RenderRoot2D must render on a camera-visible UI layer.
@@ -226,15 +231,20 @@ class GizmosDebugDraw extends Component {
     }
 
     protected lateUpdate(dt: number): void {
+        const now = Date.now();
         this._labelMap.forEach((label, id) => {
-            if (!this._usedLabelIds.has(id) && label.string) label.string = '';
+            if (now - (this._lastLabelUsed.get(id) ?? -Infinity) >
+                GizmosDebugDraw.OVERLAY_GRACE_MS && label.string) {
+                label.string = '';
+            }
         });
         this._spriteMap.forEach((sprite, id) => {
-            if (!this._usedSpriteIds.has(id) && sprite.spriteFrame) sprite.spriteFrame = null;
+            if (now - (this._lastSpriteUsed.get(id) ?? -Infinity) >
+                GizmosDebugDraw.OVERLAY_GRACE_MS && sprite.spriteFrame) {
+                sprite.spriteFrame = null;
+            }
         });
 
-        this._usedLabelIds.clear();
-        this._usedSpriteIds.clear();
         this._color = Gizmos3D.DEFAULT_COLOR;
         this._useLocalPosition = false;
     }
@@ -301,7 +311,7 @@ class GizmosDebugDraw extends Component {
 
     public drawSprite(id: string, spriteFrame: SpriteFrame, position: Vec3, scale: Vec2, color: Color = Color.WHITE) {
         const sprite = this.getSprite(id);
-        this._usedSpriteIds.add(id);
+        this._lastSpriteUsed.set(id, Date.now());
         if (sprite.spriteFrame !== spriteFrame) sprite.spriteFrame = spriteFrame;
         if (sprite.color !== color) sprite.color = color;
         if (this._useLocalPosition) sprite.node.setPosition(position);
@@ -312,7 +322,7 @@ class GizmosDebugDraw extends Component {
 
     public drawLabel(id: string, text: string, position: Vec3, fontSize: number = 40, scale: number = 1) {
         const label = this.getLabel(id);
-        this._usedLabelIds.add(id);
+        this._lastLabelUsed.set(id, Date.now());
         if (label.string !== text) label.string = text;
         label.color = this._color;
         if (label.fontSize !== fontSize) label.fontSize = fontSize;
