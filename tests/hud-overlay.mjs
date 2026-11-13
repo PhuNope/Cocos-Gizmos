@@ -69,6 +69,9 @@ const sink2D = {
     drawLabel(node, id, text, position, fontSize, scale) {
         labels.push({ id, text, position, fontSize, scale, target: '2d' });
     },
+    drawSolidRect(node, position, width, height) {
+        labels.push({ target: 'background', position, width, height });
+    },
 };
 class RenderRoot2D {}
 const sandbox = {
@@ -175,6 +178,8 @@ component.node.inverseTransformPoint = (out, point) => {
 };
 overlay.render(component, entries, { namespace: 'canvas', startRow: 0 });
 assert.equal(labels.at(-1).target, '2d');
+assert.ok(labels.some(l => l.target === 'background'),
+    'Canvas HUD draws a translucent backing row');
 assert.equal(overlay.diagnosticState.drawn2D, 1);
 assert.equal(overlay.diagnosticState.lastPath, '2d');
 assert.ok(Math.abs(labels.at(-1).scale.x - 0.05) < 1e-8);
@@ -182,6 +187,16 @@ assert.ok(Math.abs(labels.at(-1).scale.y - 0.025) < 1e-8);
 component.node.parent = oldParent;
 component.node.worldScale = oldScale;
 component.node.inverseTransformPoint = oldTransform;
+
+camera.width = 900;
+camera.height = 500;
+const previous = labels.length;
+overlay.render(component, entries, { namespace: 'dock', startRow: 0 });
+assert.ok(labels.length > previous);
+assert.ok(Math.abs(labels.at(-1).position.x + 7.2) < 1e-8,
+    'Docked HUD row uses Scene viewport left x=28 instead of the Node origin');
+camera.width = undefined;
+camera.height = undefined;
 
 camera.pixelWorld = 0;
 assert.equal(overlay.render(component, entries), 0);
