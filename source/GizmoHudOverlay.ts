@@ -33,6 +33,28 @@ function sceneCamera(): SceneHudCamera | null {
 export class GizmoHudOverlay {
     private readonly colors = new Map<string, Color>();
     private drawn = 0;
+    private drawn2D = 0;
+    private drawn3D = 0;
+    private cameraMissing = 0;
+    private projectionFailed = 0;
+    private lastPath: '2d' | '3d' | 'none' = 'none';
+
+    public get diagnosticState(): {
+        drawn2D: number; drawn3D: number;
+        cameraMissing: number; projectionFailed: number;
+        lastPath: '2d' | '3d' | 'none';
+    } {
+        return {
+            drawn2D: this.drawn2D, drawn3D: this.drawn3D,
+            cameraMissing: this.cameraMissing,
+            projectionFailed: this.projectionFailed,
+            lastPath: this.lastPath,
+        };
+    }
+
+    public get lastRenderPath(): '2d' | '3d' | 'none' {
+        return this.lastPath;
+    }
 
     public render(
         component: Component,
@@ -41,14 +63,20 @@ export class GizmoHudOverlay {
     ): number {
         const camera = sceneCamera();
         const node = component?.node;
-        if (!camera || !node?.isValid || !items.length) return 0;
+        if (!node?.isValid || !items.length) return 0;
+        if (!camera) { this.cameraMissing++; this.lastPath = 'none'; return 0; }
         const projection = createSceneHudProjection(camera, node.worldPosition);
-        if (!projection) return 0;
+        if (!projection) {
+            this.projectionFailed++;
+            this.lastPath = 'none';
+            return 0;
+        }
 
         // RenderRoot2D on Canvas owns 2D/UI labels in the 2D Scene View.
         // Creating another 3D RenderRoot for a 2D owner can leave the labels
         // invisible even while the Node's Gizmos2D primitives draw normally.
         const render2D = isUnder2DRenderRoot(node);
+        this.lastPath = render2D ? '2d' : '3d';
         if (render2D) {
             Gizmos2D.beginLayer(node, Layers.Enum.GIZMOS);
             Gizmos2D.beginLocalPosition(node);
@@ -95,6 +123,8 @@ export class GizmoHudOverlay {
             if (render2D) Gizmos2D.endLocalPosition(node);
         }
         this.drawn += drawn;
+        if (render2D) this.drawn2D += drawn;
+        else this.drawn3D += drawn;
         return drawn;
     }
 
@@ -103,5 +133,10 @@ export class GizmoHudOverlay {
     public dispose(): void {
         this.colors.clear();
         this.drawn = 0;
+        this.drawn2D = 0;
+        this.drawn3D = 0;
+        this.cameraMissing = 0;
+        this.projectionFailed = 0;
+        this.lastPath = 'none';
     }
 }
