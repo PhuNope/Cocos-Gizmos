@@ -29,6 +29,8 @@ vm.runInNewContext(compile('GizmoHudLayout'), {
 });
 const gizmoInput = { exports: {} };
 vm.runInNewContext(compile('SceneGizmoInput'), gizmoInput);
+const cameraBridge = { exports: {} };
+vm.runInNewContext(compile('SceneCameraBridge'), cameraBridge);
 const events = [];
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
@@ -104,13 +106,22 @@ const manager = {
 const cam = {
     rays: 0,
     node: { forward: new Vec3(0, 0, -1) },
-    screenPointToRay(x, y, out) {
+    geometryRenderer: {},
+    screenPointToRay(out, x, y) {
+        if (!out?.o || !out?.d || typeof x !== 'number') {
+            throw new Error('The renderer scene camera requires (out, x, y)');
+        }
         this.rays++;
         out.o = new Vec3(x, y, 100);
         out.d = new Vec3(0, 0, -1);
         return out;
     },
-    worldToScreen(point, out) { out.set(point.x, point.y, 0); },
+    worldToScreen(out, point) {
+        if (!out || typeof point?.x !== 'number') {
+            throw new Error('The renderer scene camera requires (out, worldPosition)');
+        }
+        out.set(point.x, point.y, 0);
+    },
 };
 const node = {
     uuid: 'selected-node',
@@ -140,6 +151,7 @@ const sandbox = {
         if (name === './GizmoPresentation') return presentation.exports;
         if (name === './GizmoHudProjection') return projection.exports;
         if (name === './SceneGizmoInput') return gizmoInput.exports;
+        if (name === './SceneCameraBridge') return cameraBridge.exports;
         throw new Error('Unknown import ' + name);
     },
 };
