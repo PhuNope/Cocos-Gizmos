@@ -24,6 +24,7 @@ class Node {
         this.children = [];
         this.layer = 0;
         this.hideFlags = 0;
+        this.components = [];
         this.active = true;
         this.isValid = true;
     }
@@ -31,8 +32,12 @@ class Node {
     addComponent(Type) {
         const comp = new Type();
         comp.node = this;
+        this.components.push(comp);
         if (Type === Sorting) this.sorting = comp;
         return comp;
+    }
+    getComponent(Type) {
+        return this.components.find(comp => comp instanceof Type) || null;
     }
     setWorldPosition(value) { this.position = value; }
     setWorldRotation(value) { this.rotation = value; }
@@ -44,6 +49,18 @@ class MeshRenderer {
     setMaterial(material) { this.material = material; }
 }
 class Sorting { constructor() { this.sortingOrder = 0; } }
+class RenderRoot2D {}
+class Sprite {
+    constructor() { this.spriteFrame = null; }
+}
+class SpriteFrame {
+    constructor() { this.texture = null; }
+    destroy() { this.destroyed = true; }
+}
+class UITransform {
+    setAnchorPoint(x, y) { this.anchor = [x, y]; }
+    setContentSize(w, h) { this.size = [w, h]; }
+}
 class Material {
     initialize(value) { this.options = value; }
     setProperty(key, value) { this[key] = value; }
@@ -102,7 +119,7 @@ const sandbox = {
             gfx: { CullMode: { NONE: 0 } },
             ImageAsset, Layers: { Enum: { GIZMOS: 4, UI_2D: 8 } },
             Material, Mesh: class Mesh {}, MeshRenderer, Node, Quat, Sorting,
-            RenderRoot2D: class RenderRoot2D {},
+            RenderRoot2D, Sprite, SpriteFrame, UITransform,
             Texture2D,
             utils: { createMesh(geometry) {
                 const mesh = { geometry, destroy() { this.destroyed = true; } };
@@ -146,6 +163,15 @@ assert.equal(rootGizmo.children.length, 1,
     'Screen HUD belongs to the editor Gizmo root, not Canvas/node');
 assert.equal(rootGizmo.children[0].layer, 4);
 assert.equal(rootGizmo.children[0].children[0].layer, 4);
+const sceneHudRoot = rootGizmo.children[0];
+const uiNode = sceneHudRoot.children.find(node => node.name === 'CocosGizmosHudUIRoot');
+assert.ok(uiNode, 'HUD has its own late-rendered UI_3D RenderRoot2D');
+const topSprite = uiNode.children[0].getComponent(Sprite);
+assert.ok(topSprite?.spriteFrame?.texture,
+    'The textured HUD draws as a UI Sprite above other Scene sprites');
+assert.equal(sceneHudRoot.children[0].getComponent(MeshRenderer).enabled, false,
+    'Mesh fallback must not double-render under a working UI Sprite');
+
 assert.ok(drawCalls.some(call => call[0] === 'rect' && call[3] > 1000),
     'Canvas HUD draws a full-width dark bar at retina scale');
 assert.ok(drawCalls.some(call => call[0] === 'text' && call[1] === 'Gizmos2D Test'));
