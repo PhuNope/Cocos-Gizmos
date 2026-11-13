@@ -32,6 +32,7 @@ vm.runInNewContext(compile('SceneGizmoInput'), gizmoInput);
 const cameraBridge = { exports: {} };
 vm.runInNewContext(compile('SceneCameraBridge'), cameraBridge);
 const events = [];
+const visibleDots = { canvas: [], scene3d: [] };
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
     set(x, y, z) { Object.assign(this, { x, y, z }); }
@@ -144,7 +145,16 @@ const sandbox = {
     cce: { Camera: { _camera: { camera: cam } }, Gizmo: manager, Engine: { repaintInEditMode() {} } },
     console: { warn(...args) { throw new Error(args.join(' ')); } },
     require(name) {
-        if (name === 'cc') return { Color, Vec3, Quat, Layers: { Enum: { GIZMOS: 4 } }, Component: class {} };
+        if (name === 'cc') return { Color, Vec3, Quat, Layers: { Enum: { GIZMOS: 4, UI_2D: 16 } }, RenderRoot2D: class {}, Component: class {} };
+        if (name === './Gizmos2D') return { Gizmos2D: {
+            DEFAULT_LAYER: 4, DEFAULT_COLOR: {},
+            beginLayer() {}, beginLocalPosition() {}, endLocalPosition() {},
+            beginColor() {}, drawSolidEllipse(...args) { visibleDots.canvas.push(args); },
+        } };
+        if (name === './Gizmos3D') return { Gizmos3D: {
+            DEFAULT_COLOR: {}, setDepTest() {}, beginColor() {},
+            drawSphere(...args) { visibleDots.scene3d.push(args); },
+        } };
         if (name === './PositionDragSolver') return math.exports;
         if (name === './GizmoEditSession') return edits.exports;
         if (name === './GizmoHudControls') return hud.exports;
@@ -161,6 +171,8 @@ assert.equal(adapter.status().reason, 'not-initialized');
 const selected = new Set([node.uuid]);
 adapter.refresh([component], selected, 1000);
 assert.equal(adapter.status().active, 1, 'A selected component must display its Gizmo');
+assert.ok(visibleDots.scene3d.length >= 1,
+    'Selected marker is explicitly drawn, independent of native BoxController mesh');
 assert.equal(adapter.status().registered, 2, 'Register both plain and cc-prefixed Cocos component names');
 assert.ok(componentPool.typeDefs['cc.ProbePosition']);
 const gizmo = component.gizmo;
