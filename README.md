@@ -139,6 +139,34 @@ onDrawGizmos(): void {
 Drawing callbacks remain available without a registration decorator.
 `Gizmos3D` uses the Scene geometry renderer to draw 3D primitives.
 
+## Move Gizmo 3D (Creator-like)
+
+Use `Gizmos3D.moveHandles('position', options)` inside `onGizmoHandles()`
+to display **three color-coded X/Y/Z arrows and three small XY/XZ/YZ plane
+squares** around a single editable `Vec3`. Hover highlights the selected
+handle, clicking an arrow locks one axis, clicking a square locks its plane.
+The position label is drawn above the object with a screen-size clamp.
+
+```ts
+onGizmoHandles(): GizmoHandleList {
+    return [
+        ...Gizmos3D.moveHandles('targetPosition', {
+            space: 'local', snap: 0.25,
+            axisSize: 86, pickSize: 28,
+            planeSize: 24, planeOffset: 25,
+            hoverColor: '#ffff65', showPositionLabel: true,
+        }),
+    ];
+}
+```
+
+The interactive native picking strip is larger than the visible arrow. Existing
+`visual: 'point'`, `visual: 'axis'` and `visual: 'plane'` descriptors remain
+supported. New drawing helpers: `Gizmos3D.drawPositionLabel()`,
+`Gizmos3D.drawArrow()`, and `Gizmos3D.drawPlanePreview()`.
+See [docs/MOVE_GIZMO.md](docs/MOVE_GIZMO.md) for API options and examples
+adapted from Point3D / Line3D / Plane3D use cases.
+
 ## 3D Gizmos rendering
 
 `Gizmos3D` submits primitives to the Scene geometry renderer. Color state is
