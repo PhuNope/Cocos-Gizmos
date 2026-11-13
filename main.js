@@ -134,27 +134,51 @@ exports.unload = function unload() {};
  * Creator's main process receives reliable selection:select/unselect events;
  * Scene Selection polling alone can miss the empty -> same-node transition.
  */
-async function syncSceneSelection() {
-    const editor = globalThis.Editor;
-    const selected = editor?.Selection?.getSelected?.('node') || [];
-    return editor?.Message?.request?.('scene', 'execute-scene-script', {
+let selectionRevision = 0;
+function selectedNodeIds() {
+    try {
+        const value = globalThis.Editor?.Selection?.getSelected?.('node');
+        return Array.isArray(value) ? value.filter(id => typeof id === 'string') : [];
+    } catch { return []; }
+}
+async function syncSceneSelection(selected, revision = ++selectionRevision) {
+    const ids = [...new Set(selected)];
+    return globalThis.Editor?.Message?.request?.('scene', 'execute-scene-script', {
         name: 'cocos-gizmos',
         method: 'gizmosSelectionChanged',
-        args: [Array.isArray(selected) ? selected : []],
+        args: [ids, revision],
     });
 }
-async function onSelectionSelect(type) {
+async function onSelectionSelect(type, uuid) {
     if (type !== 'node') return;
-    try { await syncSceneSelection(); }
+    // Creator can fire select before getSelected('node') reflects the new
+    // value. The event UUID is authoritative for the first click.
+    const selected = selectedNodeIds();
+    if (typeof uuid === 'string' && !selected.includes(uuid)) selected.push(uuid);
+    const revision = ++selectionRevision;
+    try { await syncSceneSelection(selected, revision); }
     catch (error) { console.warn('[cocos-gizmos/selection] select sync:', error); }
-}
-async function onSelectionUnselect(type) {
-    if (type !== 'node') return;
-    // Native Editor emits unselect before select when changing A -> B.
-    // Read the final selection next turn, including the empty case.
+    // Reconcile on the following turn; ignore if a newer event arrived.
     await new Promise(resolve => setTimeout(resolve, 0));
-    try { await syncSceneSelection(); }
+    if (revision === selectionRevision) {
+        const final = selectedNodeIds();
+        if (typeof uuid === 'string' && !final.includes(uuid)) final.push(uuid);
+        try { await syncSceneSelection(final); }
+        catch (error) { console.warn('[cocos-gizmos/selection] select reconcile:', error); }
+    }
+}
+async function onSelectionUnselect(type, uuid) {
+    if (type !== 'node') return;
+    // Do not leave the last selected component cached when clicking empty.
+    const selected = selectedNodeIds().filter(id => id !== uuid);
+    const revision = ++selectionRevision;
+    try { await syncSceneSelection(selected, revision); }
     catch (error) { console.warn('[cocos-gizmos/selection] unselect sync:', error); }
+    await new Promise(resolve => setTimeout(resolve, 0));
+    if (revision === selectionRevision) {
+        try { await syncSceneSelection(selectedNodeIds().filter(id => id !== uuid)); }
+        catch (error) { console.warn('[cocos-gizmos/selection] unselect reconcile:', error); }
+    }
 }
 
 exports.methods = {
