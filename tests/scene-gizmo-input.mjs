@@ -11,7 +11,8 @@ const code = ts.transpileModule(readFileSync(path.join(root, 'source/SceneGizmoI
 }).outputText;
 const scope = { exports: {} };
 vm.runInNewContext(code, scope);
-const { readScenePointer, readSceneHandleName, GizmoInputDiagnostics } = scope.exports;
+const { readScenePointer, readSceneHandleName, isPrimaryScenePointer,
+    GizmoInputDiagnostics } = scope.exports;
 
 function assertPointer(event, x, y) {
     const p = readScenePointer(event);
@@ -38,6 +39,34 @@ assert.equal(readSceneHandleName({ detail: { handleName: 'hud:slider' } }), 'hud
 assert.equal(readSceneHandleName({ data: { handle: { name: 'hud:toggle' } } }), 'hud:toggle');
 assert.equal(readSceneHandleName({ event: { handle: { handleName: 'hud:check' } } }), 'hud:check');
 assert.equal(readSceneHandleName({}), null);
+
+// Middle-button camera pan and right-button orbit must NEVER acquire Gizmo
+// position or HUD controls. Creator's event wrappers vary by Scene backend.
+for (const event of [
+    { button: 1, x: 100, y: 100 },
+    { getButton() { return 1; }, x: 100, y: 100 },
+    { detail: { button: 1 }, x: 100, y: 100 },
+    { data: { event: { button: 1 } }, x: 100, y: 100 },
+    { which: 2, x: 100, y: 100 },
+    { buttons: 4, x: 100, y: 100 },
+    { getButtons() { return 4; }, x: 100, y: 100 },
+    { mouse: { button: 1 }, x: 100, y: 100 },
+    { event: { button: 2 }, x: 100, y: 100 },
+]) {
+    assert.equal(isPrimaryScenePointer(event), false,
+        'Middle/right camera navigation must not be a drag gesture');
+}
+for (const event of [
+    { button: 0, x: 100, y: 100 },
+    { getButton() { return 0; } },
+    { which: 1 },
+    { buttons: 1 },
+    { detail: { getButton() { return 0; } } },
+    { x: 100, y: 100 }, // Native BoxController omits button.
+]) {
+    assert.equal(isPrimaryScenePointer(event), true,
+        'Left click and compatible native callbacks must remain draggable');
+}
 
 const stats = new GizmoInputDiagnostics();
 stats.record('controllerDown');
