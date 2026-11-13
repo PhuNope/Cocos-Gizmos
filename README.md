@@ -415,15 +415,23 @@ your project's `assets/` folder. The extension mount remains read-only.
 You can also add the Component by class name in Inspector if Creator lists it.
 
 To verify that Creator has actually imported the mounted scripts, open
-**Extensions → Gizmos Settings → Check example assets**. This performs
-read-only `asset-db/query-asset-info` checks on the three exact demo URLs.
-Each result distinguishes `imported`, `missing`, `not-imported`, `invalid`,
-`uuid-mismatch`, `wrong-importer`, `query-failed` and
-`database-not-ready`. A reported `imported` status means the script asset
-was registered in Asset DB; it **does not** prove that the class has compiled
-successfully, that Inspector drag-and-drop works, or that native Gizmo
-controllers work. Those steps still require testing in the real Editor.
-No Scene, Prefab or project asset is modified by this check.
+**Extensions → Gizmos Settings → Check example assets**. The report now
+checks **two separate systems** without modifying your project:
+
+- **Asset DB:** Queries `asset-db/query-asset-info` for each demo script,
+  distinguishing `imported`, `missing`, `not-imported`, `invalid`,
+  `uuid-mismatch`, `wrong-importer`, `query-failed` and
+  `database-not-ready`.
+- **Scene class registry:** Checks `cc.js.getClassByName()` and whether the
+  registered class derives from `cc.Component`. Each demo reports
+  `registered`, `not-registered`, `not-component`,
+  `registry-unavailable` or `scene-unavailable`. A Scene reload or an
+  unavailable Scene process is **not** treated as a missing class.
+
+Successful Asset DB import and Scene registration are stronger evidence that
+Cocos recognized the component, but still **do not prove** that dragging
+the script into the Inspector, rendering the Gizmo or native Undo/Redo works.
+Those steps require testing inside Cocos Creator 3.8.8.
 
 The mounted samples have `CocosGizmos*` class names to avoid conflicts with
 previously copied `Gizmos2DApiTest`, `Gizmos3DApiTest`, and `GizmoSmokeProbe`
