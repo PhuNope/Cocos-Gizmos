@@ -211,9 +211,9 @@ export default class Gizmos3DApiTest extends Component {
         if (this.showLabels) {
             Gizmos3D.beginColor(n, Color.WHITE);
             Gizmos3D.drawLabel(n, 'api3d-title', 'Gizmos3D API Test',
-                p(-4, 5, 0), 18, 0.15);
+                p(-4, 5, 0), 18, 0.15, 12, 26);
             Gizmos3D.drawLabel(n, 'api3d-hint', 'Select node to move colored handles',
-                p(-4, 4, 0), 14, 0.12);
+                p(-4, 4, 0), 14, 0.12, 11, 22);
         }
         Gizmos3D.beginColor(n, Gizmos3D.DEFAULT_COLOR);
     }
