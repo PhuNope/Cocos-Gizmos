@@ -186,7 +186,38 @@ async function onSelectionUnselect(type, uuid) {
     }
 }
 
+/**
+ * Top-level Gizmos > Reset Gizmos. Recreates only editor-side Gizmo resources,
+ * never reloads the user's Scene or changes serialized game components.
+ * Selection is taken from the main process to avoid stale Scene selections.
+ */
+async function resetGizmos() {
+    const editor = globalThis.Editor;
+    if (typeof editor?.Message?.request !== 'function')
+        throw new Error('Editor Scene message bridge is unavailable');
+    // Invalidate in-flight selected/unselected reconciliation tasks before
+    // rebuilding the Scene runtime.
+    ++selectionRevision;
+    const selected = [...new Set(selectedNodeIds())];
+    try {
+        const result = await editor.Message.request('scene', 'execute-scene-script', {
+            name: 'cocos-gizmos',
+            method: 'gizmosReset',
+            args: [selected],
+        });
+        if (!result || result.started !== true)
+            throw new Error('Scene did not confirm Gizmos reset');
+        editor?.log?.('[cocos-gizmos] Reset Gizmos completed');
+        return result;
+    } catch (error) {
+        editor?.warn?.('[cocos-gizmos] Reset Gizmos failed: ' +
+            String(error?.message || error));
+        throw error;
+    }
+}
+
 exports.methods = {
+    resetGizmos,
     onSelectionSelect,
     onSelectionUnselect,
     openSettings() {
