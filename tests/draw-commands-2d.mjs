@@ -91,8 +91,18 @@ Color.BLUE = new Color(0, 0, 255);
 Color.WHITE = new Color(255, 255, 255);
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+    static transformMat4(out, point, matrix) {
+        out.x = point.x + (matrix?.position?.x || 0);
+        out.y = point.y + (matrix?.position?.y || 0);
+        out.z = point.z + (matrix?.position?.z || 0);
+        return out;
+    }
 }
 Vec3.ZERO = new Vec3();
+class Vec2 {
+    constructor(x = 0, y = 0) { this.x = x; this.y = y; }
+}
+Vec2.ONE = new Vec2(1, 1);
 class Node {
     constructor(name) {
         this.name = name;
@@ -142,13 +152,23 @@ const cc = {
     _decorator: { ccclass: () => (target) => target, executeInEditMode: (target) => target },
     CCObject: { Flags: { DontSave: 1, HideInHierarchy: 2 } },
     Color, Component, Graphics, Node, Vec3, Label, Sprite,
-    Vec2: { ONE: { x: 1, y: 1 } },
+    Vec2,
     Layers: { Enum: { GIZMOS: 4, DEFAULT: 1 } },
     toRadian: (degrees) => degrees * Math.PI / 180,
 };
 let now = 1000;
+const viewCamera = {
+    pixelWorld: 1,
+    geometryRenderer: {},
+    worldToScreen(out, world) {
+        out.x = world.x / this.pixelWorld;
+        out.y = world.y / this.pixelWorld;
+        out.z = 1;
+    },
+};
 const moduleSandbox = {
     exports: {},
+    cce: { Camera: { _camera: { camera: viewCamera } } },
     Date: class extends Date { static now() { return now; } },
     require(name) {
         if (name === 'cc') return cc;
@@ -237,5 +257,21 @@ now += 451;
 debug.lateUpdate(0);
 assert.equal(label.string, '', '2D label expires only when idle longer than 750ms');
 assert.equal(sprite.spriteFrame, null);
+
+// Generic Gizmos2D.drawLabel can explicitly bound text size in screen
+// pixels even when a user zooms extremely near or far in orthographic 2D.
+viewCamera.pixelWorld = 0.001;
+Gizmos2D.drawLabel(rootNode, 'zoom-bound', 'Fixed readable size',
+    { x: 0, y: 0 }, 20, Vec2.ONE, 12, 24);
+debug.lateUpdate(0);
+const zoomLabel = debug._labelMap.get('zoom-bound');
+assert.ok(Math.abs(zoomLabel.node.scale[0].x - 0.0012) < 1e-9,
+    'Close zoom must clamp 2D Label height to maximum 24 screen pixels');
+viewCamera.pixelWorld = 20;
+Gizmos2D.drawLabel(rootNode, 'zoom-bound', 'Fixed readable size',
+    { x: 0, y: 0 }, 20, Vec2.ONE, 12, 24);
+debug.lateUpdate(0);
+assert.ok(Math.abs(zoomLabel.node.scale[0].x - 12) < 1e-7,
+    'Far zoom must enforce minimum 12 screen pixels');
 
 console.log('[draw-commands-2d] 164 paths/one stroke, local/world endpoints, render-state partitioning, idle reuse OK');
