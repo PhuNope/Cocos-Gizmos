@@ -205,6 +205,18 @@ controller.onMouseDown({ handleName: 'hud:visible', x: 80, y: 30 });
 assert.equal(component.visible, true);
 controller.onMouseUp({ handleName: 'hud:visible', x: 80, y: 30 });
 assert.equal(component.visible, false, 'Clicking the HUD quad toggles component property');
+// The Scene operation may consume native picking before Controller.onMouseDown.
+// The fallback uses the exact same visual rect, not an approximate cube.
+const clickX = (rect.left + rect.right) * 0.5;
+const clickY = (rect.bottom + rect.top) * 0.5;
+gizmo.onNotGizmoMouseDown({ x: clickX, y: clickY });
+gizmo.onNotGizmoMouseUp({ x: clickX, y: clickY });
+assert.equal(component.visible, true,
+    'HUD is still interactive if native Gizmo Controller misses the click');
+gizmo.onNotGizmoMouseDown({ x: clickX, y: clickY });
+gizmo.onNotGizmoMouseUp({ x: clickX, y: 260 });
+assert.equal(component.visible, true,
+    'Releasing a HUD button outside its screen rectangle cancels it');
 adapter.clear();
 assert.equal(controller.hitTarget.active, false, 'Deselecting hides HUD raycast plane');
 adapter.dispose();
