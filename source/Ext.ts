@@ -31,6 +31,14 @@ declare global {
         };
         /** Point marker color as a hexadecimal color string. */
         color?: string;
+        /** Unique identifier when multiple handles edit the same Vec3. */
+        id?: string;
+        /** Display a filled, clickable plane square instead of just a point. */
+        visual?: 'point' | 'plane';
+        /** Side length of the plane square in Scene pixels (default 36). */
+        planeSize?: number;
+        /** Offset of the square along its two axes in pixels (default 48). */
+        planeOffset?: number;
     }
 
     /** Controls when a component draws in the Scene View. */
