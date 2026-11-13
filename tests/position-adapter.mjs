@@ -18,6 +18,15 @@ const math = { exports: {} };
 vm.runInNewContext(compile('PositionDragSolver'), math);
 const edits = { exports: {} };
 vm.runInNewContext(compile('GizmoEditSession'), edits);
+const commands = { exports: {} };
+vm.runInNewContext(compile('GizmoMoveCommand'), {
+    exports: commands.exports,
+    require(spec) {
+        if (spec === './GizmoEditSession') return edits.exports;
+        if (spec === './PositionDragSolver') return math.exports;
+        throw Error('Unexpected command dependency ' + spec);
+    },
+});
 const hud = { exports: {} };
 vm.runInNewContext(compile('GizmoHudControls'), hud);
 const presentation = { exports: {} };
@@ -208,6 +217,7 @@ const sandbox = {
         if (name === './AxisHandleGeometry') return axes.exports;
         if (name === './PlaneHandleGeometry') return planes.exports;
         if (name === './PositionDragSolver') return math.exports;
+        if (name === './GizmoMoveCommand') return commands.exports;
         if (name === './GizmoEditSession') return edits.exports;
         if (name === './GizmoHudControls') return hud.exports;
         if (name === './GizmoPresentation') return presentation.exports;
