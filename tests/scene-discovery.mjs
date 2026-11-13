@@ -28,6 +28,8 @@ let timer = null;
 const sceneListeners = new Map();
 let scanCount = 0;
 let selectionLookups = 0;
+let flushed2D = 0;
+let pending2DCleared = 0;
 const calls = { first: 0, second: 0, selected: 0 };
 const firstComponent = {
     isValid: true, enabled: true,
@@ -79,6 +81,10 @@ const sandbox = {
     clearInterval: (id) => { assert.equal(id, 1); timer = null; },
     require: (id) => {
         if (id === './SceneUpdateScheduler') return schedulerExports;
+        if (id === './Gizmos2D') return { Gizmos2D: {
+            flushEditorFrame() { flushed2D++; },
+            clearPendingFrame() { pending2DCleared++; },
+        } };
         assert.equal(id, 'cc');
         return { Component: class {}, Node: class {}, director, Director: {
             EVENT_BEFORE_UPDATE: 'before-update',
@@ -111,12 +117,16 @@ try {
     start(); // Initial scan and render.
     assert.equal(scanCount, 1);
     assert.equal(calls.first, 1);
+    assert.equal(flushed2D, 1,
+        '2D geometry flushes in Scene updater even without debug Component lateUpdate');
     for (let i = 0; i < 10; i++) {
         now += 16;
         beforeUpdate();
     }
     assert.equal(scanCount, 1, 'No full scene traversal for each engine frame');
     assert.equal(calls.first, 11, 'Registered callbacks still draw each frame');
+    assert.equal(flushed2D, 11,
+        'Every engine callback flushes the 2D line buffers');
     assert.ok(selectionLookups <= 6, 'Selection must not be queried for every render frame');
     assert.ok(selectionLookups >= 2, 'Selection should refresh promptly during editor updates');
 
@@ -144,6 +154,8 @@ try {
     sceneListeners.get('before-scene-launch')();
     assert.ok(clearedHandles > clearsBeforeFailedLaunch,
         'Before-scene-launch proactively detaches old picking Gizmos');
+    assert.ok(pending2DCleared > 0,
+        'Before scene replacement frees pending 2D debug node references');
     const refreshesBeforeInvalid = handleRefreshes.length;
     scene = createNode('partially-activated-mask-scene', []);
     now += 16;
