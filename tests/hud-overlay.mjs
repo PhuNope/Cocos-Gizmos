@@ -58,15 +58,30 @@ const camera = {
 const sink = {
     beginColor(node, color) { assert.equal(node.uuid, 'hud-owner'); assert.ok(color); },
     drawLabel(node, id, text, position, fontSize, scale) {
-        labels.push({ id, text, position, fontSize, scale });
+        labels.push({ id, text, position, fontSize, scale, target: '3d' });
+    },
+};
+const sink2D = {
+    beginLayer(node, layer) { assert.equal(layer, 4); },
+    beginLocalPosition() {},
+    endLocalPosition() {},
+    beginColor(node, color) { assert.equal(node.uuid, 'hud-owner'); assert.ok(color); },
+    drawLabel(node, id, text, position, fontSize, scale) {
+        labels.push({ id, text, position, fontSize, scale, target: '2d' });
     },
 };
 const sandbox = {
     exports: {},
     cce: { Camera: { _camera: { camera } } },
     require(id) {
-        if (id === 'cc') return { Color, Vec3 };
+        if (id === 'cc') return {
+            Color, Vec3, Vec2: class Vec2 {
+                constructor(x = 0, y = 0) { Object.assign(this, { x, y }); }
+            },
+            Layers: { Enum: { GIZMOS: 4 } }, RenderRoot2D: class RenderRoot2D {},
+        };
         if (id === './Gizmos3D') return { Gizmos3D: sink };
+        if (id === './Gizmos2D') return { Gizmos2D: sink2D };
         if (id === './PositionDragSolver') return solver.exports;
         if (id === './GizmoPresentation') return {};
         if (id === './GizmoHudControls') return controls.exports;
@@ -86,6 +101,7 @@ assert.equal(labels[0].id, 'cocos-gizmos:hud:speed');
 assert.equal(labels[0].text, 'Speed: 42');
 assert.equal(labels[0].fontSize, 14);
 assert.ok(labels[0].scale > 0);
+assert.equal(labels[0].target, '3d');
 assert.ok(Number.isFinite(labels[0].position.x));
 assert.equal(Color.created, 1);
 assert.equal(camera.rays, 3, 'One HUD label uses three camera rays');
@@ -121,12 +137,48 @@ assert.equal(ownerLabelA.position.y - ownerLabelB.position.y, 66,
 
 camera.pixelWorld = 0.00005; // extremely close zoom
 overlay.render(component, entries, { namespace: 'zoom', startRow: 0 });
-assert.equal(labels.at(-1).scale, 0.002,
-    'Zooming extremely close should not shrink label scale below a readable minimum');
+assert.ok(Math.abs(labels.at(-1).scale - 0.00005) < 1e-9,
+    'HUD text should keep its on-screen font size even at extreme close zoom');
 camera.pixelWorld = 0.2; // normal zoom
 overlay.render(component, entries, { namespace: 'zoom', startRow: 0 });
 assert.ok(Math.abs(labels.at(-1).scale - 0.2) < 1e-7,
     'Normal zoom should retain the screen-space text scale');
+
+const { hudTextPixels } = sandbox.exports;
+assert.equal(hudTextPixels(6), 12);
+assert.equal(hudTextPixels(200), 24);
+assert.equal(hudTextPixels(18), 18);
+assert.equal(hudTextPixels(40, 10, 20), 20);
+camera.pixelWorld = 0.1;
+overlay.render(component, [{ id: 'limits', text: 'bounded',
+    fontSize: 30, minSize: 14, maxSize: 18 }]);
+assert.ok(Math.abs(labels.at(-1).scale - 0.06) < 1e-8,
+    '30px font must be scaled down to an 18px on-screen maximum');
+
+// 2D HUD must reuse the Canvas RenderRoot. Its Gizmos2D labels are already
+// in the camera's visible UI graph, unlike a second nested 3D root.
+const Root = class RenderRoot2D {};
+// The vm mock uses a separate class, so retrieve the constructor from cc.
+const UiRoot = sandbox.require('cc').RenderRoot2D;
+const canvas = {
+    getComponent(type) { return type === UiRoot ? new UiRoot() : null; },
+    parent: null,
+};
+const oldParent = component.node.parent;
+const oldScale = component.node.worldScale;
+const oldTransform = component.node.inverseTransformPoint;
+component.node.parent = canvas;
+component.node.worldScale = new Vec3(2, 4, 1);
+component.node.inverseTransformPoint = (out, point) => {
+    Object.assign(out, { x: point.x / 2, y: point.y / 4, z: point.z });
+};
+overlay.render(component, entries, { namespace: 'canvas', startRow: 0 });
+assert.equal(labels.at(-1).target, '2d');
+assert.ok(Math.abs(labels.at(-1).scale.x - 0.05) < 1e-8);
+assert.ok(Math.abs(labels.at(-1).scale.y - 0.025) < 1e-8);
+component.node.parent = oldParent;
+component.node.worldScale = oldScale;
+component.node.inverseTransformPoint = oldTransform;
 
 component.node.isValid = false;
 assert.equal(overlay.render(component, entries), 0);
