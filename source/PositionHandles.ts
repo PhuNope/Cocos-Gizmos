@@ -1,4 +1,6 @@
-import { Color, Component, Layers, Quat, Vec3 } from 'cc';
+import { Color, Component, Layers, Quat, RenderRoot2D, Vec3 } from 'cc';
+import { Gizmos2D } from './Gizmos2D';
+import { Gizmos3D } from './Gizmos3D';
 import {
     handlePlaneNormal,
     intersectHandlePlane,
@@ -128,7 +130,7 @@ function markerSize(world: Point): number {
         // projection is evaluated again after every drag so the visible point
         // keeps the same size across Scene zoom levels.
         if (Number.isFinite(pixel) && pixel > 1e-10) {
-            return Math.max(0.015, Math.min(1000, pixel * 22));
+            return Math.max(1e-8, pixel * 22);
         }
     } catch {
         // Keep the default marker size if the camera is being replaced.
@@ -157,6 +159,75 @@ function setMarkerSize(controller: any, size: number): void {
         const scale = new Vec3(size / parentX, size / parentY, size / parentZ);
         if (typeof cube.setScale === 'function') cube.setScale(scale);
         else cube.scale = scale;
+    }
+}
+
+function isCanvas2D(node: any): boolean {
+    for (let current = node; current; current = current.parent) {
+        if (typeof current.getComponent === 'function' &&
+            current.getComponent(RenderRoot2D)) return true;
+    }
+    return false;
+}
+
+/**
+ * Draw the marker independently from BoxCollider's private cube mesh. Creator
+ * may keep the picking Controller alive while its rendering mesh disappears
+ * after a 2D selection switch. The actual drag still uses initHandle and the
+ * Editor's controller event pipeline; this is the visible representation.
+ */
+function drawSelectedPositionMarkers(component: Component): void {
+    if (!component?.node?.isValid || typeof component.onGizmoHandles !== 'function') return;
+    const fields: Field[] = component.onGizmoHandles() || [];
+    if (!Array.isArray(fields) || !fields.length) return;
+    const node = component.node;
+    const onCanvas = isCanvas2D(node);
+    const nodeScale = node.worldScale || new Vec3(1, 1, 1);
+    const sx = Number.isFinite(nodeScale.x) && Math.abs(nodeScale.x) > 1e-8 ?
+        Math.abs(nodeScale.x) : 1;
+    const sy = Number.isFinite(nodeScale.y) && Math.abs(nodeScale.y) > 1e-8 ?
+        Math.abs(nodeScale.y) : 1;
+    try {
+        if (onCanvas) {
+            Gizmos2D.beginLayer(node, Layers.Enum.UI_2D);
+            Gizmos2D.beginLocalPosition(node);
+        } else {
+            Gizmos3D.setDepTest(node, false);
+        }
+        for (const field of fields) {
+            if (!field || typeof field.property !== 'string') continue;
+            const local = readField(component, field);
+            if (!local) continue;
+            const world = spaceFor(component, field).toWorld(local);
+            if (!validPoint(world)) continue;
+            const diameter = markerSize(world);
+            const radius = diameter * 0.4;
+            const color = new Color(255, 190, 40, 255);
+            if (typeof field.color === 'string' && typeof Color.fromHEX === 'function') {
+                Color.fromHEX(color, field.color);
+            }
+            if (onCanvas) {
+                const at = new Vec3();
+                node.inverseTransformPoint(at, new Vec3(world.x, world.y, world.z));
+                Gizmos2D.beginColor(node, Color.BLACK);
+                Gizmos2D.drawSolidEllipse(node, at, radius * 1.12 / sx, radius * 1.12 / sy);
+                Gizmos2D.beginColor(node, color);
+                Gizmos2D.drawSolidEllipse(node, at, radius / sx, radius / sy);
+            } else {
+                Gizmos3D.beginColor(node, color);
+                Gizmos3D.drawSphere(node, new Vec3(world.x, world.y, world.z),
+                    radius, false, 12, 8);
+            }
+        }
+    } finally {
+        if (onCanvas) {
+            Gizmos2D.endLocalPosition(node);
+            Gizmos2D.beginLayer(node, Gizmos2D.DEFAULT_LAYER);
+            Gizmos2D.beginColor(node, Gizmos2D.DEFAULT_COLOR);
+        } else {
+            Gizmos3D.setDepTest(node, true);
+            Gizmos3D.beginColor(node, Gizmos3D.DEFAULT_COLOR);
+        }
     }
 }
 
@@ -415,12 +486,13 @@ function createEditorGizmo(
             // A HUD row is 22 screen pixels tall. Keep its picking cube about
             // 14 pixels wide; multiplying a 10px world size by 14 creates a
             // ~140px hit box overlapping adjacent buttons and sliders.
-            const size = Math.min(1000, projection.pixelSize * 14);
+            const size = Math.max(1e-8, projection.pixelSize * 14);
             for (const entry of this.hudEntries) {
                 this.restoreMarker(entry.controller);
                 this.ensureMarkerVisible(entry.controller);
                 const row = hudRowScreenPosition(
-                    projection.screen, startRow + textCount + entry.index);
+                    projection.screen, startRow + textCount + entry.index,
+                    projection.viewport);
                 const world = projection.worldAt(row.x - 14, row.y);
                 entry.controller.setPosition?.(world);
                 setMarkerSize(entry.controller, size);
@@ -854,6 +926,18 @@ export function createPositionHandleAdapter(
             if (!selectionChanged && now - latestScan < 250) return;
             lastSelection = new Set(selected);
             latestScan = now;
+            // Visual markers must not disappear even when the Editor replaces
+            // the native component Gizmo or temporarily unmounts its cube.
+            for (const component of components) {
+                if (component?.isValid && component.enabled &&
+                    component.node?.activeInHierarchy &&
+                    selected.has(component.node.uuid)) {
+                    try { drawSelectedPositionMarkers(component); }
+                    catch (error) {
+                        console.warn('[cocos-gizmos/handles] Cannot paint position markers:', error);
+                    }
+                }
+            }
             if (!initialize()) return;
             const wanted = new Set<Component>();
             for (const component of components) {
