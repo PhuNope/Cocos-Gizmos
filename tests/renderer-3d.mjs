@@ -166,13 +166,13 @@ const moveHandles = Gizmos3D.moveHandles('waypoint', {
     space: 'local', snap: 0.25, pickSize: 32, hoverColor: '#ffff66',
 });
 assert.equal(moveHandles.length, 6, 'Default Move Tool exports XYZ + XY/XZ/YZ controls');
-assert.deepEqual(moveHandles.map(h => h.id),
+assert.deepEqual(Array.from(moveHandles, h => h.id),
     ['move-axis-x', 'move-axis-y', 'move-axis-z',
         'move-plane-xy', 'move-plane-xz', 'move-plane-yz']);
 assert.ok(moveHandles.every(h => h.property === 'waypoint' &&
     h.pickSize === 32 && h.snap === 0.25 && h.hoverColor === '#ffff66'));
-assert.deepEqual(moveHandles.slice(0, 3).map(h => h.axis), ['x', 'y', 'z']);
-assert.deepEqual(moveHandles.slice(3).map(h => h.plane), ['xy', 'xz', 'yz']);
+assert.deepEqual(Array.from(moveHandles.slice(0, 3), h => h.axis), ['x', 'y', 'z']);
+assert.deepEqual(Array.from(moveHandles.slice(3), h => h.plane), ['xy', 'xz', 'yz']);
 assert.equal(moveHandles.filter(h => h.showPositionLabel).length, 1,
     'One object position label, not six stacked duplicate labels');
 const color = new Color(4, 5, 6, 80);
