@@ -21,17 +21,21 @@ the automated TypeScript and Node.js regression suite.
    The extension does not automatically copy any files to your project assets.
 
 Before dragging, open **Extensions → Gizmos Settings → Check example assets**.
-Each demo should report `imported`. If it reports `database-not-ready`,
-finish the import and check again. `missing` or `query-failed` suggests the
-extension mount or Asset Database query did not succeed; check that the
-extension is enabled and inspect the Creator Console. `uuid-mismatch`,
-`invalid`, or `wrong-importer` means the mounted script metadata was not
-recognized as expected. Restart Creator after replacing the ZIP and capture
-the complete report if the error persists.
+Each script should report **Asset DB: `imported`** and
+**Scene class: `registered`**. The two checks diagnose different failures:
 
-This diagnostic checks script asset import registration only. Even when all
-three scripts show `imported`, confirm that Inspector accepts the script and
-does not display **Missing Script**, then test actual Scene handles.
+- `database-not-ready`, `missing`, `query-failed`, `uuid-mismatch`
+  or `wrong-importer` indicate possible Asset DB mount/import problems.
+- `not-registered` means the name was not found in Cocos' Scene class
+  registry; check script compilation errors, then reopen the Scene.
+- `not-component` means the registered name is not a Component subclass.
+- `scene-unavailable` / `registry-unavailable` mean the Scene class
+  lookup could not run. They **do not** prove the script is broken.
+
+Restart Cocos Creator after updating the ZIP, check Console errors and capture
+both status fields if problems remain. Even if all examples are imported and
+registered, confirm the Inspector accepts the script without **Missing
+Script**, then test actual Scene handles and native Undo/Redo.
 
 Do not edit project source or delete a Prefab override automatically as part
 of this test. Use a disposable Scene/Prefab and commit or back up your project
