@@ -34,6 +34,7 @@ export function setPresentationAdapter(adapter: PresentationAdapter | null): voi
 let running: {
     stats: UpdateStats;
     scheduler: { stop(): void; tickOnce(): void };
+    forceSelection: (values: string[]) => void;
     dispose: () => void;
 } | null = null;
 
@@ -63,6 +64,11 @@ class SelectedNodeCache {
             this.lastCheckedAt = now;
         }
         return this.previous;
+    }
+
+    public force(ids: string[]): void {
+        this.previous = { ids: new Set(ids), available: true };
+        this.lastCheckedAt = Date.now();
     }
 
     public clear(): void {
@@ -221,6 +227,10 @@ export function start(): UpdateStats {
     running = {
         stats,
         scheduler,
+        forceSelection: (selected) => {
+            selectionCache.force(selected);
+            scheduler.tickOnce();
+        },
         dispose: () => {
             registry.clear();
             selectionCache.clear();
@@ -250,5 +260,12 @@ export function status(): UpdateStats | { started: false } {
 }
 export function tickOnce(): UpdateStats | { started: false } {
     if (running) running.scheduler.tickOnce();
+    return status();
+}
+
+/** React immediately to main-process Scene selection events (including empty). */
+export function syncSelection(selected: unknown): UpdateStats | { started: false } {
+    if (running) running.forceSelection(Array.isArray(selected) ?
+        selected.filter((id): id is string => typeof id === 'string') : []);
     return status();
 }
