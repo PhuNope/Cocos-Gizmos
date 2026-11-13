@@ -841,13 +841,37 @@ function createEditorGizmo(
             drag.session.finish(cancelled);
         }
 
+        /** Fallback hit-test when Creator consumes a HUD pointer event before
+         * its native transparent mesh can receive a Controller callback. */
+        private hudEntryAt(event: any): HudEntry | null {
+            if (!this.shown || this.destroyed || !this.hudEntries.length) return null;
+            const point = readScenePointer(event);
+            const viewport = camera()?.viewport;
+            const component = this.target as Component;
+            const placement = hudLayout?.get(component);
+            if (!point || !viewport || !placement) return null;
+            for (const entry of this.hudEntries) {
+                const rect = hudControlScreenRect(viewport,
+                    placement.startRow + placement.textCount + entry.index,
+                    hudLayout?.totalRows || 0);
+                if (point.x >= rect.left && point.x <= rect.right &&
+                    point.y >= rect.bottom && point.y <= rect.top) {
+                    return entry;
+                }
+            }
+            return null;
+        }
+
         public onGizmoMouseDown(event: any): void {
             input.record('gizmoDown');
             const name = readSceneHandleName(event);
             const entry = this.entries.find((item) => item.key === name);
             if (entry) this.begin(entry, event);
-            const hud = this.hudEntries.find((item) => item.key === name);
-            if (hud) this.beginHud(hud, event);
+            const hud = this.hudEntries.find((item) => item.key === name) ||
+                (!name ? this.hudEntryAt(event) : null);
+            if (hud) this.beginHud(hud, name ? event : {
+                ...event, ...readScenePointer(event), handleName: hud.key,
+            });
         }
 
         public onGizmoMouseMove(event: any): void {
@@ -869,22 +893,32 @@ function createEditorGizmo(
 
         // GizmoOperation dispatches these callbacks to every registered Gizmo
         // on Creator 3.8.8, even when no controller was hit.
-        public onNotGizmoMouseDown(): void {
+        public onNotGizmoMouseDown(event?: any): void {
             input.record('outsideDown');
-            // A new click outside the Gizmo cancels an unfinished gesture.
+            const hud = this.hudEntryAt(event);
+            const point = readScenePointer(event);
+            if (hud && point && !this.drag && !this.pendingClick && !this.hudDrag) {
+                // Controller event routing can be intercepted by another
+                // Gizmo. Use the identical screen rectangle as the HUD mesh.
+                this.beginHud(hud, { ...event, ...point, handleName: hud.key });
+                return;
+            }
             this.finish(true);
             this.finishHud(true);
         }
 
-        public onNotGizmoMouseMove(): void {
-            // No pointer capture when the Scene operation is not dragging us.
+        public onNotGizmoMouseMove(event?: any): void {
+            if (this.hudDrag && event) this.moveHud(this.hudDrag.entry, event);
         }
 
-        public onNotGizmoMouseUp(): void {
+        public onNotGizmoMouseUp(event?: any): void {
             input.record('outsideUp');
-            // Releasing outside a handle commits drags but not button clicks.
+            // A pointer-up on the same HUD rectangle commits click actions;
+            // a true outside release cancels buttons, but commits slider drags.
+            const click = this.pendingClick;
+            const onRow = click && this.hudEntryAt(event) === click;
             this.finish(false);
-            this.finishHud(!this.hudDrag);
+            this.finishHud(!!click && !onRow);
         }
 
         public onKeyDown(event: any): boolean | void {
