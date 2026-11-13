@@ -246,59 +246,7 @@ assert.equal(typeof gizmo.onNotGizmoMouseMove, 'function');
 assert.equal(typeof gizmo.onNotGizmoMouseUp, 'function');
 assert.equal(gizmo.shouldRegisterGizmoOperationEvent, true);
 const ctrl = gizmo.controllers[0];
-// User regression: middle-button pan after a 2D point drag leaves the Scene
-// operation stuck and subsequent left clicks cannot acquire the point.
-// Mouse button 1 must NEVER be treated as position or HUD drag input.
-const editsBeforePan = events.length;
-const previousRayCount = cam.rays;
-cam.panX = 75;
-cam.panY = 30;
-gizmo.onNotGizmoMouseDown({ button: 1, x: 75, y: -30 });
-gizmo.onGizmoMouseDown({ detail: { button: 1 }, x: 75, y: -30 });
-ctrl.onControllerMouseDown({
-    getButton() { return 1; }, handleName: 'y', x: 75, y: -30,
-});
-gizmo.onNotGizmoMouseMove({ buttons: 4, x: 75, y: -30 });
-gizmo.onNotGizmoMouseUp({ button: 1 });
-gizmo.onGizmoMouseUp({ button: 1 });
-assert.equal(gizmo.diagnosticState().draggingPosition, false,
-    'Pan with middle mouse never starts or leaves a position drag');
-assert.deepEqual([component.target.x, component.target.y], [150, 0],
-    'Camera pan cannot modify serialized 2D point coordinates');
-assert.equal(events.length, editsBeforePan,
-    'Pan cannot start/end an undo transaction');
-assert.equal(cam.rays, previousRayCount,
-    'Pan is not interpreted as a position raycast');
-const syncBefore = cam.updates;
-gizmo.onNotGizmoMouseDown({ button: 0, x: 75, y: -30 });
-assert.equal(gizmo.diagnosticState().draggingPosition, true,
-    'Clicking screen-space marker after pan must start a new 2D drag');
-assert.ok(cam.updates > syncBefore,
-    'The Scene camera is synchronized before the post-pan raycast');
-gizmo.onNotGizmoMouseMove({ buttons: 1, x: 100, y: -15 });
-gizmo.onNotGizmoMouseUp({ button: 0 });
-assert.deepEqual([component.target.x, component.target.y], [180, 20],
-    'Marker remains draggable at its panned screen location with snap=10');
-component.target = new Vec3(150, 0, 0);
-// The native +Y face is the main production route, not just the fallback
-// positionEntryAt path. Re-pan and acquire the native face directly.
-cam.panX = -45;
-cam.panY = 17;
-const nativeSyncBefore = cam.updates;
-ctrl.onControllerMouseDown({ button: 0, handleName: 'y',
-    x: 195, y: -17 });
-assert.equal(gizmo.diagnosticState().draggingPosition, true,
-    'Native BoxController can acquire a point after a second middle pan');
-assert.ok(cam.updates > nativeSyncBefore,
-    'Native down synchronizes the panned Scene camera before computing ray');
-ctrl.onControllerMouseMove({ button: 0, x: 205, y: -7 });
-ctrl.onControllerMouseUp({ button: 0 });
-assert.deepEqual([component.target.x, component.target.y], [160, 10],
-    'Native drag face follows camera-pan-adjusted screen coordinates');
-component.target = new Vec3(150, 0, 0);
-cam.panX = 0;
-cam.panY = 0;
-gizmo.refreshHandles();
+
 const handleSnapshot = ctrl._handleDataMap['position:target:single'];
 assert.ok(handleSnapshot.oriColors[0] && Number.isFinite(handleSnapshot.oriColors[0].a),
     'The Creator native handle always gets a valid RGBA color snapshot');
@@ -806,6 +754,74 @@ assert.equal(multiAdapter.status().active, 1,
 assert.equal(ownerB.gizmo.controllers[0].position.y, 2,
     'Remaining HUD moves to the first row when preceding HUD is hidden');
 multiAdapter.dispose();
+
+// Isolated regression so the existing strict transaction/input counters
+// remain meaningful for their own normal left-button drag sequence.
+const panComponent = {
+    ...component,
+    node: { ...node, uuid: 'pan-selected-node' },
+    target: new Vec3(150, 0, 0), gizmo: null,
+    enabled: true, isValid: true,
+};
+const panAdapter = sandbox.exports.createPositionHandleAdapter();
+panAdapter.refresh([panComponent], new Set([panComponent.node.uuid]), 3500);
+const panGizmo = panComponent.gizmo;
+const panCtrl = panGizmo.controllers[0];
+// User regression: middle-button pan after a 2D point drag leaves the Scene
+// operation stuck and subsequent left clicks cannot acquire the point.
+// Mouse button 1 must NEVER be treated as position or HUD drag input.
+const editsBeforePan = events.length;
+const previousRayCount = cam.rays;
+cam.panX = 75;
+cam.panY = 30;
+panGizmo.onNotGizmoMouseDown({ button: 1, x: 75, y: -30 });
+panGizmo.onGizmoMouseDown({ detail: { button: 1 }, x: 75, y: -30 });
+panCtrl.onControllerMouseDown({
+    getButton() { return 1; }, handleName: 'y', x: 75, y: -30,
+});
+panGizmo.onNotGizmoMouseMove({ buttons: 4, x: 75, y: -30 });
+panGizmo.onNotGizmoMouseUp({ button: 1 });
+panGizmo.onGizmoMouseUp({ button: 1 });
+assert.equal(panGizmo.diagnosticState().draggingPosition, false,
+    'Pan with middle mouse never starts or leaves a position drag');
+assert.deepEqual([panComponent.target.x, panComponent.target.y], [150, 0],
+    'Camera pan cannot modify serialized 2D point coordinates');
+assert.equal(events.length, editsBeforePan,
+    'Pan cannot start/end an undo transaction');
+assert.equal(cam.rays, previousRayCount,
+    'Pan is not interpreted as a position raycast');
+const syncBefore = cam.updates;
+panGizmo.onNotGizmoMouseDown({ button: 0, x: 75, y: -30 });
+assert.equal(panGizmo.diagnosticState().draggingPosition, true,
+    'Clicking screen-space marker after pan must start a new 2D drag');
+assert.ok(cam.updates > syncBefore,
+    'The Scene camera is synchronized before the post-pan raycast');
+panGizmo.onNotGizmoMouseMove({ buttons: 1, x: 100, y: -15 });
+panGizmo.onNotGizmoMouseUp({ button: 0 });
+assert.deepEqual([panComponent.target.x, panComponent.target.y], [180, 20],
+    'Marker remains draggable at its panned screen location with snap=10');
+panComponent.target = new Vec3(150, 0, 0);
+// The native +Y face is the main production route, not just the fallback
+// positionEntryAt path. Re-pan and acquire the native face directly.
+cam.panX = -45;
+cam.panY = 17;
+const nativeSyncBefore = cam.updates;
+panCtrl.onControllerMouseDown({ button: 0, handleName: 'y',
+    x: 195, y: -17 });
+assert.equal(panGizmo.diagnosticState().draggingPosition, true,
+    'Native BoxController can acquire a point after a second middle pan');
+assert.ok(cam.updates > nativeSyncBefore,
+    'Native down synchronizes the panned Scene camera before computing ray');
+panCtrl.onControllerMouseMove({ button: 0, x: 205, y: -7 });
+panCtrl.onControllerMouseUp({ button: 0 });
+assert.deepEqual([panComponent.target.x, panComponent.target.y], [160, 10],
+    'Native drag face follows camera-pan-adjusted screen coordinates');
+panComponent.target = new Vec3(150, 0, 0);
+cam.panX = 0;
+cam.panY = 0;
+panGizmo.refreshHandles();
+panAdapter.dispose();
+console.log('[pan-regression] middle pan does not capture drag, left/native drag recover after camera pan OK');
 
 console.log('[hud-adapter] toggle/checkbox clicks, slider drag and cancel, button dispatch and cleanup OK');
 
