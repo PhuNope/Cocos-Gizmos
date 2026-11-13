@@ -133,8 +133,9 @@ class ScreenHudMesh {
             // A dedicated RenderRoot2D submits this final HUD in the same UI
             // pass, after the user's Scene sprites, instead of relying on
             // 3D mesh sorting to outrank an unrelated UI batching pipeline.
+            let uiRoot: Node | null = null;
             try {
-                const uiRoot = new Node('CocosGizmosHudUIRoot');
+                uiRoot = new Node('CocosGizmosHudUIRoot');
                 uiRoot.layer = (Layers.Enum.UI_3D ?? 0) | Layers.Enum.GIZMOS;
                 root.addChild(uiRoot);
                 uiRoot.addComponent(RenderRoot2D);
@@ -157,7 +158,7 @@ class ScreenHudMesh {
                 renderer.enabled = false;
             } catch (error) {
                 console.warn('[cocos-gizmos/hud] UI pass unavailable; keeping Mesh HUD fallback:', error);
-                this.uiRoot?.destroy();
+                if (uiRoot?.isValid) uiRoot.destroy();
                 this.uiRoot = null;
                 this.uiSprite = null;
                 renderer.enabled = true;
@@ -290,6 +291,10 @@ class ScreenHudMesh {
             typeof target?.setWorldScale === 'function';
         try {
             if (canTransform) {
+                if (this.uiSprite?.node?.isValid) {
+                    this.uiSprite.node.active = true;
+                    this.renderer.enabled = false;
+                }
                 // Use one immutable unit quad. Only its Node transform changes
                 // during scroll, instead of creating/destroying GPU meshes
                 // every frame. This removes zoom stutter and picker drift.
@@ -322,6 +327,9 @@ class ScreenHudMesh {
                 return;
             }
             // Fallback for editors with an alternate Scene camera wrapper.
+            // The UI Sprite cannot be positioned without camera world rotation.
+            if (this.uiSprite?.node?.isValid) this.uiSprite.node.active = false;
+            this.renderer.enabled = true;
             const signature = verts.join(',');
             if (signature === this.geometrySignature && this.geometryMode === 'world') return;
             target?.setWorldPosition?.(new Vec3());
