@@ -2,7 +2,7 @@ import * as cocos from 'cc';
 import {
     CCObject, Color, Component, director, Director, gfx, ImageAsset, Layers,
     Material, Mesh, MeshRenderer, Node, Quat, RenderRoot2D,
-    Texture2D, utils, Vec2, Vec3,
+    Sprite, SpriteFrame, Texture2D, UITransform, utils, Vec2, Vec3,
 } from 'cc';
 import { Gizmos3D } from './Gizmos3D';
 import { Gizmos2D } from './Gizmos2D';
@@ -72,6 +72,9 @@ class ScreenHudMesh {
     private mesh: Mesh | null = null;
     private texture: Texture2D | null = null;
     private image: ImageAsset | null = null;
+    private uiRoot: Node | null = null;
+    private uiSprite: Sprite | null = null;
+    private uiFrame: SpriteFrame | null = null;
     private canvas: any = null;
     private contentSignature = '';
     private geometrySignature = '';
@@ -126,6 +129,39 @@ class ScreenHudMesh {
             this.root = root;
             this.renderer = renderer;
             this.material = material;
+            // 3D Sprite/Label belong to a later UI pass than MeshRenderer.
+            // A dedicated RenderRoot2D submits this final HUD in the same UI
+            // pass, after the user's Scene sprites, instead of relying on
+            // 3D mesh sorting to outrank an unrelated UI batching pipeline.
+            try {
+                const uiRoot = new Node('CocosGizmosHudUIRoot');
+                uiRoot.layer = (Layers.Enum.UI_3D ?? 0) | Layers.Enum.GIZMOS;
+                root.addChild(uiRoot);
+                uiRoot.addComponent(RenderRoot2D);
+                const spriteNode = new Node('CocosGizmosHudTopmost');
+                spriteNode.layer = uiRoot.layer;
+                uiRoot.addChild(spriteNode);
+                const sprite = spriteNode.addComponent(Sprite);
+                const transform = spriteNode.getComponent?.(UITransform) ||
+                    spriteNode.addComponent(UITransform);
+                transform.setAnchorPoint?.(0, 0);
+                const Sorting2D = (globalThis as any).cc?.Sorting2D;
+                if (typeof Sorting2D === 'function') {
+                    const sort: any = spriteNode.addComponent(Sorting2D);
+                    if (sort) sort.sortingOrder = 32767;
+                }
+                this.uiRoot = uiRoot;
+                this.uiSprite = sprite;
+                // The textured HUD is drawn in the 2D UI pass. Keep the Mesh
+                // fallback dormant so it doesn't darken the final HUD twice.
+                renderer.enabled = false;
+            } catch (error) {
+                console.warn('[cocos-gizmos/hud] UI pass unavailable; keeping Mesh HUD fallback:', error);
+                this.uiRoot?.destroy();
+                this.uiRoot = null;
+                this.uiSprite = null;
+                renderer.enabled = true;
+            }
             director.on(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
             this.registered = true;
             return true;
@@ -211,6 +247,13 @@ class ScreenHudMesh {
                 const texture = new Texture2D();
                 texture.image = image;
                 this.material?.setProperty('mainTexture', texture);
+                if (this.uiSprite) {
+                    const frame = new SpriteFrame();
+                    frame.texture = texture;
+                    this.uiSprite.spriteFrame = frame;
+                    this.uiFrame?.destroy();
+                    this.uiFrame = frame;
+                }
                 this.texture?.destroy();
                 this.image?.destroy();
                 this.texture = texture;
@@ -268,6 +311,14 @@ class ScreenHudMesh {
                 target.setWorldPosition(new Vec3(verts[0], verts[1], verts[2]));
                 target.setWorldRotation(rotation);
                 target.setWorldScale(new Vec3(dx, dy, 1));
+                if (this.uiSprite?.node?.isValid) {
+                    const overlayNode = this.uiSprite.node;
+                    const transform = overlayNode.getComponent?.(UITransform);
+                    transform?.setContentSize?.(this.width, this.height);
+                    overlayNode.setWorldPosition(new Vec3(verts[0], verts[1], verts[2]));
+                    overlayNode.setWorldRotation(rotation);
+                    overlayNode.setWorldScale(new Vec3(dx / this.width, dy / this.height, 1));
+                }
                 return;
             }
             // Fallback for editors with an alternate Scene camera wrapper.
@@ -300,6 +351,8 @@ class ScreenHudMesh {
         this.registered = false;
         if (this.renderer?.isValid) this.renderer.mesh = null;
         this.mesh?.destroy();
+        this.uiSprite && (this.uiSprite.spriteFrame = null);
+        this.uiFrame?.destroy();
         this.material?.destroy();
         this.texture?.destroy();
         this.image?.destroy();
@@ -308,6 +361,9 @@ class ScreenHudMesh {
         this.renderer = null;
         this.material = null;
         this.mesh = null;
+        this.uiRoot = null;
+        this.uiSprite = null;
+        this.uiFrame = null;
         this.texture = null;
         this.image = null;
         this.camera = null;
