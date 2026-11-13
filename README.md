@@ -1,5 +1,17 @@
 # Cocos-Gizmos
 
+## API reference inside Cocos Creator
+
+Open **Gizmos → OpenDoc** (next to **Reset Gizmos**) to browse the dockable
+API guide for Gizmos2D, Gizmos3D, Move/Point handles and HUD callbacks. It includes
+searchable TypeScript examples and self-contained SVG diagrams. It does not need
+Internet access and does not change project Scene assets.
+
+The installable extension ZIP does **not** bundle the repository `docs/`
+folder. Markdown development notes remain available in the repository; the
+installed guide is the OpenDoc panel.
+
+
 **API gọn cho Scene Editor:** `Gizmos3D.move('position')`,
 `Gizmos2D.point('point')`, `Gizmos2D.points('vertices', count)`.
 Undo/cancel được xử lý bởi Command Pattern. Xem

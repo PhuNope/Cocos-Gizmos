@@ -59,7 +59,16 @@ assert.match(entries.get('editor-runtime/GizmoHandlePresets.js') || '',
     /makeMoveGizmo/, 'Editor includes reusable descriptor factories');
 assert.match(entries.get('dist/GizmoHandlePresets.js') || '',
     /makePointGizmos/, 'Public ESM runtime includes descriptor factories');
-assert.match(entries.get('docs/ARCHITECTURE.md') || '',
-    /Command Pattern/, 'Installer ships architecture documentation');
+assert.ok([...entries.keys()].every(name => !name.startsWith('docs/')),
+    'Installed ZIP must exclude the repository docs directory');
+assert.ok(installed.contributions.menu.some(item =>
+    item.path === 'Gizmos' && item.label === 'OpenDoc' && item.message === 'open-doc'),
+    'Installed extension must expose Gizmos > OpenDoc beside Reset Gizmos');
+assert.equal(installed.panels.docs.main, './panels/docs/index.js');
+assert.deepEqual(installed.contributions.messages['open-doc'].methods, ['openDoc']);
+assert.match(entries.get('main.js') || '', /openDoc/);
+assert.match(entries.get('panels/docs/index.js') || '', /Gizmos OpenDoc/);
+assert.match(entries.get('panels/docs/index.js') || '', /<svg/);
+assert.match(entries.get('panels/docs/index.js') || '', /Gizmos3D.move/);
 assert.ok(!installed.contributions.messages['selection:select'].methods.includes('onSelectionUnselect'));
 console.log('[packaged-selection] extracted ZIP manifest, Scene event bridge, fullscreen HUD & native reentry OK');

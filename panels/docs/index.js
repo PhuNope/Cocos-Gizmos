@@ -1,0 +1,333 @@
+'use strict';
+
+// Self-contained Editor-only reference: no external images, network calls or game assets.
+// SVG illustrations are explanatory diagrams, not Scene screenshots.
+const drawings = {
+    move: '<svg viewBox="0 0 480 174" role="img" aria-label="Move Gizmo with X Y Z axes and XY XZ YZ plane squares" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="174" rx="12" fill="#161f2c"/><g stroke-linecap="round" stroke-width="5"><line x1="222" y1="125" x2="409" y2="125" stroke="#ff606b"/><line x1="222" y1="125" x2="222" y2="20" stroke="#53de7d"/><line x1="222" y1="125" x2="105" y2="161" stroke="#5a9eff"/></g><path d="M409 125l-17 -9v18z" fill="#ff606b"/><path d="M222 20l-9 18h18z" fill="#53de7d"/><path d="M105 161l20 -2 -6 -17z" fill="#5a9eff"/><path d="M236 108h20v20h-20z" fill="#f6d85c" stroke="#fff5ba"/><path d="M209 119l-20 7 -9 9 20 -7z" fill="#79a8fc" stroke="#a8c7ff"/><path d="M208 103l14 -6v20l-14 6z" fill="#e38cce" stroke="#f7b1dd"/><circle cx="222" cy="125" r="7" fill="#f3f6fa" stroke="#172033" stroke-width="2"/><g font-family="Arial,sans-serif" font-size="15" font-weight="700"><text x="415" y="130" fill="#ff8791">X</text><text x="233" y="26" fill="#73f8a0">Y</text><text x="83" y="157" fill="#91bdff">Z</text><text x="276" y="107" fill="#fbe78d">XY</text><text x="145" y="144" fill="#8db8ff">XZ</text><text x="183" y="88" fill="#f0a2d8">YZ</text></g></svg>',
+    shapes2d: '<svg viewBox="0 0 480 174" role="img" aria-label="Outline circle, solid rectangle, ellipse and Bezier curve" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="174" rx="12" fill="#162131"/><g stroke="#53d7f5" stroke-width="3" fill="none"><circle cx="76" cy="76" r="36"/><ellipse cx="227" cy="76" rx="48" ry="28"/><rect x="335" y="39" width="86" height="73" rx="3"/></g><rect x="348" y="52" width="61" height="47" fill="#f8a06d" opacity=".72"/><path d="M24 148 Q95 88 155 148 T287 143 T458 144" fill="none" stroke="#f782d9" stroke-width="3"/><g fill="#cad9e9" font-family="Arial,sans-serif" font-size="12"><text x="52" y="130">Circle</text><text x="208" y="130">Ellipse</text><text x="362" y="130">Rect</text></g></svg>',
+    shapes3d: '<svg viewBox="0 0 480 174" role="img" aria-label="Sphere, box, cylinder, cone and wireframe 3D Gizmo shapes" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="174" rx="12" fill="#172132"/><g fill="none" stroke-width="2.3" stroke-linejoin="round"><circle cx="82" cy="80" r="47" stroke="#ffd066"/><ellipse cx="82" cy="80" rx="23" ry="47" stroke="#ffd066" opacity=".7"/><ellipse cx="82" cy="80" rx="47" ry="15" stroke="#ffd066" opacity=".7"/><path d="M177 54l53 -24 52 26 -52 27zM177 54v58l53 28V83M230 140l52 -29V56" stroke="#6fe0f0"/><path d="M340 53q37 -22 75 0v62q-38 23 -75 0zM340 53q35 25 75 0M340 115q35 -24 75 0" stroke="#f49bd6"/></g><g fill="#cad9e9" font-family="Arial,sans-serif" font-size="12"><text x="62" y="147">Sphere</text><text x="210" y="156">Box</text><text x="351" y="147">Cylinder</text></g></svg>',
+    handles2d: '<svg viewBox="0 0 480 174" role="img" aria-label="Editable points on a 2D polyline" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="174" rx="12" fill="#192335"/><path d="M67 117L168 52L284 101L394 37" fill="none" stroke="#79d6f7" stroke-width="3"/><g stroke="#e9fcff" stroke-width="3"><circle cx="67" cy="117" r="10" fill="#0acbd1"/><circle cx="168" cy="52" r="10" fill="#fbd76e"/><circle cx="284" cy="101" r="10" fill="#0acbd1"/><circle cx="394" cy="37" r="10" fill="#0acbd1"/></g><circle cx="168" cy="52" r="22" fill="none" stroke="#ffd770" stroke-dasharray="5 5" opacity=".65"/><text x="162" y="96" fill="#fbd76e" font-size="13" font-family="Arial,sans-serif">Drag</text></svg>',
+    hud: '<svg viewBox="0 0 480 174" role="img" aria-label="Scene HUD with text, slider, toggle, checkbox and button" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="174" rx="12" fill="#142031"/><rect x="20" y="17" width="440" height="140" rx="8" fill="#253248" stroke="#5f7795"/><text x="37" y="42" fill="#fff4a5" font-family="Arial,sans-serif" font-size="17" font-weight="700">Gizmos HUD</text><text x="37" y="74" fill="#dfebff" font-family="Arial,sans-serif" font-size="13">Radius</text><rect x="120" y="64" width="206" height="6" rx="3" fill="#50637a"/><rect x="120" y="64" width="134" height="6" rx="3" fill="#63b3ff"/><rect x="250" y="59" width="9" height="16" rx="2" fill="#e3efff"/><text x="337" y="73" fill="#dfebff" font-size="13">45</text><rect x="37" y="90" width="36" height="19" rx="9" fill="#4dd18a"/><circle cx="62" cy="99.5" r="7" fill="#fff"/><text x="85" y="103" fill="#dfebff" font-size="13">Visible</text><rect x="218" y="91" width="17" height="17" rx="2" fill="#63b3ff"/><path d="M222 99l4 4 6-9" stroke="#11233c" stroke-width="2" fill="none"/><text x="242" y="104" fill="#dfebff" font-size="13">Labels</text><rect x="37" y="119" width="106" height="26" rx="4" fill="#49617d"/><text x="58" y="137" fill="#fff" font-size="13">Reset</text></svg>',
+    labels: '<svg viewBox="0 0 480 174" role="img" aria-label="Position label and sprite annotation above a scene object" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="174" rx="12" fill="#142233"/><g stroke="#7b91aa" stroke-width="2" fill="none"><path d="M36 141l186 -84 218 83M222 57v89"/><path d="M78 140l164 -72 151 72"/></g><circle cx="222" cy="117" r="10" fill="#ffda7c"/><path d="M222 105v-28" stroke="#e7f3ff" stroke-dasharray="4 4"/><rect x="132" y="26" width="219" height="31" rx="7" fill="#344e70" stroke="#80b9fa"/><text x="146" y="46" fill="#f1f8ff" font-size="14" font-family="Arial,sans-serif">Pos X: 1.25  Y: 2  Z: 3</text></svg>',
+};
+const examples = Object.freeze([
+    {
+        id: 'start', group: 'start', heading: 'Bắt đầu với Scene Gizmos',
+        summary: 'Gọi API trong callback của Component, không dùng trong top-level initializer. Không cần import Gizmos2D/Gizmos3D; extension cung cấp globals.',
+        apis: ['onDrawGizmos', 'onDrawGizmosSelected', 'onGizmoSettings', 'beginColor', 'beginLocalPosition', 'endLocalPosition'],
+        figure: 'shapes2d', caption: 'Hình minh họa các primitive trong Scene View',
+        code: [
+            "import { _decorator, Component, Color, Vec2 } from 'cc';",
+            'const { ccclass } = _decorator;',
+            "@ccclass('GizmoIntro')",
+            'export class GizmoIntro extends Component {',
+            '  onGizmoSettings(): GizmoViewSettings {',
+            "    return { display: 'always', hud: 'selected' };",
+            '  }',
+            '  onDrawGizmos(): void {',
+            '    Gizmos2D.beginColor(this.node, Color.CYAN);',
+            '    Gizmos2D.beginLocalPosition(this.node);',
+            '    Gizmos2D.drawCircle(this.node, Vec2.ZERO, 40);',
+            '    Gizmos2D.endLocalPosition(this.node);',
+            '  }',
+            '}',
+        ].join('\n'),
+    },
+    {
+        id: 'shapes2d', group: '2d', heading: 'Gizmos2D: hình cơ bản',
+        summary: 'Đường, đa giác, hình tròn, elip, chữ nhật, cung và vùng tô. Vẽ trong onDrawGizmos() để thấy cả khi chưa chọn node.',
+        apis: ['drawLine', 'drawLineList', 'drawCircle', 'drawSolidCircle', 'drawRect', 'drawSolidRect', 'drawEllipse', 'drawSolidEllipse', 'drawArc', 'drawSolidArc', 'drawSolidPolygon'],
+        figure: 'shapes2d', caption: 'Circle / Ellipse / Rect / đường cong (sơ đồ)',
+        code: [
+            "import { Color, Vec2 } from 'cc';",
+            'onDrawGizmos(): void {',
+            '  const n = this.node;',
+            '  Gizmos2D.beginLocalPosition(n);',
+            '  Gizmos2D.beginColor(n, Color.CYAN);',
+            '  Gizmos2D.drawCircle(n, new Vec2(0, 0), 45);',
+            '  Gizmos2D.drawRect(n, new Vec2(70, -30), 75, 60);',
+            '  Gizmos2D.beginColor(n, Color.YELLOW);',
+            '  Gizmos2D.drawSolidCircle(n, new Vec2(-90, 0), 15);',
+            '  Gizmos2D.endLocalPosition(n);',
+            '}',
+        ].join('\n'),
+    },
+    {
+        id: 'curves2d', group: '2d', heading: 'Gizmos2D: đường cong & annotation',
+        summary: 'Bezier, quadratic curve, label và sprite có ID ổn định; label hỗ trợ giới hạn kích thước khi zoom.',
+        apis: ['drawBezierCurves', 'drawQuadraticCurve', 'drawSprite', 'drawLabel', 'beginLayer', 'DEFAULT_LAYER'],
+        figure: 'labels', caption: 'Nhãn gắn với vị trí trong Scene View',
+        code: [
+            "import { Color, Vec2 } from 'cc';",
+            'onDrawGizmos(): void {',
+            '  const n = this.node;',
+            '  Gizmos2D.beginColor(n, Color.MAGENTA);',
+            '  Gizmos2D.drawQuadraticCurve(n,',
+            '    new Vec2(-100, 0), new Vec2(0, 100), new Vec2(100, 0));',
+            "  Gizmos2D.drawLabel(n, 'tip', 'Editable path',",
+            '    new Vec2(0, 120), 18, Vec2.ONE, 12, 24);',
+            '}',
+        ].join('\n'),
+    },
+    {
+        id: 'shapes3d', group: '3d', heading: 'Gizmos3D: khối và wireframe',
+        summary: 'Các primitive dùng tọa độ Vec3; thay đổi màu theo node và bật/tắt depth test khi cần.',
+        apis: ['drawSphere', 'drawBox', 'drawCircle', 'drawDisc', 'drawPolygon', 'drawCylinder', 'drawCone', 'drawCapsule', 'drawOctahedron', 'drawCross', 'setDepTest'],
+        figure: 'shapes3d', caption: 'Sphere / Box / Cylinder (sơ đồ, không phải ảnh Scene)',
+        code: [
+            "import { Color, Vec3 } from 'cc';",
+            'onDrawGizmos(): void {',
+            '  const n = this.node, p = n.worldPosition;',
+            '  Gizmos3D.setDepTest(n, false);',
+            '  Gizmos3D.beginColor(n, Color.YELLOW);',
+            '  Gizmos3D.drawSphere(n, p, 1, true);',
+            '  Gizmos3D.drawBox(n,',
+            '    new Vec3(p.x + 3, p.y, p.z), new Vec3(2, 2, 2));',
+            '  Gizmos3D.setDepTest(n, true);',
+            '}',
+        ].join('\n'),
+    },
+    {
+        id: 'curves3d', group: '3d', heading: 'Gizmos3D: vector, mesh & labels',
+        summary: 'Line/arrow/quad, đường cong 3D, mesh; nhãn vị trí có min/max kích thước trong screen pixels.',
+        apis: ['drawLine', 'drawLineList', 'drawDashLine', 'drawDashLineList', 'drawArrow', 'drawQuad', 'drawBezier', 'drawSpline', 'drawMesh', 'drawSprite', 'drawLabel', 'drawPositionLabel', 'drawPlanePreview'],
+        figure: 'labels', caption: 'Một nhãn tọa độ cố định kích thước khi zoom',
+        code: [
+            "import { Color, Vec3 } from 'cc';",
+            'onDrawGizmosSelected(): void {',
+            '  const n = this.node;',
+            '  Gizmos3D.beginColor(n, Color.CYAN);',
+            '  Gizmos3D.drawArrow(n, n.worldPosition,',
+            '    new Vec3(n.worldPosition.x + 2,',
+            '      n.worldPosition.y, n.worldPosition.z), 0.2);',
+            "  Gizmos3D.drawPositionLabel(n, 'pos', n.worldPosition,",
+            '    { offsetPixels: 82, minSize: 12, maxSize: 22 });',
+            '}',
+        ].join('\n'),
+    },
+    {
+        id: 'move', group: 'handles', heading: 'Gizmos3D.move(): Move Object Position',
+        summary: 'Một lời gọi tạo 3 arrow X/Y/Z và 3 plane XY/XZ/YZ. Kéo tự do mặc định, hỗ trợ Undo và snap tùy chọn.',
+        apis: ['Gizmos3D.move', 'onGizmoHandles', 'onGizmoChanged', 'axisSize', 'planeSize', 'planeOffset', 'boxSize', 'snap'],
+        figure: 'move', caption: 'Sơ đồ Move Gizmo với arrow và các ô chọn plane sát tâm',
+        code: [
+            "import { _decorator, Component, Vec3 } from 'cc';",
+            "const { ccclass, property } = _decorator;",
+            "@ccclass('MoveExample')",
+            'export class MoveExample extends Component {',
+            '  @property({ type: Vec3 })',
+            '  targetPosition = new Vec3();',
+            '  onGizmoHandles(): GizmoHandleList {',
+            "    return [...Gizmos3D.move('targetPosition', {",
+            "      space: 'local', axisSize: 66, pickSize: 24,",
+            '      planeSize: 18, planeOffset: 14,',
+            '      showPositionLabel: true,',
+            '    })];',
+            '  }',
+            '}',
+        ].join('\n'),
+    },
+    {
+        id: 'points', group: 'handles', heading: 'Gizmos2D.point() và points()',
+        summary: 'Điểm có thể kéo trong Scene; dùng point() cho Vec3 và points() cho Vec3[]. Không khai báo snap nếu muốn kéo liên tục.',
+        apis: ['Gizmos2D.point', 'Gizmos2D.points', 'GizmoHandleDescriptor', 'plane', 'bounds', 'space', 'pickSize'],
+        figure: 'handles2d', caption: 'Các điểm chỉnh sửa dọc một polyline',
+        code: [
+            "import { _decorator, Component, Vec3 } from 'cc';",
+            'const { ccclass, property } = _decorator;',
+            "@ccclass('PathExample')",
+            'export class PathExample extends Component {',
+            '  @property({ type: Vec3 }) point = new Vec3();',
+            '  @property({ type: [Vec3] }) waypoints: Vec3[] = [];',
+            '  onGizmoHandles(): GizmoHandleList {',
+            '    return [',
+            "      Gizmos2D.point('point', { color: '#ffcc00' }),",
+            "      ...Gizmos2D.points('waypoints', this.waypoints.length),",
+            '    ];',
+            '  }',
+            '}',
+        ].join('\n'),
+    },
+    {
+        id: 'hud', group: 'hud', heading: 'Scene HUD: text và controls',
+        summary: 'Tạo HUD từ callback để hiển thị nhãn và tương tác: slider, toggle, checkbox, button.',
+        apis: ['onGizmoHud', 'onGizmoHudControls', 'onGizmoHudAction', 'onGizmoHudChanged', 'GizmoHudItem', 'GizmoHudControlList'],
+        figure: 'hud', caption: 'Minh họa HUD gồm slider, toggle, checkbox và nút bấm',
+        code: [
+            'onGizmoHud(): GizmoHudItem[] {',
+            "  return [{ id: 'title', text: 'Edit my gizmo', order: 0 }];",
+            '}',
+            'onGizmoHudControls(): GizmoHudControlList {',
+            '  return [',
+            "    { type: 'slider', id: 'size', text: 'Size',",
+            "      property: 'size', min: 0, max: 100 },",
+            "    { type: 'checkbox', id: 'visible', text: 'Visible',",
+            "      property: 'visible' },",
+            "    { type: 'button', id: 'reset', text: 'Reset' },",
+            '  ];',
+            '}',
+            'onGizmoHudAction(id: string): void {',
+            "  if (id === 'reset') this.size = 25;",
+            '}',
+        ].join('\n'),
+    },
+]);
+const groups = [
+    ['all', 'Tất cả'],
+    ['start', 'Bắt đầu'],
+    ['2d', '2D'],
+    ['3d', '3D'],
+    ['handles', 'Move / Points'],
+    ['hud', 'HUD'],
+];
+function html(value) {
+    return String(value).replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[ch]));
+}
+function renderExample(example) {
+    const keywords = [
+        example.heading, example.summary, example.apis.join(' '), example.code,
+    ].join(' ').toLowerCase();
+    return [
+        '<article class="cg-api-card" data-doc-group="', html(example.group),
+        '" data-doc-search="', html(keywords), '">',
+        '<div class="cg-api-card-head"><h2>', html(example.heading), '</h2>',
+        '<button class="cg-copy" type="button" data-doc-copy="', html(example.id),
+        '" aria-label="Sao chép ví dụ ', html(example.heading), '">Copy code</button></div>',
+        '<p class="cg-desc">', html(example.summary), '</p>',
+        '<figure class="cg-figure">', drawings[example.figure],
+        '<figcaption>', html(example.caption), '</figcaption></figure>',
+        '<pre class="cg-code"><code>', html(example.code), '</code></pre>',
+        '<div class="cg-tags">',
+        example.apis.map(api => '<code>' + html(api) + '</code>').join(''),
+        '</div></article>',
+    ].join('');
+}
+exports.template = [
+    '<main class="cg-docs">',
+    '<header class="cg-hero"><span class="cg-eyebrow">COCOS-GIZMOS · EDITOR API</span>',
+    '<h1>Gizmos OpenDoc</h1><p>Tra cứu API, ví dụ TypeScript và sơ đồ minh họa ngay trong Cocos Creator.</p>',
+    '<p class="cg-hint">Gizmos chỉ vẽ trong Scene Editor; callback có thể tồn tại trong component mà không chạy trong game.</p></header>',
+    '<div class="cg-toolbar"><label for="cg-doc-search">Tìm API</label>',
+    '<input id="cg-doc-search" type="search" placeholder="move, drawCircle, HUD, plane..." autocomplete="off" /></div>',
+    '<nav class="cg-nav" id="cg-doc-tabs" aria-label="Nhóm API">',
+    groups.map(([id, label], i) => '<button type="button" data-doc-tab="' +
+        id + '" aria-pressed="' + (i === 0 ? 'true' : 'false') + '">' + label + '</button>').join(''),
+    '</nav>',
+    '<section id="cg-doc-cards" class="cg-grid" aria-label="API examples">',
+    examples.map(renderExample).join(''),
+    '</section>',
+    '<p id="cg-doc-empty" hidden>Không tìm thấy API phù hợp. Thử từ khóa khác.</p>',
+    '<p id="cg-doc-status" class="cg-status" role="status" aria-live="polite"></p>',
+    '<footer class="cg-footer">Hình minh họa là sơ đồ SVG, không phải ảnh chụp Scene. ',
+    'Các ví dụ gọi Gizmos trong callback Editor. API đầy đủ xem tên hàm bên dưới mỗi ví dụ.</footer>',
+    '</main>',
+].join('');
+
+exports.style = [
+    '.cg-docs { box-sizing:border-box; height:100%; min-height:250px; overflow-y:auto;',
+    '  padding:18px; background:var(--color-normal, #171f2a); color:var(--color-normal-fill, #e8eff9);',
+    '  font:13px/1.55 sans-serif; }',
+    '.cg-docs * { box-sizing:border-box; }',
+    '.cg-hero { padding:18px 20px; background:linear-gradient(120deg,#21314c,#192c39);',
+    '  border:1px solid #354c69; border-radius:12px; }',
+    '.cg-eyebrow { color:#7ecbff; font-size:10px; letter-spacing:.14em; font-weight:700; }',
+    '.cg-hero h1 { color:#f3f7ff; font-size:24px; margin:3px 0 6px; }',
+    '.cg-hero p { color:#cfdaea; margin:6px 0; }',
+    '.cg-hero .cg-hint { color:#a9c7dc; font-size:12px; }',
+    '.cg-toolbar { margin:16px 0 9px; display:flex; align-items:center; gap:12px; }',
+    '.cg-toolbar label { font-weight:700; white-space:nowrap; }',
+    '#cg-doc-search { min-width:0; flex:1; border-radius:6px; border:1px solid #54718a;',
+    '  padding:9px 11px; background:#111c2b; color:#fff; font:inherit; }',
+    '.cg-nav { display:flex; flex-wrap:wrap; gap:7px; margin:0 0 16px; }',
+    '.cg-nav button,.cg-copy { color:#dceaf9; border:1px solid #59738e; border-radius:6px;',
+    '  padding:6px 11px; background:#2b4059; cursor:pointer; font:inherit; }',
+    '.cg-nav button[aria-pressed="true"] { color:#071b28; background:#8fdbf5; border-color:#8fdbf5; font-weight:700; }',
+    '.cg-nav button:focus-visible,.cg-copy:focus-visible { outline:2px solid #a1e6ff; outline-offset:2px; }',
+    '.cg-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); gap:14px; }',
+    '.cg-api-card { min-width:0; padding:14px; border-radius:10px; border:1px solid #354b63; background:#202c3d; }',
+    '.cg-api-card[hidden], #cg-doc-empty[hidden] { display:none !important; }',
+    '.cg-api-card-head { display:flex; gap:8px; justify-content:space-between; align-items:flex-start; }',
+    '.cg-api-card h2 { font-size:16px; color:#f5f9ff; margin:0; line-height:1.35; }',
+    '.cg-copy { white-space:nowrap; font-size:11px; padding:5px 8px; }',
+    '.cg-desc { margin:9px 0; color:#c0d0e3; min-height:35px; }',
+    '.cg-figure { margin:12px 0; } .cg-figure svg { display:block; width:100%; height:auto; max-height:180px; }',
+    '.cg-figure figcaption { font-size:11px; margin-top:4px; color:#9fb7d1; }',
+    '.cg-code { overflow-x:auto; background:#101927; border:1px solid #394a62;',
+    '  color:#d0f2f2; border-radius:7px; padding:12px; margin:9px 0; font:12px/1.5 monospace; }',
+    '.cg-tags { display:flex; flex-wrap:wrap; gap:5px; }',
+    '.cg-tags code { display:inline-block; font:11px/1.45 monospace; padding:3px 6px;',
+    '  background:#30455b; color:#b8ddff; border-radius:4px; }',
+    '.cg-status { color:#acdff0; min-height:20px; }',
+    '.cg-footer { font-size:11px; margin-top:10px; color:#9db4c9; }',
+    '@media(max-width:520px) { .cg-docs { padding:10px; } .cg-hero { padding:13px; }',
+    '  .cg-api-card { padding:10px; } .cg-api-card-head { flex-wrap:wrap; } }',
+].join('\n');
+
+exports.$ = {
+    search: '#cg-doc-search',
+    tabs: '#cg-doc-tabs',
+    cards: '#cg-doc-cards',
+    empty: '#cg-doc-empty',
+    status: '#cg-doc-status',
+};
+exports.ready = function ready() {
+    const host = this;
+    const ui = host.$;
+    host._cgDocGroup = 'all';
+    const refresh = () => {
+        const term = String(ui.search.value || '').trim().toLowerCase();
+        const items = ui.cards.querySelectorAll('.cg-api-card');
+        let count = 0;
+        for (const card of items) {
+            const match = (host._cgDocGroup === 'all' ||
+                card.dataset.docGroup === host._cgDocGroup) &&
+                (card.dataset.docSearch || '').includes(term);
+            card.hidden = !match;
+            if (match) count++;
+        }
+        ui.empty.hidden = count !== 0;
+        for (const tab of ui.tabs.querySelectorAll('[data-doc-tab]')) {
+            tab.setAttribute('aria-pressed', String(tab.dataset.docTab === host._cgDocGroup));
+        }
+    };
+    const onSearch = () => refresh();
+    const onTab = event => {
+        const tab = event.target?.closest?.('[data-doc-tab]');
+        if (!tab || !groups.some(([id]) => id === tab.dataset.docTab)) return;
+        host._cgDocGroup = tab.dataset.docTab;
+        refresh();
+    };
+    const onCopy = async event => {
+        const button = event.target?.closest?.('[data-doc-copy]');
+        if (!button) return;
+        const item = examples.find(value => value.id === button.dataset.docCopy);
+        if (!item) return;
+        try {
+            const clipboard = globalThis.navigator?.clipboard;
+            if (!clipboard || typeof clipboard.writeText !== 'function') {
+                ui.status.textContent = 'Clipboard chưa khả dụng trong Editor; bạn có thể chọn code để copy.';
+                return;
+            }
+            await clipboard.writeText(item.code);
+            ui.status.textContent = 'Đã sao chép ví dụ: ' + item.heading;
+        } catch (error) {
+            ui.status.textContent = 'Không thể copy: ' + String(error?.message || error);
+        }
+    };
+    host._cgDocSearch = onSearch;
+    host._cgDocTabClick = onTab;
+    host._cgDocCopyClick = onCopy;
+    ui.search.addEventListener('input', onSearch);
+    ui.tabs.addEventListener('click', onTab);
+    ui.cards.addEventListener('click', onCopy);
+    refresh();
+};
+exports.close = function close() {
+    const ui = this.$;
+    if (this._cgDocSearch) ui.search.removeEventListener('input', this._cgDocSearch);
+    if (this._cgDocTabClick) ui.tabs.removeEventListener('click', this._cgDocTabClick);
+    if (this._cgDocCopyClick) ui.cards.removeEventListener('click', this._cgDocCopyClick);
+    this._cgDocSearch = this._cgDocTabClick = this._cgDocCopyClick = null;
+};

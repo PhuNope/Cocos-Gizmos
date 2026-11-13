@@ -32,6 +32,7 @@ const manifest = {
   main: './main.js',
   panels: {
     settings: { title: 'Gizmos Settings', type: 'dockable', main: './panels/settings/index.js' },
+    docs: { title: 'Gizmos OpenDoc', type: 'dockable', main: './panels/docs/index.js' },
   },
   // The Scene Script is Editor-only: unlike asset-db mounts, it is never
   // included in the Cocos game script graph.
@@ -41,10 +42,12 @@ const manifest = {
     'asset-db': { mount: { path: './editor-assets', readonly: true } },
     menu: [
       { path: 'Gizmos', label: 'Reset Gizmos', message: 'reset-gizmos' },
+      { path: 'Gizmos', label: 'OpenDoc', message: 'open-doc' },
       { path: 'Gizmos', label: 'Gizmos Settings', message: 'open-settings' },
     ],
     messages: {
       'reset-gizmos': { methods: ['resetGizmos'] },
+      'open-doc': { methods: ['openDoc'] },
       'open-settings': { methods: ['openSettings'] },
       'get-settings': { methods: ['getSettings'] },
       'set-settings': { methods: ['setSettings'] },
@@ -57,7 +60,7 @@ const manifest = {
     },
   },
 };
-const usage = `# Cocos-Gizmos v${pkg.version}\n\nCocos Creator extension providing global Gizmos2D and Gizmos3D.\n\n## Install\n\n1. In Cocos Creator 3.8.2+, open Extensions > Extension Manager.\n2. Select the Project or Global tab, choose Import Extension (+), and select this ZIP.\n3. Enable the Cocos-Gizmos extension and allow the Asset Database to finish importing.\n\nEditor-only Scene Script runs Gizmos outside the game Asset Database, so runtime JS is not imported into game builds. The build hook removes only onDrawGizmos and onDrawGizmosSelected from compiled game JS. Other calls are not checked or modified. The JavaScript module must be evaluated before using the runtime globals. Use Gizmos2D and Gizmos3D inside lifecycle callbacks after startup; don't reference them in top-level initializers.\n\n## Drag-and-drop demo Components\n\nAfter enabling the extension, open the Cocos Assets panel > cocos-gizmos > Examples. Select a Scene Node, then drag CocosGizmos2DDemo.ts, CocosGizmos3DDemo.ts or CocosGizmosSmokeDemo.ts onto the Node's Inspector. If the files do not appear, use Extensions > Gizmos Settings > Check example assets to inspect both Asset Database import status and Scene Component class registration. Both should show imported/registered before manual drag-and-drop testing. Re-selecting a 2D Node should restore all drag points. The HUD uses a fixed full-width textured Gizmo overlay at the bottom of the Scene View (not Canvas Labels), with 12-24px bounded text, screen-space controls and proper camera projection. Scene selection:select/unselect events restore drag handles when selection goes empty then returns to the same Node. Use the new top-level Gizmos > Reset Gizmos menu to rebuild editor-only controllers and HUD after a Scene failure, without touching Scene assets. Use Gizmos > Gizmos Settings for diagnostics if the Scene camera or Gizmo bridge is unavailable. These demo scripts are mounted read-only and use stable UUIDs. For editable copies, use the separate examples/ folder. Remove test Components before shipping; disabling the extension makes Scenes referencing them lose those scripts.\n\nTypes are in dist/Gizmos.d.ts. Cocos Creator's engine provides cc and cc/env.\n\nSource: https://github.com/PhuNope/Cocos-Gizmos\n`;
+const usage = `# Cocos-Gizmos v${pkg.version}\n\nCocos Creator extension providing global Gizmos2D and Gizmos3D.\n\n## Install\n\n1. In Cocos Creator 3.8.2+, open Extensions > Extension Manager.\n2. Select the Project or Global tab, choose Import Extension (+), and select this ZIP.\n3. Enable the Cocos-Gizmos extension and allow the Asset Database to finish importing.\n\nEditor-only Scene Script runs Gizmos outside the game Asset Database, so runtime JS is not imported into game builds. The build hook removes only onDrawGizmos and onDrawGizmosSelected from compiled game JS. Other calls are not checked or modified. The JavaScript module must be evaluated before using the runtime globals. Use Gizmos2D and Gizmos3D inside lifecycle callbacks after startup; don't reference them in top-level initializers.\n\n## Drag-and-drop demo Components\n\nAfter enabling the extension, open the Cocos Assets panel > cocos-gizmos > Examples. Select a Scene Node, then drag CocosGizmos2DDemo.ts, CocosGizmos3DDemo.ts or CocosGizmosSmokeDemo.ts onto the Node's Inspector. If the files do not appear, use Extensions > Gizmos Settings > Check example assets to inspect both Asset Database import status and Scene Component class registration. Both should show imported/registered before manual drag-and-drop testing. Re-selecting a 2D Node should restore all drag points. The HUD uses a fixed full-width textured Gizmo overlay at the bottom of the Scene View (not Canvas Labels), with 12-24px bounded text, screen-space controls and proper camera projection. Scene selection:select/unselect events restore drag handles when selection goes empty then returns to the same Node. Use the new top-level Gizmos > Reset Gizmos menu to rebuild editor-only controllers and HUD after a Scene failure, without touching Scene assets. Use Gizmos > OpenDoc for API examples and diagrams, or Gizmos > Gizmos Settings for diagnostics if the Scene camera or Gizmo bridge is unavailable. These demo scripts are mounted read-only and use stable UUIDs. For editable copies, use the separate examples/ folder. Remove test Components before shipping; disabling the extension makes Scenes referencing them lose those scripts.\n\nTypes are in dist/Gizmos.d.ts. Cocos Creator's engine provides cc and cc/env.\n\nSource: https://github.com/PhuNope/Cocos-Gizmos\n`;
 
 // Standards-compliant ZIP using only Node built-ins; no extra zip executable
 // and no dependency required on Windows, macOS or Linux.
@@ -141,12 +144,11 @@ const entries = [
   ['examples/GizmoSmokeProbe.ts', readFileSync(path.join(ROOT, 'assets', 'GizmoSmokeProbe.ts'))],
   ['examples/Gizmos2DApiTest.ts', readFileSync(path.join(ROOT, 'assets', 'Gizmos2DApiTest.ts'))],
   ['examples/Gizmos3DApiTest.ts', readFileSync(path.join(ROOT, 'assets', 'Gizmos3DApiTest.ts'))],
-  ['docs/EDITOR_SMOKE_TEST.md', readFileSync(path.join(ROOT, 'docs', 'EDITOR_SMOKE_TEST.md'))],
-  ['docs/MOVE_GIZMO.md', readFileSync(path.join(ROOT, 'docs', 'MOVE_GIZMO.md'))],
-  ['docs/ARCHITECTURE.md', readFileSync(path.join(ROOT, 'docs', 'ARCHITECTURE.md'))],
+  // docs/ lives in the repository only. Installed users browse APIs through OpenDoc.
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
   ['scene.js', readFileSync(path.join(ROOT, 'scene.js'))],
   ['panels/settings/index.js', readFileSync(path.join(ROOT, 'panels/settings/index.js'))],
+  ['panels/docs/index.js', readFileSync(path.join(ROOT, 'panels/docs/index.js'))],
   ...['Define.js', 'GizmoDiagnostics.js', 'GizmoExampleClassDiagnostics.js', 'SceneGizmoInput.js', 'GizmoEditSession.js', 'GizmoPresentation.js', 'GizmoHudControls.js', 'GizmoHudLayout.js', 'GizmoHudProjection.js', 'SceneCameraBridge.js', 'GizmoHudOverlay.js', 'GizmoPresentationService.js', 'GizmoMoveCommand.js', 'GizmoHandlePresets.js', 'PositionDragSolver.js', 'PlaneHandleGeometry.js', 'AxisHandleGeometry.js', 'MoveHitGeometry.js', 'PositionHandles.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos2D.js', 'Gizmos3D.js']
     .map(name => ['editor-runtime/' + name, readFileSync(path.join(ROOT, 'editor-runtime', name))]),
   ['builder.js', readFileSync(path.join(ROOT, 'builder.js'))],
@@ -219,7 +221,7 @@ mkdirSync(outDir, { recursive: true });
 const outFile = path.join(outDir, `Cocos-Gizmos-v${pkg.version}.zip`);
 // The installed manifest is generated here, not copied from package.json.
 const installed = JSON.parse(String(entries.find(([name]) => name === 'package.json')?.[1] || '{}'));
-for (const event of ['reset-gizmos', 'selection:select', 'selection:unselect']) {
+for (const event of ['reset-gizmos', 'open-doc', 'selection:select', 'selection:unselect']) {
   if (!installed.contributions?.messages?.[event]?.methods?.length) {
     throw new Error('[pack] Missing required Scene selection event in release ZIP: ' + event);
   }

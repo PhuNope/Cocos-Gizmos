@@ -223,6 +223,9 @@ exports.methods = {
     openSettings() {
         return globalThis.Editor?.Panel?.open?.('cocos-gizmos.settings');
     },
+    openDoc() {
+        return globalThis.Editor?.Panel?.open?.('cocos-gizmos.docs');
+    },
     async getDiagnostics() {
         return globalThis.Editor.Message.request('scene', 'execute-scene-script', {
             name: 'cocos-gizmos',
