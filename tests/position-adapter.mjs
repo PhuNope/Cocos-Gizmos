@@ -70,9 +70,19 @@ class Base {
             _editHandlesShape: { children: [{ name: 'x', active: true }, { name: 'y', active: true }] },
             _wireFrameBoxNode: { active: true },
             _wireFrameBoxMeshRenderer: { enabled: true },
-            setColor() {}, setEditHandlesColor() {}, setHandleColor() {}, setOpacity() {},
-            initEditHandles() { throw new Error('topNode: unsafe initEditHandles'); },
-            showEditHandles() { throw new Error('topNode: unsafe showEditHandles'); },
+            setColor() {}, setEditHandlesColor() {}, setOpacity() {},
+            setHandleColor(name, color, opacity) {
+                this.lastNativeFaceColor = { name, color, opacity };
+            },
+            editInitCount: 0, editShowCount: 0,
+            initEditHandles() {
+                this.editInitCount++;
+                this._handleDataMap.y = {
+                    rendererNodes: [this._editHandlesShape.children[1]],
+                    oriColors: [undefined], oriOpacities: [undefined],
+                };
+            },
+            showEditHandles() { this.editShowCount++; },
             _handleDataMap: {},
             initHandle(node, key) {
                 // Creator 3.8.8 sometimes records incomplete original color
@@ -199,8 +209,19 @@ assert.ok(componentPool.typeDefs['cc.ProbePosition']);
 const gizmo = component.gizmo;
 assert.ok(gizmo);
 assert.equal(gizmo.controllers.length, 1);
-assert.equal(gizmo.controllers[0]._editHandlesShape.active, false,
-    'Editable BoxController face handles are never initialized or displayed');
+assert.equal(gizmo.controllers[0]._editHandlesShape.active, true,
+    'Native BoxController editable face remains active for Editor hit-testing');
+assert.equal(gizmo.controllers[0]._editHandlesShape.children[1].active, true,
+    'Cocos Gizmo Kit style +Y face is the active invisible drag proxy');
+assert.equal(gizmo.controllers[0]._editHandlesShape.children[0].active, false,
+    'Other BoxController edit faces are disabled');
+assert.equal(gizmo.controllers[0].editInitCount, 1,
+    'Native BoxController edit face initializes once');
+assert.equal(gizmo.controllers[0].editShowCount, 1,
+    'Native +Y hit proxy appears once when selected');
+assert.equal(gizmo.controllers[0].lastNativeFaceColor?.name, 'y');
+assert.equal(gizmo.controllers[0].lastNativeFaceColor?.opacity, 0,
+    'The native +Y hit proxy must remain transparent');
 assert.equal(gizmo.controllers[0]._cubeNode.active, true, 'The rendered point remains visible');
 assert.equal(gizmo.controllers[0]._cubeNodeMR.enabled, true, 'Point mesh rendering is enabled');
 assert.equal(gizmo.controllers[0]._cubeNode.layer, 4, 'Point marker uses the Gizmos render layer');
@@ -219,15 +240,29 @@ assert.ok(handleSnapshot.oriColors[0] && Number.isFinite(handleSnapshot.oriColor
     'The Creator native handle always gets a valid RGBA color snapshot');
 assert.equal(handleSnapshot.oriOpacities[0], 255,
     'The Creator native handle always gets a valid opacity snapshot');
+assert.ok(Number.isFinite(ctrl._handleDataMap.y.oriColors[0]?.a),
+    'Native +Y editable face also has a valid original alpha');
 assert.equal(ctrl.registerCount, 1, 'Controller registers only once on first show');
 gizmo.onShow();
 assert.equal(ctrl.registerCount, 1, 'Repeated onShow does not register duplicate listeners');
+gizmo.refreshHandles();
+gizmo.refreshHandles();
+assert.equal(ctrl.editInitCount, 1,
+    'Repainting never rebuilds the native editable face during a drag');
+assert.equal(ctrl.editShowCount, 1,
+    'Repainting never re-shows the editable face during a drag');
 gizmo.onHide();
 assert.equal(ctrl.unregisterCount, 1, 'Hiding unregisters listeners once');
+assert.equal(ctrl._editHandlesShape.active, false,
+    'Hiding a Gizmo disables the native edit face');
 gizmo.onHide();
 assert.equal(ctrl.unregisterCount, 1, 'Repeated onHide does not unregister twice');
 gizmo.onShow();
 assert.equal(ctrl.registerCount, 2, 'Showing again re-registers a single listener');
+assert.equal(ctrl._editHandlesShape.active, true,
+    'Re-selecting a Gizmo restores the native hit face');
+assert.equal(ctrl.editInitCount, 1,
+    'Selecting the same node must reuse original BoxController faces');
 ctrl.onMouseDown({
     detail: { handleName: 'position:target:single' },
     data: { mouseX: 150, mouseY: 0 },
@@ -377,6 +412,43 @@ assert.equal(componentPool.typeDefs.ProbePosition, undefined,
 assert.equal(componentPool.typeDefs['cc.ProbePosition'], undefined,
     'Unloading the extension must restore the prefixed Gizmo registration');
 
+
+// Regression from Creator 3.8.8: the native +Y face reports mouse-down,
+// then GizmoOperation sometimes also sends onNotGizmoMouseDown. That second
+// notification must NOT cancel a position drag already acquired by the face.
+const nativeDragAdapter = sandbox.exports.createPositionHandleAdapter();
+component.target = new Vec3(150, 0, 0);
+nativeDragAdapter.refresh([component], selected, 1850);
+const nativeDragGizmo = component.gizmo;
+const nativeDragCtrl = nativeDragGizmo.controllers[0];
+const beforeNativeDragEvents = events.length;
+nativeDragCtrl.onControllerMouseDown({
+    handleName: 'y', getLocation() { return { x: 150, y: 0 }; },
+});
+assert.equal(nativeDragGizmo.diagnosticState().draggingPosition, true,
+    'Native +Y proxy starts selected position drag');
+nativeDragGizmo.onNotGizmoMouseDown({
+    getLocation() { return { x: 150, y: 0 }; },
+});
+assert.equal(nativeDragGizmo.diagnosticState().draggingPosition, true,
+    'Duplicate outside-down cannot cancel an active native position gesture');
+nativeDragGizmo.refreshHandles();
+assert.equal(nativeDragCtrl.editInitCount, 1,
+    'Refreshing after mouse-down does not invalidate the native hit face');
+nativeDragGizmo.onNotGizmoMouseMove({
+    getLocation() { return { x: 190, y: 20 }; },
+});
+nativeDragGizmo.onNotGizmoMouseUp();
+assert.deepEqual([component.target.x, component.target.y, component.target.z], [190, 20, 0],
+    'Dragging the native +Y face updates the serialized Vec3');
+const nativeDragEvents = events.slice(beforeNativeDragEvents);
+assert.ok(nativeDragEvents.includes('begin:target'));
+assert.ok(nativeDragEvents.includes('update:target'));
+assert.ok(nativeDragEvents.includes('end:target'));
+assert.ok(!nativeDragEvents.includes('cancel:target'),
+    'Native +Y drag must report end rather than immediate cancel');
+nativeDragAdapter.dispose();
+component.target = new Vec3(150, 0, 0);
 
 node.worldPosition = new Vec3(0, 0, 0);
 component.visible = false;
