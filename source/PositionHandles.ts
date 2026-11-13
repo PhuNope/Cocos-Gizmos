@@ -602,6 +602,107 @@ function createHudPickingQuad(purpose = 'Hud'): HudPickingQuad | null {
         return null;
     }
 }
+type ProjectedMoveGeometry = {
+    type: 'axis' | 'plane' | 'box';
+    rect: { left: number; right: number; bottom: number; top: number };
+    axis?: { start: ScreenPoint; end: ScreenPoint };
+    corners?: ScreenPoint[];
+};
+
+function projectedMoveGeometry(component: Component, field: Field,
+    local: Point, world: Point, view: any): ProjectedMoveGeometry | null {
+    if (field.visual === 'axis') {
+        const arrow = axisPlacement(component, field, local, world);
+        if (!arrow) return null;
+        const start = projectMovePoint(view, arrow.start);
+        const end = projectMovePoint(view, arrow.end);
+        const rect = start && end ? boundsOf([start, end]) : null;
+        return start && end && rect ? {
+            type: 'axis', rect, axis: { start, end },
+        } : null;
+    }
+    if (field.visual === 'plane') {
+        const tile = planePlacement(component, field, local, world);
+        if (!tile) return null;
+        const corners = tile.corners.map(p => projectMovePoint(view, p));
+        if (corners.some(p => !p)) return null;
+        const projected = corners as ScreenPoint[];
+        const rect = boundsOf(projected);
+        return rect ? { type: 'plane', rect, corners: projected } : null;
+    }
+    if (field.visual === 'box') {
+        const corners = boxPlacement(component, field, local);
+        if (!corners) return null;
+        const projected = corners.map(p => projectMovePoint(view, p));
+        if (projected.some(p => !p)) return null;
+        const rect = boundsOf(projected as ScreenPoint[]);
+        return rect ? { type: 'box', rect } : null;
+    }
+    return null;
+}
+
+/** One transparent MeshRenderer quad for every move region. GizmoOperation
+ * raycasts this *registered* mesh, just as it does working HUD controls.
+ * The old editable +Y face was not aligned to the arrow or plane tile and
+ * drew the unwanted round '+' glyphs at each proxy center.
+ */
+function updateMovePickingQuad(
+    entry: Entry, geometry: ProjectedMoveGeometry | null,
+    view: any, projection: ReturnType<typeof createViewportHudProjection>,
+): boolean {
+    const picking = entry.picking;
+    if (!picking?.node?.isValid || !projection || !geometry) {
+        if (picking?.node?.isValid) picking.node.active = false;
+        return false;
+    }
+    const rect = geometry.rect;
+    const middleX = (rect.left + rect.right) * 0.5;
+    const middleY = (rect.bottom + rect.top) * 0.5;
+    if (![middleX, middleY].every(Number.isFinite)) {
+        picking.node.active = false;
+        return false;
+    }
+    let width = Math.max(16, rect.right - rect.left + 6);
+    let height = Math.max(16, rect.top - rect.bottom + 6);
+    let angle = 0;
+    if (geometry.axis) {
+        const { start, end } = geometry.axis;
+        const dx = end.x - start.x, dy = end.y - start.y;
+        const length = Math.hypot(dx, dy);
+        if (!Number.isFinite(length) || length < 6) {
+            picking.node.active = false;
+            return false;
+        }
+        // Entire arrow shaft + head, not only the old tiny center face.
+        width = length + 18;
+        height = Math.max(24, (entry.field.pickSize ?? 28) * 1.25);
+        angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    } else if (geometry.type === 'plane') {
+        width = Math.max(16, width);
+        height = Math.max(16, height);
+    }
+    picking.node.active = true;
+    picking.node.setWorldPosition(projection.worldAt(middleX, middleY));
+    const base = view?.node?.worldRotation;
+    if (base && geometry.axis &&
+        typeof Quat.fromEuler === 'function' &&
+        typeof Quat.multiply === 'function') {
+        const roll = new Quat();
+        Quat.fromEuler(roll, 0, 0, angle);
+        const worldRotation = new Quat();
+        Quat.multiply(worldRotation, base, roll);
+        picking.node.setWorldRotation(worldRotation);
+    } else if (base) {
+        picking.node.setWorldRotation(base);
+    }
+    picking.node.setWorldScale(new Vec3(
+        projection.pixelSize * width,
+        projection.pixelSize * height, 1,
+    ));
+    if (entry.controller?.shape) entry.controller.shape.active = true;
+    return true;
+}
+
 function disposeHudPickingQuad(picking?: HudPickingQuad | null): void {
     if (!picking) return;
     if (picking.renderer.isValid) picking.renderer.mesh = null;
