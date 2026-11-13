@@ -270,6 +270,9 @@ function createEditorGizmo(
             if (controller._cubeNodeMR?.isValid !== false && controller._cubeNodeMR) {
                 controller._cubeNodeMR.enabled = true;
             }
+            // The native cube provides picking only. Visible points are drawn
+            // independently, so do not overlay a second (often green) square.
+            controller.setOpacity?.(0);
         }
 
         private hasDestroyedMarkers(): boolean {
@@ -354,7 +357,7 @@ function createEditorGizmo(
                     if (field.color && Color.fromHEX) Color.fromHEX(color, field.color);
                     else color.set(255, 174, 66, 255);
                     controller.setColor?.(color);
-                    controller.setOpacity?.(255);
+                    controller.setOpacity?.(0);
                     // Use only the standalone cube. BoxController's editable face
                     // handles require private topNode state and crash on 3.8.8.
                     if (controller._wireFrameBoxNode) controller._wireFrameBoxNode.active = false;
