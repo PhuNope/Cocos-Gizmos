@@ -280,6 +280,22 @@ gizmo.onNotGizmoMouseUp({ button: 0 });
 assert.deepEqual([component.target.x, component.target.y], [180, 20],
     'Marker remains draggable at its panned screen location with snap=10');
 component.target = new Vec3(150, 0, 0);
+// The native +Y face is the main production route, not just the fallback
+// positionEntryAt path. Re-pan and acquire the native face directly.
+cam.panX = -45;
+cam.panY = 17;
+const nativeSyncBefore = cam.updates;
+ctrl.onControllerMouseDown({ button: 0, handleName: 'y',
+    x: 195, y: -17 });
+assert.equal(gizmo.diagnosticState().draggingPosition, true,
+    'Native BoxController can acquire a point after a second middle pan');
+assert.ok(cam.updates > nativeSyncBefore,
+    'Native down synchronizes the panned Scene camera before computing ray');
+ctrl.onControllerMouseMove({ button: 0, x: 205, y: -7 });
+ctrl.onControllerMouseUp({ button: 0 });
+assert.deepEqual([component.target.x, component.target.y], [160, 10],
+    'Native drag face follows camera-pan-adjusted screen coordinates');
+component.target = new Vec3(150, 0, 0);
 cam.panX = 0;
 cam.panY = 0;
 gizmo.refreshHandles();
