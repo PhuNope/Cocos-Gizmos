@@ -47,8 +47,14 @@ export default class Gizmos2DApiTest extends Component {
                 snap: 5, color: '#ffcc00',
                 bounds: { min: { x: -600, y: -450 }, max: { x: 600, y: 450 } },
             },
-            { property: 'waypoints', index: 0, plane: 'xy', space: 'local', color: '#00ffff' },
-            { property: 'waypoints', index: 1, plane: 'xy', space: 'local', color: '#00ffff' },
+            { property: 'waypoints', index: 0, plane: 'xy', space: 'local',
+                color: '#00ffff', bounds: {
+                    min: { x: -600, y: -450 }, max: { x: 600, y: 450 },
+                } },
+            { property: 'waypoints', index: 1, plane: 'xy', space: 'local',
+                color: '#00ffff', bounds: {
+                    min: { x: -600, y: -450 }, max: { x: 600, y: 450 },
+                } },
         ];
     }
 
