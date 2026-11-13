@@ -396,6 +396,35 @@ enabled. They require the compatible Editor Gizmo controller. The extension
 does not add runtime JavaScript to the game; these optional callbacks can
 remain in a project using only the TypeScript declarations.
 
+## Drag-and-drop test Components from the extension Assets
+
+The development extension mounts three **read-only TypeScript Components** in
+the Cocos Creator Asset DB, not just in the ZIP's loose `examples/` directory:
+
+| Cocos Assets location | Component | Tests |
+| --- | --- | --- |
+| `db://cocos-gizmos/Examples/CocosGizmos2DDemo.ts` | `CocosGizmos2DDemo` | 2D shapes, Position Handles, HUD |
+| `db://cocos-gizmos/Examples/CocosGizmos3DDemo.ts` | `CocosGizmos3DDemo` | 3D geometry, Mesh, Position Handles, HUD |
+| `db://cocos-gizmos/Examples/CocosGizmosSmokeDemo.ts` | `CocosGizmosSmokeDemo` | Serialized fields, HUD controls, Prefab/Undo smoke checks |
+
+After installing/enabling the ZIP and letting the Asset Database refresh,
+expand **Assets → cocos-gizmos → Examples**. Select a Scene Node in the
+Hierarchy and **drag the desired `.ts` script onto that Node's Inspector**.
+This attaches the Component; there is no need to manually copy the script into
+your project's `assets/` folder. The extension mount remains read-only.
+You can also add the Component by class name in Inspector if Creator lists it.
+
+The mounted samples have `CocosGizmos*` class names to avoid conflicts with
+previously copied `Gizmos2DApiTest`, `Gizmos3DApiTest`, and `GizmoSmokeProbe`
+scripts. Their committed `.meta` UUIDs remain stable across extension
+updates. The ZIP also retains editable original copies under `examples/`.
+
+**Do not rely on these components for production.** Mounted samples are
+regular Cocos script assets when referenced by a Scene/Prefab; remove test
+components before shipping. Disabling/uninstalling the extension can make
+existing sample-component references appear as Missing Script. These are
+different from the extension's Editor-only Scene Script.
+
 ## Verify in Cocos Creator 3.8.8
 
 Open **Extensions → Gizmos Settings → Check Scene integration** to view the
@@ -405,12 +434,13 @@ active handle counts and currently running editor callbacks. It also lists
 checks that cannot be verified automatically, including real mouse picking,
 native Undo/Redo and Prefab override tracking.
 
-The development extension ZIP contains `examples/GizmoSmokeProbe.ts` and
-`docs/EDITOR_SMOKE_TEST.md`. Copy the example into your project's
-`assets/` directory only when you want to run the interactive smoke test;
-the extension never creates that file in your project. Follow the guide to
-test drag/cancel, HUD controls, Scene close/reopen, Inspector synchronization,
-Prefab instances and Ctrl+Z / Ctrl+Shift+Z.
+The development extension ZIP contains the mounted `editor-assets/Examples/`
+Components, the editable sources under `examples/`, and
+`docs/EDITOR_SMOKE_TEST.md`. Drag a mounted Component from the extension
+Assets package into a Node's Inspector, or copy an editable source into your
+project's `assets/` folder if you need to customize it. The extension never
+creates files in the project's `assets/` directory. Follow the guide for
+drag/cancel, HUD controls, Scene lifecycle, Prefabs and Undo/Redo.
 
 The component Gizmo pool and controller hooks are private Editor interfaces.
 A green CI or a successful compatibility probe cannot guarantee that they
@@ -448,7 +478,12 @@ See [Cocos Creator extension installation guide](https://docs.cocos.com/creator/
 
 ## Editor-only build handling
 
-The extension registers `contributions.scene.script` for Editor runtime and `contributions.asset-db.mount` for type-only scripts. The Scene Script loads CommonJS modules from `editor-runtime/`. Only `editor-assets/GizmosGlobal.ts` is mounted into the Asset Database; the runtime modules are not game assets. `dist/Gizmos.d.ts` is generated for separately installed type packages.
+The extension registers `contributions.scene.script` for Editor runtime and `contributions.asset-db.mount` for type-only scripts. The Scene Script loads CommonJS modules from `editor-runtime/`. The Asset Database mounts the generated `editor-assets/GizmosGlobal.ts`
+type declarations **and** the three optional sample Components under
+`editor-assets/Examples/`. The `editor-runtime/` implementation is not mounted
+and is not part of the game asset graph. Mounted examples are ordinary Cocos
+scripts when a Scene/Prefab references them and should be removed before
+building a production game. `dist/Gizmos.d.ts` is generated for separately installed type packages.
 
 The `onAfterBuild` hook strips **only** `onDrawGizmos()` and `onDrawGizmosSelected()` method definitions from compiled JavaScript. It does **not** remove helper methods, `if (EDITOR)` blocks, or unrelated method names. It does **not** validate remaining calls to `Gizmos2D` or `Gizmos3D`; if application code executes such a call in the built game, `ReferenceError` is possible by design. Your project TypeScript files are never modified.
 
