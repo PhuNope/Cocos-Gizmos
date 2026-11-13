@@ -152,7 +152,7 @@ assert.ok(drawCalls.some(call => call[0] === 'text' && call[1] === 'Gizmos2D Tes
 assert.ok(drawCalls.some(call => call[0] === 'text' && call[1] === 'Radius'),
     'Slider is painted with a proper track and numeric value');
 assert.equal(meshes.length, 1);
-assert.equal(rootGizmo.children[0].children[0].sorting?.sortingOrder, 32770,
+assert.equal(rootGizmo.children[0].children[0].sorting?.sortingOrder, 32767,
     'HUD receives the highest gizmo sorting order');
 assert.equal(meshes[0].geometry.positions.length, 12);
 assert.deepEqual(Array.from(meshes[0].geometry.indices), [0, 3, 1, 3, 2, 1]);
