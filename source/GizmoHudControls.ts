@@ -85,9 +85,20 @@ export function hudControlLayoutSignature(controls: readonly HudControl[]): stri
     }));
 }
 
-export function hudRowScreenPosition(anchor: { x: number; y: number }, index: number): {
-    x: number; y: number;
-} {
+export function hudRowScreenPosition(
+    anchor: { x: number; y: number }, index: number,
+    viewport?: { width: number; height: number },
+): { x: number; y: number } {
+    // Dock HUD to the Scene viewport rather than over the selected Node's
+    // handles/shapes. Both rendering and picking use the same projection.
+    // If a Creator build omits viewport dimensions, keep node-relative HUD.
+    if (viewport && Number.isFinite(viewport.width) && Number.isFinite(viewport.height) &&
+        viewport.width > 220 && viewport.height > 120) {
+        return {
+            x: 28,
+            y: viewport.height - 44 - index * HUD_ROW_HEIGHT,
+        };
+    }
     return {
         x: anchor.x + HUD_ROW_OFFSET_X,
         y: anchor.y + HUD_ROW_OFFSET_Y - index * HUD_ROW_HEIGHT,
