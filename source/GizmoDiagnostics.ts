@@ -3,6 +3,8 @@
  * This intentionally does not invoke controller events or mutate the Scene.
  * It cannot prove native mouse picking or Undo without real user interaction.
  */
+import { resolveSceneCamera, SceneCameraConvention } from './SceneCameraBridge';
+
 type UnknownRecord = Record<string, any>;
 
 export interface GizmoSmokeReport {
@@ -12,6 +14,7 @@ export interface GizmoSmokeReport {
         components: number;
         callbackErrors: number;
         engineFrames: number;
+        hudDrawn: number;
         selectionApi: boolean;
         selectedNodeCount: number | null;
     };
@@ -23,6 +26,7 @@ export interface GizmoSmokeReport {
         cameraWorldToScreen: boolean;
         cameraScreenPointToRay: boolean;
         cameraSource: 'direct' | 'wrapped' | 'missing';
+        cameraConvention: SceneCameraConvention;
         hasNativeControlBegin: boolean;
         hasNativeControlEnd: boolean;
         hasNativeControlCancel: boolean;
@@ -48,10 +52,10 @@ export function buildGizmoSmokeReport(
     const pool = safely<any>(() => cce?.Gizmo?._gizmoPool?._getPool?.('component'), null);
     const ctor = pool?.typeDefs?.['cc.BoxCollider'];
     const controller = ctor?.prototype;
-    const cameraApi = cce?.Camera;
-    const cam = cameraApi?.camera || cameraApi?._camera?.camera;
-    const cameraSource = cameraApi?.camera ? 'direct' :
-        cameraApi?._camera?.camera ? 'wrapped' : 'missing';
+    const resolution = resolveSceneCamera(cce);
+    const cam = resolution.camera;
+    const cameraSource = resolution.source === 'unavailable' ?
+        'missing' : resolution.source;
     const report: GizmoSmokeReport = {
         scene: {
             updaterStarted: updater?.started === true,
@@ -59,6 +63,7 @@ export function buildGizmoSmokeReport(
             components: typeof updater?.components === 'number' ? updater.components : 0,
             callbackErrors: typeof updater?.errors === 'number' ? updater.errors : 0,
             engineFrames: typeof updater?.engineFrames === 'number' ? updater.engineFrames : 0,
+            hudDrawn: typeof updater?.hudDrawn === 'number' ? updater.hudDrawn : 0,
             selectionApi: updater?.selectionApi === true && selectionCount !== null,
             selectedNodeCount: selectionCount,
         },
@@ -70,6 +75,7 @@ export function buildGizmoSmokeReport(
             cameraWorldToScreen: typeof cam?.worldToScreen === 'function',
             cameraScreenPointToRay: typeof cam?.screenPointToRay === 'function',
             cameraSource,
+            cameraConvention: resolution.convention,
             hasNativeControlBegin: typeof controller?.onControlBegin === 'function',
             hasNativeControlEnd: typeof controller?.onControlEnd === 'function',
             hasNativeControlCancel: typeof controller?.onControlCancel === 'function',
