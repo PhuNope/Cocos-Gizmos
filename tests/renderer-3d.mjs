@@ -182,6 +182,12 @@ assert.deepEqual(Array.from(moveHandles.slice(0, 3), h => h.axis), ['x', 'y', 'z
 assert.deepEqual(Array.from(moveHandles.slice(3), h => h.plane), ['xy', 'xz', 'yz']);
 assert.equal(moveHandles.filter(h => h.showPositionLabel).length, 1,
     'One object position label, not six stacked duplicate labels');
+const selectableBox = Gizmos3D.move('moveObject', { boxSize: 0.7 });
+assert.equal(selectableBox.length, 7,
+    'An explicitly drawn wire box adds one body drag area without affecting the default');
+assert.equal(selectableBox.at(-1).visual, 'box');
+assert.equal(selectableBox.at(-1).plane, 'view');
+assert.equal(selectableBox.at(-1).boxSize, 0.7);
 const color = new Color(4, 5, 6, 80);
 
 Gizmos3D.beginColor(node, color);
