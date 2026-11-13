@@ -67,7 +67,11 @@ export class GizmoPresentationService {
         const plannedPlacement = this.layout.get(component);
         if (plannedPlacement) {
             const count = this.overlay.render(component, plannedPlacement.items, plannedPlacement);
-            if (count) Gizmos3D.beginColor(component.node, Gizmos3D.DEFAULT_COLOR);
+            // On a 2D Canvas, rendering through Gizmos2D must not create a
+            // separate 3D debug root just to reset its drawing color.
+            if (count && this.overlay.lastRenderPath !== '2d') {
+                Gizmos3D.beginColor(component.node, Gizmos3D.DEFAULT_COLOR);
+            }
             return count;
         }
         if (this.planned) return 0;
@@ -90,12 +94,18 @@ export class GizmoPresentationService {
             }
         }
         const count = this.overlay.render(component, entries);
-        if (count) Gizmos3D.beginColor(component.node, Gizmos3D.DEFAULT_COLOR);
+        if (count && this.overlay.lastRenderPath !== '2d') {
+            Gizmos3D.beginColor(component.node, Gizmos3D.DEFAULT_COLOR);
+        }
         return count;
     }
 
-    public getStats(): { hudLabels: number; defaults: GizmoViewConfig } {
-        return { hudLabels: this.overlay.totalDrawn, defaults: this.getSettings() };
+    public getStats() {
+        return {
+            hudLabels: this.overlay.totalDrawn,
+            overlay: this.overlay.diagnosticState,
+            defaults: this.getSettings(),
+        };
     }
 
     public dispose(): void { this.clearFrame(); this.overlay.dispose(); }
