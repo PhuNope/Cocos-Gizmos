@@ -40,7 +40,12 @@
         },
         "menu": [
             {
-                "path": "i18n:menu.extension/Gizmos Settings",
+                "path": "Gizmos",
+                "label": "Reset Gizmos",
+                "message": "reset-gizmos"
+            },
+            {
+                "path": "Gizmos",
                 "label": "Gizmos Settings",
                 "message": "open-settings"
             }
@@ -79,6 +84,11 @@
             "selection:unselect": {
                 "methods": [
                     "onSelectionUnselect"
+                ]
+            },
+            "reset-gizmos": {
+                "methods": [
+                    "resetGizmos"
                 ]
             }
         }
