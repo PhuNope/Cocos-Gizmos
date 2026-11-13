@@ -120,7 +120,7 @@ class ScreenHudMesh {
             // renderer sorting order, so HUD stays above other 2D/3D gizmos.
             const Sorting = (cocos as any).Sorting;
             if (typeof Sorting === 'function') {
-                const sorting = node.addComponent(Sorting);
+                const sorting: any = node.addComponent(Sorting);
                 if (sorting) sorting.sortingOrder = 32770;
             }
             this.root = root;
