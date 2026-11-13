@@ -74,7 +74,12 @@ class Base {
                 setScale(scale) { this.scale = scale; } },
             _cubeNodeMR: { enabled: false },
             shape: { active: true },
-            _editHandlesShape: { children: [{ name: 'x', active: true }, { name: 'y', active: true }] },
+            _editHandlesShape: { children: [{ name: 'x', active: true },
+                { name: 'y', active: true,
+                    setWorldScale(...values) { this.lastScale = values; },
+                    setWorldPosition(value) { this.lastPosition = value; },
+                    setWorldRotation(value) { this.lastRotation = value; },
+                }] },
             _wireFrameBoxNode: { active: true },
             _wireFrameBoxMeshRenderer: { enabled: true },
             setColor() {}, setEditHandlesColor() {}, setOpacity() {},
@@ -198,6 +203,7 @@ const sandbox = {
             drawSphere(...args) { visibleDots.scene3d.push(args); },
             drawQuad(...args) { visibleDots.scene3d.push(args); },
             drawLine() {},
+            drawPositionLabel(...args) { visibleDots.scene3d.push(args); },
         } };
         if (name === './AxisHandleGeometry') return axes.exports;
         if (name === './PlaneHandleGeometry') return planes.exports;
@@ -833,21 +839,32 @@ const axisComponent = {
     moveObject: new Vec3(4, 2, 1),
     onGizmoHud: undefined, onGizmoHudControls: undefined,
     onGizmoHandles() {
-        return ['x', 'y', 'z'].map(axis => ({
-            property: 'moveObject', id: 'axis-' + axis,
-            visual: 'axis', plane: 'view', axis, axisSize: 78,
-            space: 'local', snap: 0.25,
-        }));
+        const common = { property: 'moveObject', space: 'local',
+            snap: 0.25, pickSize: 28, hoverColor: '#ffff65' };
+        return [
+            ...['x', 'y', 'z'].map((axis, i) => ({
+                ...common, id: 'axis-' + axis,
+                visual: 'axis', plane: 'view', axis, axisSize: 86,
+                showPositionLabel: i === 0,
+            })),
+            ...['xy', 'xz', 'yz'].map(plane => ({
+                ...common, id: 'plane-' + plane,
+                visual: 'plane', plane, planeSize: 24, planeOffset: 25,
+            })),
+        ];
     },
 };
 const rayAdapter = sandbox.exports.createPositionHandleAdapter();
 rayAdapter.refresh([axisComponent], new Set([axisNode.uuid]), 3650);
 const rayGizmo = axisComponent.gizmo;
-assert.equal(rayGizmo.controllers.length, 3,
-    'One object has only three XYZ axis controllers');
-assert.ok(rayGizmo.controllers.every(ctrl =>
+assert.equal(rayGizmo.controllers.length, 6,
+    'One object has XYZ arrows and XY/XZ/YZ plane handles');
+assert.ok(rayGizmo.controllers.slice(0, 3).every(ctrl =>
     ctrl._cubeNode.active === false && ctrl._cubeNodeMR.enabled === false),
-    'Ray Gizmo hides every chunky native BoxController point');
+    'Ray Gizmo hides chunky native BoxController points');
+const xNative = rayGizmo.controllers[0]._editHandlesShape.children[1];
+assert.ok(xNative.lastScale?.[0] > xNative.lastScale?.[1],
+    'Invisible arrow pick proxy covers a long screen-aligned strip');
 assert.ok(rayGizmo.controllers.every(ctrl =>
     ctrl._editHandlesShape.children[1].active === true),
     'All three rays keep a native +Y face for reliable Scene picking');
@@ -868,6 +885,20 @@ assert.equal(axisComponent.moveObject.x, 26);
 assert.equal(axisComponent.moveObject.y, 18,
     'Y ray changes only Y independent of cursor X motion');
 assert.equal(axisComponent.moveObject.z, 1);
+xRay.onControllerHoverIn?.({ handleName: 'y' });
+assert.equal(rayGizmo.hoveredKey, 'position:moveObject:single:axis-x',
+    'Native hover updates selected highlighting');
+xRay.onControllerHoverOut?.({ handleName: 'y' });
+assert.equal(rayGizmo.hoveredKey, null,
+    'Moving pointer away clears selected highlighting');
+const planeXY = rayGizmo.controllers[3];
+planeXY.onControllerMouseDown({ button: 0, handleName: 'y', x: 26, y: 18 });
+assert.equal(rayGizmo.diagnosticState().draggingPosition, true);
+planeXY.onControllerMouseMove({ button: 0, x: 38, y: 31 });
+planeXY.onControllerMouseUp({ button: 0 });
+assert.deepEqual([axisComponent.moveObject.x, axisComponent.moveObject.y,
+    axisComponent.moveObject.z], [38, 31, 1],
+    'XY selection moves the two plane coordinates and preserves Z');
 rayAdapter.dispose();
 console.log('[axis-rays] three compact native pick proxies, X/Y axis locks and shared Vec3 OK');
 
