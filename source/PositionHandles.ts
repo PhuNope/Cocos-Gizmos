@@ -623,7 +623,15 @@ function createEditorGizmo(
             if (!at) { input.record('missingPointer'); return; }
             if (!Number.isFinite(current)) return;
             try {
-                const solver = new HudSliderDrag(entry.control, current, at.x);
+                const view = camera();
+                const placement = hudLayout?.get(component);
+                const total = hudLayout?.totalRows || 0;
+                const track = view?.viewport ?
+                    hudSliderScreenTrack(view.viewport,
+                        (placement?.startRow || 0) + (placement?.textCount || 0) +
+                            entry.index, total || entry.index + 1) : null;
+                const solver = new HudSliderDrag(entry.control, current, at.x,
+                    track?.width);
                 const property = entry.control.property;
                 const session = new GizmoEditSession<number>(
                     () => (component as any)[property],
