@@ -1,5 +1,5 @@
 import { CCObject, Color, Component, director, Director, gfx, Layers,
-    ImageAsset, input, Input, Material, Mesh, MeshRenderer, Node, Quat, RenderRoot2D,
+    ImageAsset, input as engineInput, Input, Material, Mesh, MeshRenderer, Node, Quat, RenderRoot2D,
     Sprite, SpriteFrame, Texture2D, UITransform, utils, Vec3 } from 'cc';
 import { Gizmos2D } from './Gizmos2D';
 import { Gizmos3D } from './Gizmos3D';
@@ -514,11 +514,11 @@ function createEditorGizmo(
         };
         private registerGlobalMouse(): void {
             const events = Input?.EventType;
-            if (this.globalMouseRegistered || !events || typeof input?.on !== 'function') return;
+            if (this.globalMouseRegistered || !events || typeof engineInput?.on !== 'function') return;
             try {
-                input.on(events.MOUSE_DOWN, this.onGlobalMouseDown, this);
-                input.on(events.MOUSE_MOVE, this.onGlobalMouseMove, this);
-                input.on(events.MOUSE_UP, this.onGlobalMouseUp, this);
+                engineInput.on(events.MOUSE_DOWN, this.onGlobalMouseDown, this);
+                engineInput.on(events.MOUSE_MOVE, this.onGlobalMouseMove, this);
+                engineInput.on(events.MOUSE_UP, this.onGlobalMouseUp, this);
                 this.globalMouseRegistered = true;
             } catch (error) {
                 // Different Creator builds expose different input backends.
@@ -527,10 +527,10 @@ function createEditorGizmo(
             }
         }
         private unregisterGlobalMouse(): void {
-            if (typeof input?.off === 'function' && Input?.EventType) {
-                input.off(Input.EventType.MOUSE_DOWN, this.onGlobalMouseDown, this);
-                input.off(Input.EventType.MOUSE_MOVE, this.onGlobalMouseMove, this);
-                input.off(Input.EventType.MOUSE_UP, this.onGlobalMouseUp, this);
+            if (typeof engineInput?.off === 'function' && Input?.EventType) {
+                engineInput.off(Input.EventType.MOUSE_DOWN, this.onGlobalMouseDown, this);
+                engineInput.off(Input.EventType.MOUSE_MOVE, this.onGlobalMouseMove, this);
+                engineInput.off(Input.EventType.MOUSE_UP, this.onGlobalMouseUp, this);
             }
             this.globalMouseRegistered = false;
         }
