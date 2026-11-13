@@ -752,7 +752,7 @@ export class Gizmos3D {
      * This façade only builds descriptors; Editor adapters own interactions.
      */
     public static move(
-        property: string, options: GizmoMoveHandleOptions = {},
+        property: string, options: GizmosMoveHandleOptions = {},
     ): GizmoHandleDescriptor[] {
         return makeMoveGizmo(property, options);
     }
