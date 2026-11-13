@@ -120,6 +120,29 @@ export function hudRowScreenPosition(
     };
 }
 
+/** Exact screen rectangle used by BOTH the HUD texture and native picking. */
+export function hudControlScreenRect(
+    viewport: { width: number; height: number }, index: number, totalRows: number,
+): { left: number; right: number; bottom: number; top: number; width: number; height: number } {
+    const row = hudRowScreenPosition({ x: 0, y: 0 }, index, viewport, totalRows);
+    const grid = hudGrid(viewport, totalRows);
+    const width = Math.max(30, grid.columnWidth - 14);
+    return {
+        left: row.x - 5, right: row.x - 5 + width,
+        bottom: row.y - 11, top: row.y + 11, width, height: 22,
+    };
+}
+
+/** Matches the track drawing (36% left, 38% wide) inside each HUD column. */
+export function hudSliderScreenTrack(
+    viewport: { width: number; height: number }, index: number, totalRows: number,
+): { left: number; width: number } {
+    const row = hudRowScreenPosition({ x: 0, y: 0 }, index, viewport, totalRows);
+    const grid = hudGrid(viewport, totalRows);
+    return { left: row.x + grid.columnWidth * 0.36,
+        width: Math.max(50, grid.columnWidth * 0.38) };
+}
+
 export function formatHudControl(control: HudControl, value: unknown): string {
     if (control.type === 'button') return '[' + control.text + ']';
     if (control.type === 'toggle') return control.text + ': ' + (value === true ? '[ON]' : '[OFF]');
@@ -145,6 +168,7 @@ export class HudSliderDrag {
         private readonly control: Extract<HudControl, { type: 'slider' }>,
         initial: number,
         private readonly startX: number,
+        private readonly trackPixels = HUD_SLIDER_TRACK_PIXELS,
     ) {
         if (!Number.isFinite(initial) || !Number.isFinite(startX)) {
             throw new Error('Invalid HUD slider starting state');
@@ -155,7 +179,7 @@ export class HudSliderDrag {
     public move(x: number): number | null {
         if (!Number.isFinite(x)) return null;
         const { min, max, step } = this.control;
-        const raw = this.initial + ((x - this.startX) / HUD_SLIDER_TRACK_PIXELS) * (max - min);
+        const raw = this.initial + ((x - this.startX) / this.trackPixels) * (max - min);
         const snapped = step ? min + Math.round((raw - min) / step) * step : raw;
         if (!Number.isFinite(snapped)) return null;
         const result = Math.max(min, Math.min(max, snapped));
