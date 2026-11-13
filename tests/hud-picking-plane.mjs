@@ -189,6 +189,7 @@ const cc = {
 };
 const solver = evaluate('PositionDragSolver');
 const planes = evaluate('PlaneHandleGeometry');
+const axes = evaluate('AxisHandleGeometry');
 const edit = evaluate('GizmoEditSession');
 const controls = evaluate('GizmoHudControls');
 const presentation = { normalizeHudItems(value) { return value; } };
@@ -275,7 +276,8 @@ const sandbox = {
                 drawSphere() {},
             } },
             './PositionDragSolver': solver,
-            './PlaneHandleGeometry': planes, './GizmoEditSession': edit,
+            './PlaneHandleGeometry': planes, './AxisHandleGeometry': axes,
+            './GizmoEditSession': edit,
             './GizmoHudControls': controls, './GizmoHudProjection': projection,
             './GizmoPresentation': presentation, './GizmoHudLayout': layoutModule,
             './SceneCameraBridge': cameraBridge, './SceneGizmoInput': input,
