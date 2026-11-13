@@ -577,7 +577,9 @@ function configurePositionHitProxy(controller: any, color: Color, enabled: boole
                 controller.__cocosGizmosProxyReady &&
                 child.name === 'y';
         }
-        applyGizmoLayer(shape);
+        // Recursively walking the whole native handle tree every BEFORE_DRAW
+        // adds unnecessary work during camera orbit/pan and long edit sessions.
+        if (enabled && !wasEnabled) applyGizmoLayer(shape);
     }
     if (enabled && !wasEnabled && controller.__cocosGizmosProxyReady) {
         controller.setEditHandlesColor?.(color);
@@ -602,14 +604,50 @@ function createEditorGizmo(
         private shown = false;
         private destroyed = false;
         private beforeDrawRegistered = false;
+        private lastSceneCamera: any = null;
+        private lastProjectionMode: any = undefined;
         // Creator's embedded Scene routes mouse events through GizmoOperation,
         // not the Game Canvas input pipeline. Native BoxController's editable
         // +Y face is the same hit proxy used by Cocos Gizmo Kit.
         private readonly beforeDraw = (): void => {
             if (!this.shown || this.destroyed) return;
-            // Re-project during Scene scroll, before native controller raycast.
+            // Scene 2D/3D button can replace the renderer camera without
+            // changing selected Components. The old native raycast proxy
+            // belongs to the previous Scene camera; re-mount it once, not
+            // on every rotation/zoom of the new camera.
+            this.refreshSceneCamera();
             this.updateMarkers();
         };
+        private refreshSceneCamera(): void {
+            const sceneCamera = cceNamespace()?.Camera;
+            const raw = sceneCamera?.camera?.camera ||
+                sceneCamera?._camera?.camera || sceneCamera?.camera || null;
+            const mode = raw?.projectionType ?? raw?.projection ??
+                sceneCamera?.is2D ?? undefined;
+            if (this.lastSceneCamera === raw && this.lastProjectionMode === mode) return;
+            const changed = this.lastSceneCamera !== null;
+            this.lastSceneCamera = raw;
+            this.lastProjectionMode = mode;
+            if (!changed || !raw) return;
+            for (const entry of this.entries) {
+                const controller = entry.controller;
+                if (!controller || controller.__cocosGizmosNativeShown === false) continue;
+                controller.__cocosGizmosNativeShown = false;
+                const color = new Color(255, 174, 66, 255);
+                if (entry.field.color && Color.fromHEX)
+                    Color.fromHEX(color, entry.field.color);
+                try {
+                    controller.show?.();
+                    controller.__cocosGizmosNativeShown = true;
+                    // Rebind the same native +Y face after the Scene camera
+                    // changes. No new BoxController or Gizmo is allocated.
+                    configurePositionHitProxy(controller, color, false);
+                    configurePositionHitProxy(controller, color, true);
+                } catch (error) {
+                    console.warn('[cocos-gizmos/handles] Camera switch hit proxy:', error);
+                }
+            }
+        }
         private layout = '';
         private readonly registeredControllers = new WeakSet<object>();
         private readonly unavailableMarkers = new WeakSet<object>();
@@ -1465,6 +1503,10 @@ function createEditorGizmo(
             for (const entry of this.entries) {
                 if (entry.visual?.node?.isValid) entry.visual.node.active = false;
                 configurePositionHitProxy(entry.controller, new Color(255,255,255,255), false);
+                // The native BoxController keeps a separate raycast shape.
+                // Disabling only its cube and +Y face leaves an invisible hit
+                // proxy over the 3D View after switching from Test2D.
+                if (entry.controller?.shape) entry.controller.shape.active = false;
                 entry.controller.__cocosGizmosNativeShown = false;
             }
             this.finish(true);
@@ -1529,6 +1571,7 @@ function createEditorGizmo(
             }
             this.destroyed = true;
             this.shown = false;
+            this.lastSceneCamera = null;
             this.finish(true);
             this.finishHud(true);
             this.clearEntries();
@@ -1555,6 +1598,10 @@ export function createPositionHandleAdapter(
 ): PositionHandleSceneAdapter {
     const registered = new Map<string, any>();
     const active = new Map<Component, any>();
+    // Hidden Gizmos are not in "active" but their BoxController shapes,
+    // per-frame callbacks and visual Sprite resources still exist. Track all
+    // Gizmos ever mounted by this adapter until the Scene changes.
+    const owned = new Map<Component, any>();
     let gizmoConstructor: any = null;
     let latestScan = -Infinity;
     let lastSelection = new Set<string>();
@@ -1575,6 +1622,23 @@ export function createPositionHandleAdapter(
         if (!gizmoConstructor) gizmoConstructor = createEditorGizmo(typeDefs['cc.BoxCollider'], allowHud, input, hudLayout);
         reason = 'ready';
         return true;
+    }
+
+    function releaseGizmo(component: Component, gizmo: any): void {
+        if (!gizmo) return;
+        try { gizmo.hide?.(); }
+        catch (error) {
+            console.warn('[cocos-gizmos/handles] Native hide during cleanup:', error);
+            try { gizmo.onHide?.(); } catch { /* previous Scene is gone */ }
+        }
+        try { gizmo.onDestroy?.(); }
+        catch (error) {
+            console.warn('[cocos-gizmos/handles] Native release during cleanup:', error);
+        }
+        try {
+            if ((component as any)?.gizmo === gizmo)
+                (component as any).gizmo = null;
+        } catch { /* destroyed component */ }
     }
 
     function show(component: Component): any {
@@ -1604,6 +1668,9 @@ export function createPositionHandleAdapter(
             }
         }
         if (!(gizmo instanceof gizmoConstructor) || gizmo.isHandleDisposed?.()) return null;
+        const previous = owned.get(component);
+        if (previous && previous !== gizmo) releaseGizmo(component, previous);
+        owned.set(component, gizmo);
         gizmo.show?.();
         // Some Editor Gizmo implementations do not dispatch onShow when
         // reusing a previously hidden component Gizmo. Restore it explicitly.
@@ -1619,25 +1686,13 @@ export function createPositionHandleAdapter(
      * remaining controllers from being released.
      */
     function releaseForSceneChange(): void {
-        for (const [component, gizmo] of active) {
-            try { gizmo.hide?.(); }
-            catch (error) {
-                console.warn('[cocos-gizmos/handles] Could not hide old Scene controller:', error);
-                try { gizmo.onHide?.(); }
-                catch { /* old scene already destroyed */ }
-            }
-            try { gizmo.onDestroy?.(); }
-            catch (error) {
-                console.warn('[cocos-gizmos/handles] Old Scene controller cleanup:', error);
-            }
-            try {
-                if ((component as any).gizmo === gizmo) {
-                    // The editor-only Component.gizmo pointer is not serialized.
-                    // Never carry a disposed Gizmo into another Scene.
-                    (component as any).gizmo = null;
-                }
-            } catch { /* Component is already invalid */ }
+        // Important: selecting Test2D, then Test3D, removes Test2D from
+        // "active" but it still has a cached Gizmo and native BoxController.
+        // Release both selected and hidden instances before swapping Scenes.
+        for (const [component, gizmo] of owned) {
+            releaseGizmo(component, gizmo);
         }
+        owned.clear();
         active.clear();
         lastSelection.clear();
         latestScan = -Infinity;
@@ -1702,7 +1757,13 @@ export function createPositionHandleAdapter(
             }
             for (const [component, gizmo] of active) {
                 if (!wanted.has(component)) {
-                    gizmo.hide?.();
+                    // Do not destroy on every selection change, but disable
+                    // both native raycast shape and visual picking volume.
+                    try { gizmo.hide?.(); }
+                    catch (error) {
+                        console.warn('[cocos-gizmos/handles] Deselect hide failed:', error);
+                        try { gizmo.onHide?.(); } catch { /* stale */ }
+                    }
                     active.delete(component);
                 }
             }
