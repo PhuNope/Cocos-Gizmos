@@ -1237,10 +1237,10 @@ function createEditorGizmo(
             camera()?.sync?.();
             const component = this.target as Component;
             if (!component?.node?.isValid) return;
-            const view = camera();
-            const moveProjection = view?.viewport &&
+            const moveView = camera();
+            const moveProjection = moveView?.viewport &&
                 this.entries.some(entry => entry.picking) ?
-                createViewportHudProjection(view) : null;
+                createViewportHudProjection(moveView) : null;
             for (const entry of this.entries) {
                 const local = readField(component, entry.field);
                 if (!local) {
@@ -1269,8 +1269,8 @@ function createEditorGizmo(
                 if (!entry.picking) setMarkerSize(entry.controller, size);
                 if (entry.picking) {
                     updateMovePickingQuad(entry,
-                        projectedMoveGeometry(component, entry.field, local, world, view),
-                        view, moveProjection);
+                        projectedMoveGeometry(component, entry.field, local, world, moveView),
+                        moveView, moveProjection);
                     if (entry.controller._editHandlesShape)
                         entry.controller._editHandlesShape.active = false;
                     if (entry.controller._cubeNode)
