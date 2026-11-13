@@ -131,8 +131,10 @@ const sceneCamera = {
     geometryRenderer,
     initGeometryRenderer() {},
 };
+let now = 1000;
 const sandbox = {
     exports: {},
+    Date: class extends Date { static now() { return now; } },
     require: mod => {
         if (mod === 'cc') return cc;
         if (mod === './Define') return { cce: { Camera: { _camera: { camera: sceneCamera } } } };
@@ -197,9 +199,16 @@ Gizmos3D.drawSprite(node, 'icon', frame, new Vec3(0, 0, 0), { x: 1, y: 1 });
 debug.lateUpdate(0);
 assert.equal(label.stringWrites, labelWrites, 'Static text must not be reset and rewritten each frame');
 assert.equal(sprite.frameWrites, spriteWrites, 'Static sprite must not be reset each frame');
+now += 300;
 debug.lateUpdate(0);
-assert.equal(label.string, '');
-assert.equal(sprite.spriteFrame, null);
+assert.equal(label.string, 'Range',
+    'HUD labels survive the 250ms idle/watchdog interval');
+assert.equal(sprite.spriteFrame, frame,
+    '3D sprites also survive the 250ms idle/watchdog interval');
+now += 451;
+debug.lateUpdate(0);
+assert.equal(label.string, '', 'Labels expire after 750ms without a draw');
+assert.equal(sprite.spriteFrame, null, 'Sprites expire after 750ms without a draw');
 const labelAfterClear = label.stringWrites;
 const spriteAfterClear = sprite.frameWrites;
 debug.lateUpdate(0);
