@@ -21,7 +21,6 @@ assert.equal((doc.template.match(/class="cg-api-card"/g) || []).length, 8,
 assert.ok(!doc.template.includes('<script'), 'No untrusted remote scripting');
 
 const originalEditor = globalThis.Editor;
-const originalNavigator = globalThis.navigator;
 const opened = [];
 globalThis.Editor = {
     Panel: { open(id) { opened.push(id); return true; } },
@@ -77,6 +76,4 @@ try {
 } finally {
     if (originalEditor === undefined) delete globalThis.Editor;
     else globalThis.Editor = originalEditor;
-    if (originalNavigator === undefined) delete globalThis.navigator;
-    else globalThis.navigator = originalNavigator;
 }
