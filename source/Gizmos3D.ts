@@ -22,6 +22,7 @@ import {
     Vec3,
 } from 'cc';
 import { cce } from './Define';
+import { makeMoveGizmo } from './GizmoHandlePresets';
 
 const { ccclass, executeInEditMode } = _decorator;
 
@@ -747,42 +748,13 @@ export interface GizmosMoveHandleOptions {
 }
 
 export class Gizmos3D {
-    /** Creator Move Tool-style preset: three X/Y/Z arrow handles and three
-     * small XY/XZ/YZ plane squares, all editing the SAME Vec3 field.
-     * Use it inside onGizmoHandles() without adding any scene components.
+    /** One call creates the complete XYZ + XY/XZ/YZ Move Gizmo.
+     * This façade only builds descriptors; Editor adapters own interactions.
      */
-    public static moveHandles(
-        property: string, options: GizmosMoveHandleOptions = {},
+    public static move(
+        property: string, options: GizmoMoveHandleOptions = {},
     ): GizmoHandleDescriptor[] {
-        const base = {
-            property, space: options.space || 'local',
-            snap: options.snap,
-            bounds: options.bounds,
-            pickSize: options.pickSize ?? 24,
-            hoverColor: options.hoverColor ?? '#ffff65',
-        };
-        const axisColor = { x: '#ff595e', y: '#43df66', z: '#4b8fff' };
-        const planeColor = { xy: '#fff16e', xz: '#58dfff', yz: '#ff78de' };
-        const arrows: GizmoHandleDescriptor[] =
-            (['x', 'y', 'z'] as const).map((axis, index) => ({
-                ...base,
-                id: 'move-axis-' + axis,
-                visual: 'axis' as const, plane: 'view' as const,
-                axis, color: axisColor[axis],
-                axisSize: options.axisSize ?? 86,
-                showPositionLabel: index === 0 && options.showPositionLabel !== false,
-                positionLabelOffset: options.positionLabelOffset ?? 94,
-            }));
-        const planes: GizmoHandleDescriptor[] =
-            (['xy', 'xz', 'yz'] as const).map(plane => ({
-                ...base,
-                id: 'move-plane-' + plane,
-                visual: 'plane' as const, plane,
-                color: planeColor[plane],
-                planeSize: options.planeSize ?? 24,
-                planeOffset: options.planeOffset ?? 25,
-            }));
-        return [...arrows, ...planes];
+        return makeMoveGizmo(property, options);
     }
 
     public static readonly DEFAULT_COLOR = Color.BLUE;
