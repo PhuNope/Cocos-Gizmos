@@ -1024,7 +1024,15 @@ function createEditorGizmo(
                 const size = ray?.size || tile?.size || markerSize(world);
                 setMarkerSize(entry.controller, size);
                 if (tile) positionPlaneHitProxy(entry.controller, entry.field.plane, tile);
-                if (ray) positionAxisHitProxy(entry.controller, ray);
+                if (ray) {
+                    positionAxisHitProxy(entry.controller, ray);
+                    // The +Y editable face is the actual native hit proxy.
+                    // Hide BoxController's own cube, otherwise three chunky
+                    // cubes obscure the three thin axis arrows.
+                    if (entry.controller._cubeNode) entry.controller._cubeNode.active = false;
+                    if (entry.controller._cubeNodeMR)
+                        entry.controller._cubeNodeMR.enabled = false;
+                }
                 if (!entry.visual?.node?.isValid) {
                     const color = new Color(255, 174, 66, 255);
                     if (entry.field.color && Color.fromHEX)
