@@ -9,6 +9,7 @@ import { createSceneHudProjection } from './GizmoHudProjection';
 import { normalizeHudItems } from './GizmoPresentation';
 import { GizmoEditSession } from './GizmoEditSession';
 import { GizmoHudLayout } from './GizmoHudLayout';
+import { resolveSceneCamera } from './SceneCameraBridge';
 import {
     GizmoInputDiagnostics, GizmoInputSnapshot, readSceneHandleName,
     readScenePointer, ScenePointer,
@@ -26,9 +27,7 @@ function cceNamespace(): any {
 }
 
 function camera(): any {
-    const editorCamera = cceNamespace()?.Camera;
-    // Creator 3.8 Scene camera is often exposed through the internal wrapper.
-    return editorCamera?.camera || editorCamera?._camera?.camera || null;
+    return resolveSceneCamera(cceNamespace()).camera;
 }
 
 function validPoint(value: any): value is Point {
