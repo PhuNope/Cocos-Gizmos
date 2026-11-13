@@ -21,7 +21,9 @@ function isUnder2DRenderRoot(node: any): boolean {
 
 
 type ScreenRow = { index: number; text: string; color: string; fontSize: number;
-    minSize?: number; maxSize?: number; isControl: boolean };
+    minSize?: number; maxSize?: number; isControl: boolean;
+    kind?: 'button' | 'slider' | 'toggle' | 'checkbox';
+    value?: number | boolean; min?: number; max?: number };
 
 function projectHudPlane(camera: SceneHudCamera, left: number, bottom: number,
     width: number, height: number): number[] | null {
@@ -163,8 +165,33 @@ class ScreenHudMesh {
                     ctx.font = font * scale + 'px sans-serif';
                     ctx.fillStyle = /^#[a-fA-F0-9]{6,8}$/.test(row.color) ?
                         row.color : '#ffffff';
-                    ctx.fillText(row.text, x * scale, y * scale,
-                        columnTextWidth * scale);
+                    if (row.kind === 'slider') {
+                        const label = row.text.split(':')[0];
+                        const value = typeof row.value === 'number' ? row.value : row.min || 0;
+                        const progress = Number.isFinite(value) &&
+                            Number.isFinite(row.min) && Number.isFinite(row.max) &&
+                            (row.max as number) > (row.min as number) ?
+                            Math.max(0, Math.min(1, (value - (row.min as number)) /
+                                ((row.max as number) - (row.min as number)))) : 0;
+                        const trackX = x + grid.columnWidth * 0.36;
+                        const trackWidth = Math.max(50, grid.columnWidth * 0.38);
+                        ctx.fillText(label, x * scale, y * scale, grid.columnWidth * 0.32 * scale);
+                        ctx.fillStyle = '#566577';
+                        ctx.fillRect(trackX * scale, (y - 2) * scale,
+                            trackWidth * scale, 4 * scale);
+                        ctx.fillStyle = '#70b7fa';
+                        ctx.fillRect(trackX * scale, (y - 2) * scale,
+                            trackWidth * progress * scale, 4 * scale);
+                        ctx.fillStyle = '#daeafa';
+                        ctx.fillRect((trackX + trackWidth * progress - 4) * scale,
+                            (y - 8) * scale, 8 * scale, 16 * scale);
+                        ctx.fillText(String(Math.round(value * 1000) / 1000),
+                            (trackX + trackWidth + 8) * scale, y * scale,
+                            grid.columnWidth * 0.22 * scale);
+                    } else {
+                        ctx.fillText(row.text, x * scale, y * scale,
+                            columnTextWidth * scale);
+                    }
                 }
                 const image = new ImageAsset(canvas);
                 const texture = new Texture2D();
@@ -266,7 +293,9 @@ export class GizmoHudOverlay {
     private frameActive = false;
     private screenActive = false;
 
-    public get isScreenHudActive(): boolean { return this.screenActive; }
+    public get isScreenHudActive(): boolean {
+        return this.screenActive || (this.frameActive && this.screenRows.length > 0);
+    }
 
     public beginFrame(): void {
         this.frameActive = true;
@@ -312,7 +341,8 @@ export class GizmoHudOverlay {
     public render(
         component: Component,
         items: readonly GizmoHudText[],
-        placement?: Pick<GizmoHudPlacement, 'namespace' | 'startRow'>,
+        placement?: Pick<GizmoHudPlacement, 'namespace' | 'startRow'> &
+            Partial<Pick<GizmoHudPlacement, 'textCount' | 'controls'>>,
     ): number {
         const camera = sceneCamera();
         const node = component?.node;
@@ -323,12 +353,21 @@ export class GizmoHudOverlay {
         if (this.frameActive && camera.viewport && (globalThis as any).document?.createElement) {
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
+                const control = placement?.controls && i >= (placement.textCount || 0) ?
+                    placement.controls[i - (placement.textCount || 0)] : undefined;
+                const current = control && 'property' in control ?
+                    (component as any)[control.property] : undefined;
                 this.screenRows.push({
                     index: (placement?.startRow || 0) + i,
                     text: item.text, color: item.color,
                     fontSize: item.fontSize, minSize: item.minSize,
                     maxSize: item.maxSize,
                     isControl: item.id.startsWith('control:'),
+                    kind: control?.type,
+                    value: typeof current === 'number' || typeof current === 'boolean' ?
+                        current : undefined,
+                    min: control?.type === 'slider' ? control.min : undefined,
+                    max: control?.type === 'slider' ? control.max : undefined,
                 });
             }
             this.drawn += items.length;
