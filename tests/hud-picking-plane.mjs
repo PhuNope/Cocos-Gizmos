@@ -135,6 +135,28 @@ const director = {
 const meshInstances = [];
 const uiDrawCalls = [];
 const document = {
+    listeners: new Map(),
+    addEventListener(type, callback) {
+        const list = this.listeners.get(type) || [];
+        list.push(callback);
+        this.listeners.set(type, list);
+    },
+    removeEventListener(type, callback) {
+        this.listeners.set(type, (this.listeners.get(type) || [])
+            .filter(item => item !== callback));
+    },
+    emit(type, event) {
+        for (const callback of [...(this.listeners.get(type) || [])])
+            callback(event);
+    },
+    querySelector(name) { return name === 'canvas' ? this.sceneCanvas : null; },
+    sceneCanvas: {
+        tagName: 'CANVAS',
+        getBoundingClientRect() {
+            return { left: 0, top: 0, width: 900, height: 500,
+                bottom: 500, right: 900 };
+        },
+    },
     createElement(name) {
         assert.equal(name, 'canvas');
         return {
@@ -352,6 +374,8 @@ assert.ok(dragSprite3D?.spriteFrame,
     '3D drag point must be visible through the same Sprite UI pipeline as HUD');
 assert.ok(dragSprite3D.node.listeners.get('mouse-down')?.length,
     'Marker Sprite must register actual Cocos Node mouse input');
+assert.equal(document.listeners.get('pointerdown')?.length, 1,
+    'Selected marker captures the Editor Scene canvas pointer independently');
 assert.equal(globalInput.count(MouseTypes.MOUSE_DOWN), 1,
     'Selected 3D Gizmo must subscribe to a global mouse fallback');
 assert.equal(dragSprite3D.node.active, true);
@@ -378,14 +402,41 @@ globalInput.emit(MouseTypes.MOUSE_UP, {
 assert.equal(dragComponent.handlePosition.x, 121);
 assert.equal(dragComponent.handlePosition.y, 114);
 assert.equal(dragGizmo.diagnosticState().draggingPosition, false);
+// Embedded Creator Scene can expose DOM events even when cc.input is routed
+// to Game View. Verify the browser capture path with viewport-local coords.
+const pointDom = {
+    target: document.sceneCanvas, button: 0,
+    clientX: 121, clientY: 500 - 114,
+    preventDefault() { this.prevented = true; },
+    stopPropagation() { this.stopped = true; },
+};
+document.emit('pointerdown', pointDom);
+assert.equal(pointDom.prevented, true,
+    'Canvas pointer hit is intercepted before Scene selection steals the drag');
+assert.equal(dragGizmo.diagnosticState().draggingPosition, true);
+document.emit('pointermove', {
+    target: document.sceneCanvas, clientX: 140, clientY: 500 - 122,
+    preventDefault() {},
+});
+document.emit('pointerup', {
+    target: document.sceneCanvas, clientX: 140, clientY: 500 - 122,
+});
+assert.equal(dragComponent.handlePosition.x, 140);
+assert.equal(dragComponent.handlePosition.y, 122);
+assert.equal(dragGizmo.diagnosticState().draggingPosition, false);
+
 dragAdapter.refresh([dragComponent], new Set(), 2100);
 assert.equal(globalInput.count(MouseTypes.MOUSE_DOWN), 0,
     'Deselecting must remove global Scene input listeners');
+assert.equal(document.listeners.get('pointerdown')?.length, 0,
+    'Deselecting must detach all browser Scene mouse capture callbacks');
 assert.equal(positionDisc.active, false,
     'Deselecting hides only the visible disc without destroying its mesh');
 dragAdapter.refresh([dragComponent], new Set([dragNode.uuid]), 2110);
 assert.equal(globalInput.count(MouseTypes.MOUSE_DOWN), 1,
     'Reselect must register exactly one mouse listener');
+assert.equal(document.listeners.get('pointerdown')?.length, 1,
+    'Reselect adds a single DOM capture callback without leaking listeners');
 assert.equal(positionDisc.active, true,
     'Selected -> empty -> same node immediately restores visible drag disc');
 dragAdapter.dispose();
