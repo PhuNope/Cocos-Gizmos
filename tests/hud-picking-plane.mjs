@@ -25,6 +25,10 @@ class Vec3 {
         Object.assign(out, value);
         return out;
     }
+    set(x, y, z) {
+        Object.assign(this, { x, y, z });
+        return this;
+    }
 }
 class Quat {}
 class Color {
@@ -45,6 +49,10 @@ class Node {
     setWorldPosition(value) { this.worldPosition = value; }
     setWorldRotation(value) { this.worldRotation = value; }
     setWorldScale(value) { this.worldScale = value; }
+    inverseTransformPoint(out, value) {
+        Object.assign(out, value);
+        return out;
+    }
     destroy() { this.isValid = false; }
 }
 class MeshRenderer {
@@ -57,6 +65,7 @@ class Material {
     destroy() { this.destroyed = true; }
 }
 let beforeDraw = null;
+const twoDDraws = [];
 const director = {
     on(name, callback) { assert.equal(name, 'before-draw'); beforeDraw = callback; },
     off() { beforeDraw = null; },
@@ -143,8 +152,16 @@ const sandbox = {
     console: { warn(...args) { throw new Error(args.join(' ')); } },
     require(id) {
         const imports = {
-            cc, './Gizmos2D': { Gizmos2D: {} },
-            './Gizmos3D': { Gizmos3D: {} },
+            cc, './Gizmos2D': { Gizmos2D: {
+                DEFAULT_COLOR: {}, DEFAULT_LAYER: 4,
+                beginLayer() {}, beginLocalPosition() {}, endLocalPosition() {},
+                beginColor() {},
+                drawSolidEllipse(...args) { twoDDraws.push(args); },
+            } },
+            './Gizmos3D': { Gizmos3D: {
+                DEFAULT_COLOR: {}, setDepTest() {}, beginColor() {},
+                drawSphere() {},
+            } },
             './PositionDragSolver': solver, './GizmoEditSession': edit,
             './GizmoHudControls': controls, './GizmoHudProjection': projection,
             './GizmoPresentation': presentation, './GizmoHudLayout': layoutModule,
@@ -220,4 +237,80 @@ assert.equal(component.visible, true,
 adapter.clear();
 assert.equal(controller.hitTarget.active, false, 'Deselecting hides HUD raycast plane');
 adapter.dispose();
+
+// Regression: Editor 3.8.8 may hide its private BoxController cube after
+// selection changes. The independent colored disc must remain visible and
+// draggable in both Scene 3D and Canvas 2D, using the same mouse callbacks.
+zoom = 1;
+const dragNode = new Node('Drag3DNode');
+dragNode.uuid = 'drag-node-3d';
+dragNode.activeInHierarchy = true;
+dragNode.worldMatrix = {};
+dragNode.worldPosition = new Vec3();
+const dragComponent = {
+    __classname__: 'HudProbe',
+    constructor: { name: 'HudProbe' },
+    node: dragNode, isValid: true, enabled: true,
+    handlePosition: new Vec3(100, 100, 0),
+    onGizmoHandles() {
+        return [{ property: 'handlePosition', plane: 'xy',
+            space: 'local', color: '#ffcc00' }];
+    },
+};
+const dragAdapter = createPositionHandleAdapter(() => true);
+dragAdapter.refresh([dragComponent], new Set([dragNode.uuid]), 2000);
+assert.equal(dragAdapter.status().active, 1);
+assert.equal(dragAdapter.status().positionHandles, 1);
+const dragGizmo = dragComponent.gizmo;
+const dragController = dragGizmo.controllers[0];
+const positionDisc = gizmoRootNode.children.find(node =>
+    node.name === 'CocosGizmosPositionPoint' && node.active);
+assert.ok(positionDisc, '3D selected drag point has its own visible mesh');
+assert.equal(positionDisc.worldPosition.x, 100);
+assert.equal(positionDisc.worldPosition.y, 100);
+assert.ok(positionDisc.worldScale.x > 0);
+assert.equal(dragController._cubeNode.active, true,
+    'Native drag hit cube is re-activated separately from the point mesh');
+dragGizmo.onNotGizmoMouseDown({ x: 100, y: 100 });
+assert.equal(dragGizmo.diagnosticState().draggingPosition, true,
+    'Independent drag point hit-test begins a Scene position edit');
+dragGizmo.onNotGizmoMouseMove({ x: 121, y: 114 });
+dragGizmo.onNotGizmoMouseUp({ x: 121, y: 114 });
+assert.equal(dragComponent.handlePosition.x, 121);
+assert.equal(dragComponent.handlePosition.y, 114);
+assert.equal(dragGizmo.diagnosticState().draggingPosition, false);
+dragAdapter.refresh([dragComponent], new Set(), 2100);
+assert.equal(positionDisc.active, false,
+    'Deselecting hides only the visible disc without destroying its mesh');
+dragAdapter.refresh([dragComponent], new Set([dragNode.uuid]), 2110);
+assert.equal(positionDisc.active, true,
+    'Selected -> empty -> same node immediately restores visible drag disc');
+dragAdapter.dispose();
+
+const canvas = new Node('TestCanvas');
+canvas.getComponent = Type => Type === cc.RenderRoot2D ? {} : null;
+const dragNode2D = new Node('Drag2DNode');
+dragNode2D.uuid = 'drag-node-2d';
+dragNode2D.activeInHierarchy = true;
+dragNode2D.parent = canvas;
+dragNode2D.worldMatrix = {};
+dragNode2D.worldPosition = new Vec3();
+const drag2D = {
+    ...dragComponent, node: dragNode2D,
+    handlePosition: new Vec3(50, 60, 0),
+};
+const dragAdapter2D = createPositionHandleAdapter(() => true);
+dragAdapter2D.refresh([drag2D], new Set([dragNode2D.uuid]), 3000);
+const visual2D = gizmoRootNode.children.find(node =>
+    node.name === 'CocosGizmosPositionPoint' && node.active);
+assert.ok(visual2D, 'Canvas 2D selected point also owns a scene-visible disc');
+assert.ok(twoDDraws.length >= 2, 'Canvas 2D fallback still draws Graphics markers');
+drag2D.gizmo.onNotGizmoMouseDown({ x: 50, y: 60 });
+drag2D.gizmo.onNotGizmoMouseMove({ x: 75, y: 70 });
+drag2D.gizmo.onNotGizmoMouseUp({ x: 75, y: 70 });
+assert.equal(drag2D.handlePosition.x, 75);
+assert.equal(drag2D.handlePosition.y, 70);
+dragAdapter2D.dispose();
+
+console.log('[position-visual] independent 2D/3D selected point disc, native reselect and drag fallback OK');
 console.log('[hud-picking-plane] exact native HUD quad geometry, zoom and click OK');
