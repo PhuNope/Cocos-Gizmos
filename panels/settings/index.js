@@ -27,6 +27,13 @@ exports.template = `
         <button id="gizmo-diagnostics-run" type="button">Check Scene integration</button>
         <pre id="gizmo-diagnostics-result" role="status" aria-live="polite"></pre>
     </section>
+    <section class="diagnostics">
+        <h3>Mounted example scripts</h3>
+        <p>Check whether the 2D, 3D and Smoke Test scripts are imported
+        in the extension Asset Database. This does not modify the project.</p>
+        <button id="gizmo-examples-run" type="button">Check example assets</button>
+        <pre id="gizmo-examples-result" role="status" aria-live="polite"></pre>
+    </section>
 </section>
 `;
 
@@ -49,6 +56,8 @@ exports.$ = {
     feedback: '#gizmo-feedback',
     diagnosticsRun: '#gizmo-diagnostics-run',
     diagnosticsResult: '#gizmo-diagnostics-result',
+    examplesRun: '#gizmo-examples-run',
+    examplesResult: '#gizmo-examples-result',
 };
 
 exports.ready = async function ready() {
@@ -104,6 +113,34 @@ exports.ready = async function ready() {
     };
     this._gizmosOnDiagnostics = checkScene;
     this.$.diagnosticsRun.addEventListener('click', checkScene);
+
+    const checkExamples = async () => {
+        const button = this.$.examplesRun;
+        const output = this.$.examplesResult;
+        button.disabled = true;
+        output.textContent = 'Checking extension Asset Database...';
+        try {
+            const report = await editor.Message.request('cocos-gizmos', 'get-example-assets');
+            const details = (report?.examples || []).map((entry) =>
+                entry.name + ': ' + entry.status +
+                (entry.importer ? ' (importer: ' + entry.importer + ')' : '') +
+                (entry.error ? ' — ' + entry.error : ''));
+            output.textContent = [
+                'Asset Database: ' + (report?.databaseReady === null ?
+                    'readiness not reported' : report.databaseReady ? 'ready' : 'starting'),
+                ...details,
+                '',
+                report?.guidance || 'No Asset Database result was returned.',
+            ].join('\n');
+        } catch (error) {
+            output.textContent = 'Cannot check mounted scripts: ' +
+                String(error?.message || error);
+        } finally {
+            button.disabled = false;
+        }
+    };
+    this._gizmosOnExamples = checkExamples;
+    this.$.examplesRun.addEventListener('click', checkExamples);
 };
 
 exports.close = function close() {
@@ -114,5 +151,9 @@ exports.close = function close() {
     if (this._gizmosOnDiagnostics) {
         this.$.diagnosticsRun.removeEventListener('click', this._gizmosOnDiagnostics);
         this._gizmosOnDiagnostics = null;
+    }
+    if (this._gizmosOnExamples) {
+        this.$.examplesRun.removeEventListener('click', this._gizmosOnExamples);
+        this._gizmosOnExamples = null;
     }
 };
