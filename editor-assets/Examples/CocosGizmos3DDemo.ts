@@ -198,8 +198,14 @@ export default class CocosGizmos3DDemo extends Component {
                 Vec3.ZERO, Vec3.ONE, wire);
         }
         if (this.showOptionalAssets && this.testSprite) {
+            // drawSprite() scale multiplies native SpriteFrame pixel dimensions.
+            // A fixed 0.4 scale makes 1024px textures hundreds of world units.
+            // Fit any source texture into a ~1.5 world-unit square instead.
+            const sourceSize = this.testSprite.originalSize;
+            const maxDimension = Math.max(1, sourceSize.width, sourceSize.height);
+            const spriteScale = 1.5 / maxDimension;
             Gizmos3D.drawSprite(n, 'api3d-sprite', this.testSprite,
-                p(8, 2.5, 10), new Vec2(0.4, 0.4), Color.WHITE);
+                p(8, 2.5, 10), new Vec2(spriteScale, spriteScale), Color.WHITE);
         }
 
         // Reusable label IDs verify no label proliferation per frame.
