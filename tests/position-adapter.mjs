@@ -440,6 +440,18 @@ assert.ok(selected3DGizmo?.isHandleVisible());
 assert.equal(oldSceneGizmo.isHandleVisible(), false);
 assert.equal(oldSceneGizmo.controllers[0].shape.active, false,
     'Hidden 2D Gizmo must not intercept the next 3D object click');
+for (let i = 0; i < 8; i++) {
+    adapter.refresh([component, otherComponent], selected, 1731 + i * 2);
+    assert.equal(component.gizmo, oldSceneGizmo,
+        '2D/3D toggling reuses the 2D controller rather than allocating it');
+    assert.equal(selected3DGizmo.controllers[0].shape.active, false,
+        '3D native hit target is disabled while Test2D is selected');
+    adapter.refresh([component, otherComponent], new Set([otherNode.uuid]), 1732 + i * 2);
+    assert.equal(otherComponent.gizmo, selected3DGizmo,
+        'Repeated switching reuses the 3D native controller');
+    assert.equal(oldSceneGizmo.controllers[0].shape.active, false,
+        'Old 2D picking shape stays disabled while Test3D is selected');
+}
 adapter.clear();
 assert.equal(adapter.status().active, 0);
 assert.equal(selected3DGizmo.isHandleDisposed(), true,
