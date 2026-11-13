@@ -70,6 +70,7 @@ const sink2D = {
         labels.push({ id, text, position, fontSize, scale, target: '2d' });
     },
 };
+class RenderRoot2D {}
 const sandbox = {
     exports: {},
     cce: { Camera: { _camera: { camera } } },
@@ -78,7 +79,7 @@ const sandbox = {
             Color, Vec3, Vec2: class Vec2 {
                 constructor(x = 0, y = 0) { Object.assign(this, { x, y }); }
             },
-            Layers: { Enum: { GIZMOS: 4 } }, RenderRoot2D: class RenderRoot2D {},
+            Layers: { Enum: { GIZMOS: 4 } }, RenderRoot2D,
         };
         if (id === './Gizmos3D') return { Gizmos3D: sink };
         if (id === './Gizmos2D') return { Gizmos2D: sink2D };
@@ -157,9 +158,7 @@ assert.ok(Math.abs(labels.at(-1).scale - 0.06) < 1e-8,
 
 // 2D HUD must reuse the Canvas RenderRoot. Its Gizmos2D labels are already
 // in the camera's visible UI graph, unlike a second nested 3D root.
-const Root = class RenderRoot2D {};
-// The vm mock uses a separate class, so retrieve the constructor from cc.
-const UiRoot = sandbox.require('cc').RenderRoot2D;
+const UiRoot = RenderRoot2D;
 const canvas = {
     getComponent(type) { return type === UiRoot ? new UiRoot() : null; },
     parent: null,
