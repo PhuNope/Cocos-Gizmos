@@ -1,8 +1,18 @@
 import {
-    _decorator, Color, Component, Mesh, SpriteFrame, Vec2, Vec3,
+    _decorator, Color, Component, Enum, Mesh, Node, SpriteFrame, Vec2, Vec3,
 } from 'cc';
 
 const { ccclass, property } = _decorator;
+
+/** A virtual object can be dragged with the same plane constraints as a
+ * Scene move gizmo. Use the Inspector selector to change movement planes.
+ */
+enum MovePlane3D {
+    XY = 0,
+    XZ = 1,
+    YZ = 2,
+    Camera = 3,
+}
 
 /**
  * Attach to a Node in a 3D Scene and focus the Scene camera near the Node.
@@ -41,6 +51,17 @@ export default class Gizmos3DApiTest extends Component {
     @property({ type: Vec3 })
     public yzPoint = new Vec3(0, 2, -2);
 
+    /** Single selected gizmo object — move the yellow cube by dragging its dot. */
+    @property({ type: Vec3, displayName: 'Move Object Position' })
+    public moveObject = new Vec3(4, 2, 1);
+
+    @property({ type: Enum(MovePlane3D), displayName: 'Move Plane' })
+    public movePlane: MovePlane3D = MovePlane3D.XY;
+
+    /** Optional actual Scene Node: dragging the virtual handle will move it. */
+    @property({ type: Node, displayName: 'Movable Scene Node' })
+    public movableNode: Node | null = null;
+
     @property({ type: [Vec3] })
     public controlPoints: Vec3[] = [
         new Vec3(-2, 0, 0),
@@ -55,8 +76,19 @@ export default class Gizmos3DApiTest extends Component {
         return { display: 'always', hud: 'selected' };
     }
 
+    private getSelectedMovePlane(): 'xy' | 'xz' | 'yz' | 'view' {
+        switch (this.movePlane) {
+        case MovePlane3D.XZ: return 'xz';
+        case MovePlane3D.YZ: return 'yz';
+        case MovePlane3D.Camera: return 'view';
+        default: return 'xy';
+        }
+    }
+
     public onGizmoHandles(): GizmoHandleList {
         return [
+            { property: 'moveObject', plane: this.getSelectedMovePlane(),
+                space: 'local', snap: 0.25, color: '#ffb94a' },
             { property: 'xyPoint', plane: 'xy', space: 'local', snap: 0.25,
                 color: '#ffcc00' },
             { property: 'xzPoint', plane: 'xz', space: 'local', snap: 0.25,
@@ -74,6 +106,8 @@ export default class Gizmos3DApiTest extends Component {
         return [
             { id: 'title', text: 'Gizmos3D API Test', order: 0, color: '#ffff88' },
             { id: 'size', text: 'Size: ' + this.size.toFixed(2), order: 1 },
+            { id: 'move-plane', text: 'Move object plane: ' +
+                this.getSelectedMovePlane().toUpperCase(), order: 1 },
             { id: 'depth', text: 'Depth test: ' + this.depthTest, order: 2 },
             { id: 'event', text: 'Last event: ' + this.lastEvent, order: 3, fontSize: 12 },
         ];
@@ -99,6 +133,8 @@ export default class Gizmos3DApiTest extends Component {
         this.xyPoint = new Vec3(0, 1.5, 0);
         this.xzPoint = new Vec3(2, 0, 2);
         this.yzPoint = new Vec3(0, 2, -2);
+        this.moveObject = new Vec3(4, 2, 1);
+        this.movePlane = MovePlane3D.XY;
         this.lastEvent = 'reset button';
     }
 
@@ -110,6 +146,11 @@ export default class Gizmos3DApiTest extends Component {
 
     public onGizmoChanged(name: string, phase: GizmoHandlePhase, index?: number): void {
         this.lastEvent = name + (index === undefined ? '' : '[' + index + ']') + ': ' + phase;
+        if (name === 'moveObject' && this.movableNode?.isValid &&
+            (phase === 'update' || phase === 'end' || phase === 'cancel')) {
+            const world = Vec3.transformMat4(new Vec3(), this.moveObject, this.node.worldMatrix);
+            this.movableNode.setWorldPosition(world);
+        }
     }
 
     public onDrawGizmos(): void {
@@ -228,6 +269,20 @@ export default class Gizmos3DApiTest extends Component {
         Gizmos3D.drawLine(n, Vec3.ZERO, this.xzPoint);
         Gizmos3D.drawLine(n, Vec3.ZERO, this.yzPoint);
         Gizmos3D.drawSphere(n, this.xyPoint, 0.2, false, 12, 8);
+
+        // Selected draggable virtual object. The Box position comes from the
+        // same Vec3 property as its native Editor Controller drag marker.
+        Gizmos3D.beginColor(n, new Color(255, 185, 70));
+        Gizmos3D.drawBox(n, this.moveObject, new Vec3(0.7, 0.7, 0.7),
+            Vec3.ZERO, true);
+        const center = this.moveObject;
+        Gizmos3D.beginColor(n, Color.RED);
+        Gizmos3D.drawLine(n, center, new Vec3(center.x + 1.1, center.y, center.z));
+        Gizmos3D.beginColor(n, Color.GREEN);
+        Gizmos3D.drawLine(n, center, new Vec3(center.x, center.y + 1.1, center.z));
+        Gizmos3D.beginColor(n, Color.BLUE);
+        Gizmos3D.drawLine(n, center, new Vec3(center.x, center.y, center.z + 1.1));
+        Gizmos3D.beginColor(n, Color.YELLOW);
         Gizmos3D.drawLineList(n, this.controlPoints);
         Gizmos3D.endLocalPosition(n);
         Gizmos3D.beginColor(n, Gizmos3D.DEFAULT_COLOR);
