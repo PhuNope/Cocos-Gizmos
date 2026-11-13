@@ -153,7 +153,9 @@ class GizmosDebugDraw extends Component {
     private static get overlayLayer(): number {
         // A 3D-space RenderRoot2D must render on a camera-visible UI layer.
         // Creator's Scene camera commonly excludes UI_2D.
-        return Layers.Enum.UI_3D ?? Layers.Enum.GIZMOS;
+        // Include GIZMOS as well: some Creator Scene View modes render
+        // Editor gizmos while excluding the regular UI_3D camera layer.
+        return (Layers.Enum.UI_3D ?? 0) | Layers.Enum.GIZMOS;
     }
 
     private orientToEditorCamera(node: Node): void {
