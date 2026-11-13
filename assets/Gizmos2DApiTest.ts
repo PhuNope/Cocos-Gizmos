@@ -41,20 +41,17 @@ export default class Gizmos2DApiTest extends Component {
     }
 
     public onGizmoHandles(): GizmoHandleList {
+        const bounds = {
+            min: { x: -600, y: -450 },
+            max: { x: 600, y: 450 },
+        };
         return [
-            {
-                property: 'point', plane: 'xy', space: 'local',
-                snap: 5, color: '#ffcc00',
-                bounds: { min: { x: -600, y: -450 }, max: { x: 600, y: 450 } },
-            },
-            { property: 'waypoints', index: 0, plane: 'xy', space: 'local',
-                color: '#00ffff', bounds: {
-                    min: { x: -600, y: -450 }, max: { x: 600, y: 450 },
-                } },
-            { property: 'waypoints', index: 1, plane: 'xy', space: 'local',
-                color: '#00ffff', bounds: {
-                    min: { x: -600, y: -450 }, max: { x: 600, y: 450 },
-                } },
+            Gizmos2D.point('point', {
+                snap: 5, color: '#ffcc00', bounds,
+            }),
+            ...Gizmos2D.points('waypoints', this.waypoints.length, {
+                color: '#00ffff', bounds,
+            }),
         ];
     }
 
