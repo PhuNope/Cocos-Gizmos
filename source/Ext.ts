@@ -33,8 +33,13 @@ declare global {
         color?: string;
         /** Unique identifier when multiple handles edit the same Vec3. */
         id?: string;
-        /** Display a filled, clickable plane square instead of just a point. */
-        visual?: 'point' | 'plane';
+        /** Compact axis-arrow handle, plane tile, or a single point.
+         * For 'axis' set axis: 'x' | 'y' | 'z'. Three axis handles can
+         * reference the same Vec3 property using distinct ids.
+         */
+        visual?: 'point' | 'plane' | 'axis';
+        /** Visible length of an axis arrow in Scene pixels (default 78). */
+        axisSize?: number;
         /** Side length of the plane square in Scene pixels (default 36). */
         planeSize?: number;
         /** Offset of the square along its two axes in pixels (default 48). */
