@@ -32,29 +32,35 @@ export function resolveSceneCamera(cce: any): SceneCameraResolution {
     let convention: SceneCameraConvention = 'unavailable';
     let source: SceneCameraResolution['source'] = 'unavailable';
 
-    if (hasProjectionMethods(wrapped)) {
-        raw = wrapped;
-        convention = 'render-camera';
-        source = 'wrapped';
-    } else if (hasProjectionMethods(direct?.camera)) {
-        raw = direct.camera;
-        convention = 'render-camera';
-        source = 'direct';
-    } else if (hasProjectionMethods(direct)) {
+    // The public Scene cce.Camera.camera is a cc.Camera component in
+    // Creator 3.8.x. Prefer it over private _camera.camera (renderer camera):
+    // their viewport/pointer coordinates can differ during Scene 2D pan/zoom.
+    if (hasProjectionMethods(direct)) {
         raw = direct;
-        // A renderer camera has no Component.camera getter. It also exposes
-        // render-scene properties used by geometry drawing.
         convention = direct.geometryRenderer !== undefined ||
             typeof direct.initGeometryRenderer === 'function' ||
             direct.matViewProj !== undefined || direct.projectionType !== undefined ?
             'render-camera' : 'component-camera';
         source = 'direct';
+    } else if (hasProjectionMethods(direct?.camera)) {
+        raw = direct.camera;
+        convention = 'render-camera';
+        source = 'direct';
+    } else if (hasProjectionMethods(wrapped)) {
+        raw = wrapped;
+        convention = 'render-camera';
+        source = 'wrapped';
     }
 
     if (!raw) return { camera: null, convention, source };
 
+    const viewport = raw.camera || raw;
+    const width = Number(viewport?.width);
+    const height = Number(viewport?.height);
     const camera: SceneHudCamera = {
         node: raw.node,
+        viewport: Number.isFinite(width) && width > 0 &&
+            Number.isFinite(height) && height > 0 ? { width, height } : undefined,
         worldToScreen(world, out) {
             if (convention === 'render-camera') {
                 raw.worldToScreen(out, world);
