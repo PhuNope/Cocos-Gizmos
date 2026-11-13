@@ -49,6 +49,15 @@ globalThis.Editor = {
             }
             assert.equal(service, 'scene');
             assert.equal(message, 'execute-scene-script');
+            if (args.method === 'gizmosExampleClassStatus') {
+                if (!allowScene) throw new Error('Scene reloading');
+                assert.deepEqual(args.args, []);
+                return {
+                    registryAvailable: true,
+                    classes: Object.keys(exampleIds).map((name) =>
+                        ({ name, status: 'registered' })),
+                };
+            }
             if (args.method === 'gizmosSmokeReport') {
                 if (!allowScene) throw new Error('Scene not ready');
                 assert.deepEqual(args.args, []);
@@ -102,10 +111,13 @@ try {
     assert.match(host.$.diagnosticsResult.textContent, /SampleScene/);
     assert.ok(host.$.diagnosticsResult.textContent.includes('Ctrl+Z'));
     await host.$.examplesRun.click();
-    assert.match(host.$.examplesResult.textContent, /CocosGizmos2DDemo: imported/);
+    assert.match(host.$.examplesResult.textContent,
+        /CocosGizmos2DDemo: imported \| Scene class: registered/);
     assert.match(host.$.examplesResult.textContent, /CocosGizmos3DDemo: imported/);
     assert.match(host.$.examplesResult.textContent, /CocosGizmosSmokeDemo: imported/);
     assert.equal(host.$.examplesRun.disabled, false);
+    assert.match(host.$.examplesResult.textContent,
+        /CocosGizmosSmokeDemo: imported \| Scene class: registered/);
 
     host.$.display.value = 'selected';
     host.$.hud.value = 'off';
