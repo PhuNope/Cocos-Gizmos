@@ -66,6 +66,39 @@ async function queryExampleAssets(editor) {
     };
 }
 
+/**
+ * A mounted script may be visible in Assets but absent from Scene's class
+ * registry (for example after a compile error). Query only: never instantiate
+ * or attach Components.
+ */
+async function queryExampleClassRegistry(editor) {
+    try {
+        const report = await editor.Message.request('scene', 'execute-scene-script', {
+            name: 'cocos-gizmos',
+            method: 'gizmosExampleClassStatus',
+            args: [],
+        });
+        if (!report || !Array.isArray(report.classes)) return null;
+        const allowed = new Set([
+            'registered', 'not-registered', 'not-component',
+            'registry-unavailable', 'lookup-error',
+        ]);
+        const classes = new Map();
+        for (const entry of report.classes) {
+            if (entry && typeof entry.name === 'string' &&
+                allowed.has(entry.status) &&
+                EXAMPLE_ASSETS.some((sample) => sample.name === entry.name)) {
+                classes.set(entry.name, entry.status);
+            }
+        }
+        return { registryAvailable: report.registryAvailable === true, classes };
+    } catch {
+        // An unloaded or compiling Scene process is not evidence that classes
+        // are missing. Report it separately from a successful negative lookup.
+        return null;
+    }
+}
+
 let viewSettings = { display: 'always', hud: 'selected' };
 
 function normalizeSettings(value) {
@@ -109,7 +142,40 @@ exports.methods = {
         });
     },
     async getExampleAssets() {
-        return queryExampleAssets(globalThis.Editor);
+        const editor = globalThis.Editor;
+        const assets = await queryExampleAssets(editor);
+        if (assets.databaseReady === false) {
+            return {
+                ...assets, sceneRegistry: 'not-checked',
+                examples: assets.examples.map((item) =>
+                    ({ ...item, classStatus: 'not-checked' })),
+            };
+        }
+        const registry = await queryExampleClassRegistry(editor);
+        const examples = assets.examples.map((item) => ({
+            ...item,
+            classStatus: registry?.classes.get(item.name) ||
+                (registry?.registryAvailable === false ?
+                    'registry-unavailable' : 'scene-unavailable'),
+        }));
+        const allRegistered = examples.every((entry) =>
+            entry.status === 'imported' && entry.classStatus === 'registered');
+        const missingClass = examples.some((entry) =>
+            entry.status === 'imported' &&
+            ['not-registered', 'not-component', 'lookup-error'].includes(entry.classStatus));
+        const guidance = allRegistered ?
+            'Asset DB import and Scene class registration succeeded. Confirm drag-and-drop in the Inspector manually.' :
+            missingClass ?
+                'Some imported scripts are not registered as Components in Scene. Inspect Cocos script compilation errors and reload the Scene.' :
+                assets.guidance + (registry === null ?
+                    ' Scene class registration could not be checked (Scene process unavailable).' : '');
+        return {
+            ...assets,
+            sceneRegistry: registry === null ? 'unavailable' :
+                registry.registryAvailable ? 'available' : 'registry-unavailable',
+            examples,
+            guidance,
+        };
     },
     getSettings() {
         return { ...viewSettings };
