@@ -484,36 +484,48 @@ function suspendNativeController(controller: any, picking?: HudPickingQuad | nul
  */
 function configurePositionHitProxy(controller: any, color: Color, enabled: boolean): void {
     if (!controller) return;
-    if (enabled) {
-        // BoxController builds the face nodes only after initEditHandles().
-        // Do not modify its private topNode or create replacement mesh shapes.
-        if (!controller.__cocosGizmosProxyReady) {
-            try {
-                controller._defaultEditHandleSize = 0.08;
-                controller.initEditHandles?.();
-                controller.__cocosGizmosProxyReady = true;
-            } catch (error) {
-                console.warn('[cocos-gizmos/handles] Native edit face init unavailable:', error);
-            }
+    // Creator 3.8 uses BoxController's +Y editable face as the hit target.
+    // Initializing/showing the face again on *every Scene frame* resets
+    // Editor picking state just after mouse-down. Only change the native
+    // controller on a real disabled -> enabled transition.
+    const wasEnabled = controller.__cocosGizmosProxyEnabled === true;
+    if (enabled && !controller.__cocosGizmosProxyReady) {
+        try {
+            controller._defaultEditHandleSize = 0.08;
+            controller.initEditHandles?.();
+            controller.__cocosGizmosProxyReady = true;
+        } catch (error) {
+            // A Creator build without the private editable-face API retains
+            // the standalone cube as a fallback; don't disrupt HUD/selection.
+            controller.__cocosGizmosProxyReady = false;
+            console.warn('[cocos-gizmos/handles] Native edit face init unavailable:', error);
         }
-        try { controller.showEditHandles?.(); }
-        catch (error) { console.warn('[cocos-gizmos/handles] Native edit face show unavailable:', error); }
     }
+    if (enabled && !wasEnabled && controller.__cocosGizmosProxyReady) {
+        try {
+            controller.showEditHandles?.();
+        } catch (error) {
+            console.warn('[cocos-gizmos/handles] Native edit face show unavailable:', error);
+        }
+    }
+    controller.__cocosGizmosProxyEnabled = enabled;
     controller._edit = enabled;
     controller._editable = enabled;
     controller.editable = enabled;
     const shape = controller._editHandlesShape;
     if (shape) {
-        shape.active = enabled;
+        shape.active = enabled && controller.__cocosGizmosProxyReady;
         for (const child of shape.children || []) {
-            // The +Y face is the verified native hit proxy; others are hidden
-            // to avoid intercepting unrelated editor tools.
-            child.active = enabled && child.name === 'y';
+            child.active = enabled &&
+                controller.__cocosGizmosProxyReady &&
+                child.name === 'y';
         }
         applyGizmoLayer(shape);
     }
-    if (enabled) {
+    if (enabled && !wasEnabled && controller.__cocosGizmosProxyReady) {
         controller.setEditHandlesColor?.(color);
+        // Like Cocos Gizmo Kit, the +Y face is fully transparent but
+        // remains present in native GizmoOperation raycast.
         controller.setHandleColor?.('y', color, 0);
         repairNativeHandleColors(controller, 'y', color);
     }
@@ -1268,6 +1280,11 @@ function createEditorGizmo(
         // on Creator 3.8.8, even when no controller was hit.
         public onNotGizmoMouseDown(event?: any): void {
             input.record('outsideDown');
+            // Creator dispatches onNotGizmoMouseDown to selected component
+            // gizmos even after BoxController's onControllerMouseDown has
+            // already started a valid gesture. The previous fallthrough
+            // finish(true) cancelled it immediately (begin -> cancel).
+            if (this.drag || this.hudDrag || this.pendingClick) return;
             const hud = this.hudEntryAt(event);
             const point = readScenePointer(event);
             // HUD gets priority when on-screen shapes overlap position points.
@@ -1284,8 +1301,8 @@ function createEditorGizmo(
                 this.beginHud(hud, { ...event, ...point, handleName: hud.key });
                 return;
             }
-            this.finish(true);
-            this.finishHud(true);
+            // Clicks outside every selected handle are normal Scene
+            // interactions. There is no active session to roll back here.
         }
 
         public onNotGizmoMouseMove(event?: any): void {
