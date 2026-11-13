@@ -80,3 +80,40 @@ export function createSceneHudProjection(
         },
     };
 }
+
+/**
+ * Creates a camera-facing, one-world-unit-deep HUD plane that tracks the Scene
+ * viewport rather than the selected Node's world depth. Matching the
+ * screen-textured HUD plane keeps picking handles aligned after zoom.
+ */
+export function createViewportHudProjection(camera: SceneHudCamera): SceneHudProjection | null {
+    const viewport = camera.viewport;
+    if (!viewport || viewport.width <= 0 || viewport.height <= 0) return null;
+    const center = rayAt(camera, viewport.width * 0.5, viewport.height * 0.5);
+    if (!center) return null;
+    const origin = new Vec3(center.o.x + center.d.x,
+        center.o.y + center.d.y, center.o.z + center.d.z);
+    const normal = center.d;
+    const x0 = viewport.width * 0.5;
+    const y0 = viewport.height * 0.5;
+    const x = rayAt(camera, x0 + 1, y0);
+    const y = rayAt(camera, x0, y0 + 1);
+    if (!x || !y) return null;
+    const right = intersectHandlePlane(x, origin, normal);
+    const up = intersectHandlePlane(y, origin, normal);
+    const base = intersectHandlePlane(center, origin, normal);
+    if (!base || !right || !up) return null;
+    const dx = new Vec3(right.x - base.x, right.y - base.y, right.z - base.z);
+    const dy = new Vec3(up.x - base.x, up.y - base.y, up.z - base.z);
+    const pixelSize = Math.hypot(dx.x, dx.y, dx.z);
+    if (!Number.isFinite(pixelSize) || pixelSize < 1e-9) return null;
+    return {
+        screen: { x: x0, y: y0 }, viewport, pixelSize,
+        worldAt(x: number, y: number): Vec3 {
+            const u = x - x0, v = y - y0;
+            return new Vec3(base.x + u * dx.x + v * dy.x,
+                base.y + u * dx.y + v * dy.y,
+                base.z + u * dx.z + v * dy.z);
+        },
+    };
+}
