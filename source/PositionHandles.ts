@@ -1,5 +1,5 @@
 import { CCObject, Color, Component, director, Director, gfx, Layers,
-    ImageAsset, input as engineInput, Input, Material, Mesh, MeshRenderer, Node, Quat, RenderRoot2D,
+    ImageAsset, Material, Mesh, MeshRenderer, Node, Quat, RenderRoot2D,
     Sprite, SpriteFrame, Texture2D, UITransform, utils, Vec3 } from 'cc';
 import { Gizmos2D } from './Gizmos2D';
 import { Gizmos3D } from './Gizmos3D';
@@ -477,6 +477,48 @@ function suspendNativeController(controller: any, picking?: HudPickingQuad | nul
     if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = false;
 }
 
+/** Creator 3.8.x Scene hit-testing selects BoxController's editable +Y
+ * face. The visible position Sprite is purely decorative: it does not enter
+ * Editor GizmoOperation's picking list. Mirror the working Cocos Gizmo Kit
+ * design by keeping exactly one invisible editable face enabled.
+ */
+function configurePositionHitProxy(controller: any, color: Color, enabled: boolean): void {
+    if (!controller) return;
+    if (enabled) {
+        // BoxController builds the face nodes only after initEditHandles().
+        // Do not modify its private topNode or create replacement mesh shapes.
+        if (!controller.__cocosGizmosProxyReady) {
+            try {
+                controller._defaultEditHandleSize = 0.08;
+                controller.initEditHandles?.();
+                controller.__cocosGizmosProxyReady = true;
+            } catch (error) {
+                console.warn('[cocos-gizmos/handles] Native edit face init unavailable:', error);
+            }
+        }
+        try { controller.showEditHandles?.(); }
+        catch (error) { console.warn('[cocos-gizmos/handles] Native edit face show unavailable:', error); }
+    }
+    controller._edit = enabled;
+    controller._editable = enabled;
+    controller.editable = enabled;
+    const shape = controller._editHandlesShape;
+    if (shape) {
+        shape.active = enabled;
+        for (const child of shape.children || []) {
+            // The +Y face is the verified native hit proxy; others are hidden
+            // to avoid intercepting unrelated editor tools.
+            child.active = enabled && child.name === 'y';
+        }
+        applyGizmoLayer(shape);
+    }
+    if (enabled) {
+        controller.setEditHandlesColor?.(color);
+        controller.setHandleColor?.('y', color, 0);
+        repairNativeHandleColors(controller, 'y', color);
+    }
+}
+
 function createEditorGizmo(
     base: any, allowHud: (component: Component) => boolean,
     input: GizmoInputDiagnostics,
@@ -491,118 +533,9 @@ function createEditorGizmo(
         private shown = false;
         private destroyed = false;
         private beforeDrawRegistered = false;
-        private globalMouseRegistered = false;
-        private domMouseRegistered = false;
-        /** Map browser events from the Editor's Scene canvas to the same
-         * bottom-left pixel space as cce.Camera.worldToScreen. The Engine input
-         * backend is not always connected to the embedded Scene WebView.
-         */
-        private domPointer(event: any): ScenePointer | null {
-            if (!event || typeof event.clientX !== 'number' ||
-                typeof event.clientY !== 'number') return null;
-            const view = camera();
-            const viewport = view?.viewport;
-            if (!viewport) return null;
-            const doc = (globalThis as any).document;
-            const canvas = event.target?.tagName?.toLowerCase?.() === 'canvas' ?
-                event.target : (doc?.querySelector?.('#GameCanvas') ||
-                    doc?.querySelector?.('canvas'));
-            const rect = canvas?.getBoundingClientRect?.();
-            if (!rect || rect.width <= 0 || rect.height <= 0) return null;
-            const x = (event.clientX - rect.left) * viewport.width / rect.width;
-            const y = (rect.bottom - event.clientY) * viewport.height / rect.height;
-            if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 ||
-                y < 0 || x > viewport.width || y > viewport.height) return null;
-            return { x, y };
-        }
-        private readonly onDomMouseDown = (event: any): void => {
-            if (!this.shown || this.destroyed || this.drag || this.hudDrag ||
-                this.pendingClick || (event.button !== undefined && event.button !== 0))
-                return;
-            const point = this.domPointer(event);
-            if (!point || this.hudEntryAt(point)) return;
-            const entry = this.positionEntryAt(point);
-            if (!entry) return;
-            this.begin(entry, point);
-            if (this.drag) {
-                // A visible overlay Sprite can otherwise let the Editor's
-                // selection tool steal the click before a drag starts.
-                event.preventDefault?.();
-                event.stopPropagation?.();
-            }
-        };
-        private readonly onDomMouseMove = (event: any): void => {
-            if (!this.drag) return;
-            const point = this.domPointer(event);
-            if (point) this.move(this.drag.entry, point);
-            if (point) event.preventDefault?.();
-        };
-        private readonly onDomMouseUp = (event: any): void => {
-            if (!this.drag) return;
-            const point = this.domPointer(event);
-            if (point) this.move(this.drag.entry, point);
-            this.finish(false);
-        };
-        private registerDomMouse(): void {
-            const doc = (globalThis as any).document;
-            if (this.domMouseRegistered || typeof doc?.addEventListener !== 'function') return;
-            doc.addEventListener('pointerdown', this.onDomMouseDown, true);
-            doc.addEventListener('pointermove', this.onDomMouseMove, true);
-            doc.addEventListener('pointerup', this.onDomMouseUp, true);
-            this.domMouseRegistered = true;
-        }
-        private unregisterDomMouse(): void {
-            if (!this.domMouseRegistered) return;
-            const doc = (globalThis as any).document;
-            doc?.removeEventListener?.('pointerdown', this.onDomMouseDown, true);
-            doc?.removeEventListener?.('pointermove', this.onDomMouseMove, true);
-            doc?.removeEventListener?.('pointerup', this.onDomMouseUp, true);
-            this.domMouseRegistered = false;
-        }
-
-        /** Cocos input is independent of private Scene BoxController picking.
-         * Only initiate gestures inside the selected screen-space drag disc.
-         * Never swallow the event: the standard Editor transform tool works
-         * normally for every click outside the custom handles.
-         */
-        private readonly onGlobalMouseDown = (event: any): void => {
-            if (!this.shown || this.destroyed || this.drag || this.hudDrag ||
-                this.pendingClick || !event) return;
-            if (typeof event.getButton === 'function' &&
-                event.getButton() !== 0) return;
-            if (this.hudEntryAt(event)) return;
-            const entry = this.positionEntryAt(event);
-            if (entry) this.begin(entry, event);
-        };
-        private readonly onGlobalMouseMove = (event: any): void => {
-            if (this.drag && event) this.move(this.drag.entry, event);
-        };
-        private readonly onGlobalMouseUp = (_event: any): void => {
-            if (this.drag) this.finish(false);
-        };
-        private registerGlobalMouse(): void {
-            const events = Input?.EventType;
-            if (this.globalMouseRegistered || !events || typeof engineInput?.on !== 'function') return;
-            try {
-                engineInput.on(events.MOUSE_DOWN, this.onGlobalMouseDown, this);
-                engineInput.on(events.MOUSE_MOVE, this.onGlobalMouseMove, this);
-                engineInput.on(events.MOUSE_UP, this.onGlobalMouseUp, this);
-                this.globalMouseRegistered = true;
-            } catch (error) {
-                // Different Creator builds expose different input backends.
-                console.warn('[cocos-gizmos/handles] Global input fallback unavailable:', error);
-                this.unregisterGlobalMouse();
-            }
-        }
-        private unregisterGlobalMouse(): void {
-            if (typeof engineInput?.off === 'function' && Input?.EventType) {
-                engineInput.off(Input.EventType.MOUSE_DOWN, this.onGlobalMouseDown, this);
-                engineInput.off(Input.EventType.MOUSE_MOVE, this.onGlobalMouseMove, this);
-                engineInput.off(Input.EventType.MOUSE_UP, this.onGlobalMouseUp, this);
-            }
-            this.globalMouseRegistered = false;
-        }
-
+        // Creator's embedded Scene routes mouse events through GizmoOperation,
+        // not the Game Canvas input pipeline. Native BoxController's editable
+        // +Y face is the same hit proxy used by Cocos Gizmo Kit.
         private readonly beforeDraw = (): void => {
             if (!this.shown || this.destroyed) return;
             // Re-project during Scene scroll, before native controller raycast.
@@ -728,11 +661,13 @@ function createEditorGizmo(
                     else color.set(255, 174, 66, 255);
                     controller.setColor?.(color);
                     controller.setOpacity?.(255);
-                    // Use only the standalone cube. BoxController's editable face
-                    // handles require private topNode state and crash on 3.8.8.
+                    controller._hoverColor = color;
+                    controller.hoverColor = color;
+                    // BoxController's editable +Y hit face, not the Sprite,
+                    // is what Creator's Scene GizmoOperation can raycast.
+                    configurePositionHitProxy(controller, color, true);
                     if (controller._wireFrameBoxNode) controller._wireFrameBoxNode.active = false;
                     if (controller._wireFrameBoxMeshRenderer) controller._wireFrameBoxMeshRenderer.enabled = false;
-                    if (controller._editHandlesShape) controller._editHandlesShape.active = false;
                     if (!controller._cubeNode || typeof controller.initHandle !== 'function') {
                         throw new Error('Standalone position marker is unavailable');
                     }
@@ -744,7 +679,14 @@ function createEditorGizmo(
                     repairNativeHandleColors(controller, key, color);
                     entry.visual = createPositionVisual(color);
                     this.registerVisualMouse(entry);
-                    const down = (event: any) => { input.record('controllerDown'); this.begin(entry, event); };
+                    const down = (event: any) => {
+                        input.record('controllerDown');
+                        // Creator reports the editable face as 'y', not our
+                        // custom cube handle. Translate it before begin().
+                        const name = readSceneHandleName(event);
+                        this.begin(entry, name === 'y' ?
+                            { ...event, handleName: entry.key } : event);
+                    };
                     const move = (event: any) => { input.record('controllerMove'); this.move(entry, event); };
                     const up = () => {
                         input.record('controllerUp');
@@ -886,6 +828,11 @@ function createEditorGizmo(
                 }
                 this.restoreMarker(entry.controller);
                 this.ensureMarkerVisible(entry.controller);
+                // Editor may reset edit face visibility on selection change.
+                const color = new Color(255, 174, 66, 255);
+                if (entry.field.color && Color.fromHEX)
+                    Color.fromHEX(color, entry.field.color);
+                configurePositionHitProxy(entry.controller, color, true);
                 entry.controller.setPosition?.(new Vec3(world.x, world.y, world.z));
                 entry.controller.setRotation?.(new Quat());
                 const size = markerSize(world);
@@ -1289,8 +1236,8 @@ function createEditorGizmo(
             input.record('gizmoDown');
             const name = readSceneHandleName(event);
             const entry = this.entries.find((item) => item.key === name) ||
-                (!name ? this.positionEntryAt(event) : null);
-            if (entry) this.begin(entry, name ? event : {
+                (name === 'y' || !name ? this.positionEntryAt(event) : null);
+            if (entry) this.begin(entry, name === entry.key ? event : {
                 ...event, ...readScenePointer(event), handleName: entry.key,
             });
             const hud = this.hudEntries.find((item) => item.key === name) ||
@@ -1371,8 +1318,6 @@ function createEditorGizmo(
         public onShow(): void {
             if (this.destroyed) return;
             this.shown = true;
-            this.registerGlobalMouse();
-            this.registerDomMouse();
             if (!this.beforeDrawRegistered && typeof director?.on === 'function') {
                 director.on(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
                 this.beforeDrawRegistered = true;
@@ -1393,8 +1338,6 @@ function createEditorGizmo(
         }
 
         public onHide(): void {
-            this.unregisterGlobalMouse();
-            this.unregisterDomMouse();
             if (this.beforeDrawRegistered) {
                 director.off(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
                 this.beforeDrawRegistered = false;
@@ -1404,6 +1347,7 @@ function createEditorGizmo(
             }
             for (const entry of this.entries) {
                 if (entry.visual?.node?.isValid) entry.visual.node.active = false;
+                configurePositionHitProxy(entry.controller, new Color(255,255,255,255), false);
             }
             this.finish(true);
             this.finishHud(true);
@@ -1461,8 +1405,6 @@ function createEditorGizmo(
         }
 
         public onDestroy(): void {
-            this.unregisterGlobalMouse();
-            this.unregisterDomMouse();
             if (this.beforeDrawRegistered) {
                 director.off(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
                 this.beforeDrawRegistered = false;
