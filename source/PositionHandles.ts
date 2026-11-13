@@ -1,5 +1,6 @@
 import { CCObject, Color, Component, director, Director, gfx, Layers,
-    Material, Mesh, MeshRenderer, Node, Quat, RenderRoot2D, utils, Vec3 } from 'cc';
+    ImageAsset, Material, Mesh, MeshRenderer, Node, Quat, RenderRoot2D,
+    Sprite, SpriteFrame, Texture2D, UITransform, utils, Vec3 } from 'cc';
 import { Gizmos2D } from './Gizmos2D';
 import { Gizmos3D } from './Gizmos3D';
 import {
@@ -21,7 +22,11 @@ import {
 
 type Point = { x: number; y: number; z: number };
 type Field = GizmoHandleDescriptor;
-type PositionVisual = { node: Node; renderer: MeshRenderer; material: Material; mesh: Mesh };
+type PositionVisual = {
+    node: Node; renderer: MeshRenderer; material: Material; mesh: Mesh;
+    sprite?: Sprite | null; image?: ImageAsset | null; texture?: Texture2D | null;
+    frame?: SpriteFrame | null; uiRoot?: Node | null;
+};
 type Entry = { field: Field; controller: any; key: string; visual?: PositionVisual | null };
 type DragState = { entry: Entry; solver: PositionDragSolver; session: GizmoEditSession<Point> };
 type HudPickingQuad = { node: Node; renderer: MeshRenderer; material: Material; mesh: Mesh };
@@ -194,7 +199,9 @@ function drawSelectedPositionMarkers(component: Component): void {
         Math.abs(nodeScale.y) : 1;
     try {
         if (onCanvas) {
-            Gizmos2D.beginLayer(node, Layers.Enum.UI_2D);
+            // The existing 2D Gizmo shapes in Creator Scene use GIZMOS,
+            // not UI_2D. UI_2D is excluded by some Editor Scene cameras.
+            Gizmos2D.beginLayer(node, Layers.Enum.GIZMOS);
             Gizmos2D.beginLocalPosition(node);
         } else {
             Gizmos3D.setDepTest(node, false);
@@ -283,7 +290,80 @@ function createPositionVisual(color: Color): PositionVisual | null {
         for (let i = 1; i <= segments; i++) indices.push(0, i, i + 1);
         mesh = utils.createMesh({ positions, indices }, undefined, { calculateBounds: true });
         renderer.mesh = mesh;
-        return { node, renderer, material, mesh };
+        const visual: PositionVisual = { node, renderer, material, mesh };
+        // Match the HUD's proven RenderRoot2D/Sprite rendering path. A
+        // standalone builtin-unlit MeshRenderer can be invisible to the
+        // Creator 3.8.8 Scene camera, especially in 2D mode.
+        const document = (globalThis as any).document;
+        if (document?.createElement && typeof Sprite === 'function') {
+            let uiRoot: Node | null = null;
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = 64;
+                canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    const r = Math.max(0, Math.min(255, color.r));
+                    const g = Math.max(0, Math.min(255, color.g));
+                    const b = Math.max(0, Math.min(255, color.b));
+                    ctx.clearRect(0, 0, 64, 64);
+                    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+                    ctx.beginPath();
+                    ctx.arc(32, 32, 29, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+                    ctx.beginPath();
+                    ctx.arc(32, 32, 24, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(32, 32, 24, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.strokeStyle = '#151923';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(20, 32); ctx.lineTo(44, 32);
+                    ctx.moveTo(32, 20); ctx.lineTo(32, 44);
+                    ctx.stroke();
+                    const image = new ImageAsset(canvas);
+                    const texture = new Texture2D();
+                    texture.image = image;
+                    const frame = new SpriteFrame();
+                    frame.texture = texture;
+                    uiRoot = new Node('CocosGizmosPointUIRoot');
+                    uiRoot.layer = Layers.Enum.GIZMOS | (Layers.Enum.UI_3D || 0);
+                    node.addChild(uiRoot);
+                    uiRoot.addComponent(RenderRoot2D);
+                    const spriteNode = new Node('CocosGizmosDragPointVisible');
+                    spriteNode.layer = uiRoot.layer;
+                    uiRoot.addChild(spriteNode);
+                    const sprite = spriteNode.addComponent(Sprite);
+                    const transform = spriteNode.getComponent(UITransform) ||
+                        spriteNode.addComponent(UITransform);
+                    transform.setAnchorPoint?.(0.5, 0.5);
+                    transform.setContentSize?.(28, 28);
+                    sprite.spriteFrame = frame;
+                    const Sorting2D = (globalThis as any).cc?.Sorting2D;
+                    if (typeof Sorting2D === 'function') {
+                        const sorting: any = spriteNode.addComponent(Sorting2D);
+                        if (sorting) sorting.sortingOrder = 32760;
+                    }
+                    visual.uiRoot = uiRoot;
+                    visual.sprite = sprite;
+                    visual.image = image;
+                    visual.texture = texture;
+                    visual.frame = frame;
+                    // Never draw both representations at the same time.
+                    renderer.enabled = false;
+                }
+            } catch (error) {
+                console.warn('[cocos-gizmos/handles] Sprite marker fallback:', error);
+                if (uiRoot?.isValid) uiRoot.destroy();
+                renderer.enabled = true;
+            }
+        }
+        return visual;
     } catch (error) {
         console.warn('[cocos-gizmos/handles] Native point visual fallback:', error);
         mesh?.destroy();
@@ -296,6 +376,10 @@ function createPositionVisual(color: Color): PositionVisual | null {
 function disposePositionVisual(visual?: PositionVisual | null): void {
     if (!visual) return;
     if (visual.renderer.isValid) visual.renderer.mesh = null;
+    if (visual.sprite?.isValid) visual.sprite.spriteFrame = null;
+    visual.frame?.destroy();
+    visual.texture?.destroy();
+    visual.image?.destroy();
     visual.mesh.destroy();
     visual.material.destroy();
     if (visual.node.isValid) visual.node.destroy();
@@ -670,6 +754,35 @@ function createEditorGizmo(
                     const rotation = camera()?.node?.worldRotation;
                     if (rotation) visible.setWorldRotation(rotation);
                     visible.setWorldScale(new Vec3(size * 0.8, size * 0.8, 1));
+                    // Render the Sprite directly in screen space, at the same
+                    // near-camera depth as the working HUD overlay.
+                    if (entry.visual?.sprite?.node?.isValid) {
+                        const view = camera();
+                        const screen = new Vec3();
+                        const projection = view?.viewport ?
+                            createViewportHudProjection(view) : null;
+                        let projected = false;
+                        if (view && projection) {
+                            view.sync?.();
+                            try {
+                                view.worldToScreen(new Vec3(world.x, world.y, world.z), screen);
+                                if (Number.isFinite(screen.x) && Number.isFinite(screen.y)) {
+                                    const dot = entry.visual.sprite.node;
+                                    dot.setWorldPosition(projection.worldAt(screen.x, screen.y));
+                                    const rotation = view.node?.worldRotation;
+                                    if (rotation) dot.setWorldRotation(rotation);
+                                    dot.setWorldScale(new Vec3(
+                                        projection.pixelSize, projection.pixelSize, 1));
+                                    dot.active = true;
+                                    projected = true;
+                                }
+                            } catch {
+                                // Keep MeshRenderer as fallback for unusual Editor cameras.
+                            }
+                        }
+                        entry.visual.sprite.node.active = projected;
+                        entry.visual.renderer.enabled = !projected;
+                    }
                 }
             }
             if (!this.hudEntries.length) return;
