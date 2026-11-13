@@ -56,6 +56,22 @@ declare global {
         planeOffset?: number;
     }
 
+    /** Shared options for Gizmos3D.moveHandles(property, options).
+     * Generates six editable handles for one Vec3 property.
+     */
+    interface GizmosMoveHandleOptions {
+        space?: GizmoHandleSpace;
+        snap?: number;
+        axisSize?: number;
+        pickSize?: number;
+        planeSize?: number;
+        planeOffset?: number;
+        hoverColor?: string;
+        showPositionLabel?: boolean;
+        positionLabelOffset?: number;
+        bounds?: GizmoHandleDescriptor['bounds'];
+    }
+
     /** Controls when a component draws in the Scene View. */
     type GizmoDisplayMode = 'always' | 'selected' | 'off';
 
