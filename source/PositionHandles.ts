@@ -17,8 +17,8 @@ import { planeHandleGeometry, PlaneHandleGeometry } from './PlaneHandleGeometry'
 import { GizmoHudLayout } from './GizmoHudLayout';
 import { resolveSceneCamera } from './SceneCameraBridge';
 import {
-    GizmoInputDiagnostics, GizmoInputSnapshot, readSceneHandleName,
-    readScenePointer, ScenePointer,
+    GizmoInputDiagnostics, GizmoInputSnapshot, isPrimaryScenePointer,
+    readSceneHandleName, readScenePointer, ScenePointer,
 } from './SceneGizmoInput';
 
 type Point = { x: number; y: number; z: number };
@@ -800,6 +800,7 @@ function createEditorGizmo(
                     this.registerVisualMouse(entry);
                     const down = (event: any) => {
                         input.record('controllerDown');
+                        if (!isPrimaryScenePointer(event)) return;
                         // Creator reports the editable face as 'y', not our
                         // custom cube handle. Translate it before begin().
                         const name = readSceneHandleName(event);
@@ -807,8 +808,9 @@ function createEditorGizmo(
                             { ...event, handleName: entry.key } : event);
                     };
                     const move = (event: any) => { input.record('controllerMove'); this.move(entry, event); };
-                    const up = () => {
+                    const up = (event?: any) => {
                         input.record('controllerUp');
+                        if (!isPrimaryScenePointer(event)) return;
                         // An unrelated controller may receive the same Scene mouse-up.
                         if (this.drag?.entry === entry) this.finish(false);
                         else if (this.drag || this.hudDrag || this.pendingClick)
@@ -861,10 +863,14 @@ function createEditorGizmo(
                     }
                     controller.initHandle(picking?.node || controller._cubeNode, key);
                     repairNativeHandleColors(controller, key, color);
-                    const down = (event: any) => { input.record('controllerDown'); this.beginHud(entry, event); };
+                    const down = (event: any) => {
+                        input.record('controllerDown');
+                        if (isPrimaryScenePointer(event)) this.beginHud(entry, event);
+                    };
                     const move = (event: any) => { input.record('controllerMove'); this.moveHud(entry, event); };
                     const up = (event: any) => {
                         input.record('controllerUp');
+                        if (!isPrimaryScenePointer(event)) return;
                         if (this.hudDrag?.entry === entry) this.finishHud(false);
                         else if (this.pendingClick === entry) {
                             const releasedOn = readSceneHandleName(event);
@@ -907,7 +913,7 @@ function createEditorGizmo(
             const types = Node.EventType;
             node.on(types.MOUSE_DOWN, (event: any) => {
                 if (!this.shown || this.destroyed || this.drag) return;
-                if (typeof event?.getButton === 'function' && event.getButton() !== 0) return;
+                if (!isPrimaryScenePointer(event)) return;
                 this.begin(entry, event);
                 if (this.drag?.entry === entry) event.propagationStopped = true;
             });
@@ -932,6 +938,10 @@ function createEditorGizmo(
 
         private updateMarkers(): void {
             if (!this.shown && !this.drag) return;
+            // A middle-button pan moves the Editor camera before the render
+            // camera's inverse view-projection matrix is rebuilt. Sync once
+            // before updating all native hit faces and visible point Sprites.
+            camera()?.sync?.();
             const component = this.target as Component;
             if (!component?.node?.isValid) return;
             for (const entry of this.entries) {
@@ -982,7 +992,6 @@ function createEditorGizmo(
                             createViewportHudProjection(view) : null;
                         let projected = false;
                         if (view && projection) {
-                            view.sync?.();
                             try {
                                 view.worldToScreen(new Vec3(center.x, center.y, center.z), screen);
                                 if (Number.isFinite(screen.x) && Number.isFinite(screen.y)) {
@@ -1068,6 +1077,7 @@ function createEditorGizmo(
         }
 
         private beginHud(entry: HudEntry, event: any): void {
+            if (!isPrimaryScenePointer(event)) return;
             if (!this.shown || this.drag || this.hudDrag || this.pendingClick) return;
             const handleName = readSceneHandleName(event);
             if (handleName && handleName !== entry.key) return;
@@ -1214,6 +1224,7 @@ function createEditorGizmo(
         }
 
         private begin(entry: Entry, event: any): void {
+            if (!isPrimaryScenePointer(event)) return;
             if (!this.shown || this.drag || this.hudDrag || this.pendingClick) return;
             const handleName = readSceneHandleName(event);
             if (handleName && handleName !== entry.key) return;
@@ -1306,9 +1317,11 @@ function createEditorGizmo(
          */
         private positionEntryAt(event: any): Entry | null {
             if (!this.shown || this.destroyed || !this.entries.length) return null;
+            if (!isPrimaryScenePointer(event)) return null;
             const pointer = readScenePointer(event);
             const view = camera();
             if (!pointer || typeof view?.worldToScreen !== 'function') return null;
+            view.sync?.();
             let nearest: Entry | null = null;
             let bestDistanceSquared = Number.POSITIVE_INFINITY;
             for (const entry of this.entries) {
@@ -1361,6 +1374,7 @@ function createEditorGizmo(
 
         public onGizmoMouseDown(event: any): void {
             input.record('gizmoDown');
+            if (!isPrimaryScenePointer(event)) return;
             const name = readSceneHandleName(event);
             const entry = this.entries.find((item) => item.key === name) ||
                 (name === 'y' || !name ? this.positionEntryAt(event) : null);
@@ -1382,6 +1396,7 @@ function createEditorGizmo(
 
         public onGizmoMouseUp(event?: any): void {
             input.record('gizmoUp');
+            if (!isPrimaryScenePointer(event)) return;
             // The Scene Operation route may include a named picking target.
             // A different target must not activate a pending HUD button.
             const click = this.pendingClick;
@@ -1395,6 +1410,8 @@ function createEditorGizmo(
         // on Creator 3.8.8, even when no controller was hit.
         public onNotGizmoMouseDown(event?: any): void {
             input.record('outsideDown');
+            // Middle mouse belongs to Scene camera pan, never a Gizmo drag.
+            if (!isPrimaryScenePointer(event)) return;
             // Creator dispatches onNotGizmoMouseDown to selected component
             // gizmos even after BoxController's onControllerMouseDown has
             // already started a valid gesture. The previous fallthrough
@@ -1432,6 +1449,7 @@ function createEditorGizmo(
 
         public onNotGizmoMouseUp(event?: any): void {
             input.record('outsideUp');
+            if (!isPrimaryScenePointer(event)) return;
             // A pointer-up on the same HUD rectangle commits click actions;
             // a true outside release cancels buttons, but commits slider drags.
             const click = this.pendingClick;
