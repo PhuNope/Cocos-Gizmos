@@ -127,9 +127,24 @@ const cc = {
     gfx: { Format: {}, AttributeName: {} },
 };
 const sceneCamera = {
-    node: Object.assign(new Node('camera'), { worldRotation: { x: 0, y: 0, z: 0, w: 1 } }),
+    node: Object.assign(new Node('camera'), {
+        worldRotation: { x: 0, y: 0, z: 0, w: 1 },
+        forward: new Vec3(0, 0, -1),
+    }),
+    pixelWorld: 1,
     geometryRenderer,
     initGeometryRenderer() {},
+    worldToScreen(out, world) {
+        out.x = world.x / this.pixelWorld;
+        out.y = world.y / this.pixelWorld;
+        out.z = 1;
+        return out;
+    },
+    screenPointToRay(out, x, y) {
+        out.o = new Vec3(x * this.pixelWorld, y * this.pixelWorld, 100);
+        out.d = new Vec3(0, 0, -1);
+        return out;
+    },
 };
 let now = 1000;
 const sandbox = {
@@ -214,6 +229,19 @@ const spriteAfterClear = sprite.frameWrites;
 debug.lateUpdate(0);
 assert.equal(label.stringWrites, labelAfterClear, 'Idle overlay must not repeatedly clear text');
 assert.equal(sprite.frameWrites, spriteAfterClear, 'Idle overlay must not repeatedly clear sprite');
+
+sceneCamera.pixelWorld = 0.001; // zoom close, native label would be enormous
+Gizmos3D.drawLabel(node, 'bounded', 'Bounded zoom', new Vec3(0, 0, 0),
+    20, 0.5, 12, 24);
+const bounded = debug._labelMap.get('bounded');
+assert.ok(Math.abs(bounded.node.worldScaleSet[0] - 0.0012) < 1e-9,
+    'Close zoom clamps 3D label to maximum 24 on-screen pixels');
+sceneCamera.pixelWorld = 20; // zoom far, native label would be microscopic
+Gizmos3D.drawLabel(node, 'bounded', 'Bounded zoom', new Vec3(0, 0, 0),
+    20, 0.5, 12, 24);
+assert.ok(Math.abs(bounded.node.worldScaleSet[0] - 12) < 1e-7,
+    'Far zoom scales 3D label up to minimum 12 on-screen pixels');
+sceneCamera.pixelWorld = 1;
 
 const vertices = [
     new Vec3(0, 0, 0), new Vec3(1, 0, 0),
