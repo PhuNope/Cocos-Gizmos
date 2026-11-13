@@ -264,6 +264,29 @@ adapter.refresh([component], new Set(), 1300);
 assert.deepEqual([component.target.x, component.target.y, component.target.z], [150, 0, 0],
     'Selection change must cancel an active drag and restore original property');
 assert.equal(adapter.status().active, 0);
+
+// Regression: A -> B -> A in less than 250ms must re-show the same
+// native Gizmo, rather than losing its hidden controller indefinitely.
+adapter.refresh([component], selected, 1316);
+assert.equal(adapter.status().active, 1, 'Reselecting a Node restores its Gizmo immediately');
+assert.equal(gizmo.isHandleVisible(), true);
+assert.equal(ctrl.registerCount, 3, 'Reselection reinstalls the owning controller listener');
+assert.equal(ctrl._cubeNode.active, true);
+gizmo.hide(); // Cocos may hide a Gizmo directly on a Scene selection event.
+assert.equal(gizmo.isHandleVisible(), false);
+adapter.refresh([component], selected, 1600);
+assert.equal(gizmo.isHandleVisible(), true, 'Refresh restores a Gizmo hidden by native Editor selection');
+assert.equal(adapter.status().active, 1);
+const restoredListeners = ctrl.registerCount;
+adapter.refresh([component], selected, 1616);
+assert.equal(ctrl.registerCount, restoredListeners,
+    'Healthy frames must not duplicate listeners after selection recovery');
+adapter.refresh([component], new Set(), 1632);
+assert.equal(adapter.status().active, 0, 'Immediate deselection hides the picking Gizmo');
+adapter.refresh([component], selected, 1648);
+assert.equal(adapter.status().active, 1, 'Repeated quick selection cycles must work');
+adapter.refresh([component], new Set(), 1664);
+assert.equal(adapter.status().active, 0);
 assert.ok(adapter.status().input.controllerDown >= 4,
     'Diagnostics count real controller entry points');
 assert.ok(adapter.status().input.controllerMove >= 4,
