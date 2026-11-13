@@ -51,7 +51,8 @@ export function readScenePointer(event: any): ScenePointer | null {
  */
 export function isPrimaryScenePointer(event: any): boolean {
     const wrapped = [event, event?.detail, event?.data, event?.mouse,
-        event?.event, event?.detail?.event, event?.nativeEvent];
+        event?.event, event?.detail?.event, event?.data?.event,
+        event?.nativeEvent];
     for (const item of wrapped) {
         if (!item || typeof item !== 'object') continue;
         if (typeof item.getButton === 'function') {
