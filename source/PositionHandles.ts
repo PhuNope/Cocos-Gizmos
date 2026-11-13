@@ -921,11 +921,9 @@ export function createPositionHandleAdapter(
         refresh(components, selected, now) {
             const selectionChanged = selected.size !== lastSelection.size ||
                 [...selected].some((id) => !lastSelection.has(id));
-            // A rapid A -> B -> A selection must not be swallowed by the
-            // discovery throttle; selection is a lifecycle event, not a scan.
-            if (!selectionChanged && now - latestScan < 250) return;
-            lastSelection = new Set(selected);
-            latestScan = now;
+            // Paint every Scene tick. 2D Graphics are cleared at lateUpdate,
+            // whereas registering native Controller instances can be throttled.
+            // A rapid A -> B -> A selection still bypasses the controller scan.
             // Visual markers must not disappear even when the Editor replaces
             // the native component Gizmo or temporarily unmounts its cube.
             for (const component of components) {
@@ -938,6 +936,10 @@ export function createPositionHandleAdapter(
                     }
                 }
             }
+            // Native Gizmo discovery and activation are heavier than painting.
+            if (!selectionChanged && now - latestScan < 250) return;
+            lastSelection = new Set(selected);
+            latestScan = now;
             if (!initialize()) return;
             const wanted = new Set<Component>();
             for (const component of components) {
