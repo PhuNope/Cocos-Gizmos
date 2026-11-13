@@ -1,5 +1,11 @@
 # Cocos-Gizmos
 
+**API gọn cho Scene Editor:** `Gizmos3D.move('position')`,
+`Gizmos2D.point('point')`, `Gizmos2D.points('vertices', count)`.
+Undo/cancel được xử lý bởi Command Pattern. Xem
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) để biết phân chia
+Domain / Application / Editor Adapter và cách thêm command mới.
+
 See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
 
 A Cocos Creator **3.8.2+ extension** providing two public classes: `Gizmos2D` and `Gizmos3D`.
