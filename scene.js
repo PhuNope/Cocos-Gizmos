@@ -61,6 +61,7 @@ exports.methods = {
             cce,
             updater ? updater.status() : null,
             handles ? handles.status() : null,
+            presentation ? presentation.getStats() : null,
         );
     },
 };
