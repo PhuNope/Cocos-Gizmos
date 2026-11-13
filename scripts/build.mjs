@@ -19,7 +19,9 @@ const FILES = [
     { name: 'Define', ns: '_Define' },
     { name: 'Ext', ns: null },
     { name: 'SceneUpdateScheduler', ns: '_SceneUpdateScheduler' },
-    { name: 'ExecuteGizmos', ns: '_ExecuteGizmos', relImports: { './SceneUpdateScheduler': '_SceneUpdateScheduler' } },
+    { name: 'ExecuteGizmos', ns: '_ExecuteGizmos', relImports: {
+         './SceneUpdateScheduler': '_SceneUpdateScheduler', './Gizmos2D': '_Gizmos2D',
+     } },
     { name: 'DrawCommandBuffer2D', ns: '_DrawCommandBuffer2D' },
     { name: 'Gizmos2D', ns: '_Gizmos2D', relImports: { './DrawCommandBuffer2D': '_DrawCommandBuffer2D' } },
     { name: 'Gizmos3D', ns: '_Gizmos3D', relImports: { './Define': '_Define' } },
@@ -250,9 +252,14 @@ function transpileRuntimeModule(name) {
     }
     if (name === 'ExecuteGizmos') {
         generated = generated.replaceAll("from './SceneUpdateScheduler'", "from './SceneUpdateScheduler.js'")
-                             .replaceAll('from "./SceneUpdateScheduler"', 'from "./SceneUpdateScheduler.js"');
+                             .replaceAll('from "./SceneUpdateScheduler"', 'from "./SceneUpdateScheduler.js"')
+                             .replaceAll("from './Gizmos2D'", "from './Gizmos2D.js'")
+                             .replaceAll('from "./Gizmos2D"', 'from "./Gizmos2D.js"');
         if (!generated.includes('SceneUpdateScheduler.js')) {
             fail('ExecuteGizmos missing compiled SceneUpdateScheduler import');
+        }
+        if (!generated.includes('Gizmos2D.js')) {
+            fail('ExecuteGizmos missing compiled Gizmos2D import');
         }
     }
     writeFileSync(path.join(ROOT, 'dist', name + '.js'), generated, 'utf8');
