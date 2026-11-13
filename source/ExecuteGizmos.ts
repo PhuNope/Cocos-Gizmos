@@ -152,6 +152,16 @@ export function start(): UpdateStats {
         catch (error) { warnOnce('HUD pre-scene cleanup failed', error); }
         activeScene = null;
     };
+    const afterSceneLaunch = (): void => {
+        // Do not restore the old Scene's selection or native controllers.
+        // Re-scan and mount fresh editable +Y faces only after activation
+        // succeeded. This callback is never reached if Mask.onLoad throws.
+        sceneTransitioning = false;
+        registry.clear();
+        selectionCache.clear();
+        activeScene = null;
+        scheduler.tickOnce();
+    };
     function warnOnce(key: string, error: unknown): void {
         stats.errors++;
         if (reported.has(key)) return;
@@ -159,11 +169,10 @@ export function start(): UpdateStats {
         console.error('[cocos-gizmos/updater] ' + key, error);
     }
     function update(source: string): void {
-        if (sceneTransitioning) {
-            // Avoid registering Gizmos on a partially activated new Scene.
-            // A failed Mask.onLoad may leave director.getScene() non-null.
-            if (source === 'timer') return;
-        }
+        // A Mask.onLoad exception can abort new-scene activation while
+        // director.getScene() is already pointing to a partial Scene.
+        // Even engine ticks must not mount Gizmos before AFTER_SCENE_LAUNCH.
+        if (sceneTransitioning) return;
         stats.frames++;
         stats.lastSource = source;
         if (source === 'engine') stats.engineFrames++;
@@ -173,11 +182,6 @@ export function start(): UpdateStats {
         try { root = director.getScene(); }
         catch (error) { warnOnce('director.getScene()', error); return; }
         stats.scene = root && (root.name || root.uuid || '(unnamed scene)');
-        if (sceneTransitioning) {
-            // An engine frame proves the Scene process is responsive again.
-            // A new selection snapshot is required before restoring handles.
-            sceneTransitioning = false;
-        }
         if (root !== activeScene) {
             activeScene = root;
             selectionCache.clear();
@@ -253,6 +257,7 @@ export function start(): UpdateStats {
         catch (error) { warnOnce('Screen HUD flush failed', error); }
     }
     director.on(Director.EVENT_BEFORE_SCENE_LAUNCH, beforeSceneLaunch);
+    director.on(Director.EVENT_AFTER_SCENE_LAUNCH, afterSceneLaunch);
     const scheduler = new SceneUpdateScheduler({
         now: () => Date.now(),
         subscribe: (listener) => director.on(Director.EVENT_BEFORE_UPDATE, listener),
@@ -274,6 +279,7 @@ export function start(): UpdateStats {
         },
         dispose: () => {
             director.off(Director.EVENT_BEFORE_SCENE_LAUNCH, beforeSceneLaunch);
+            director.off(Director.EVENT_AFTER_SCENE_LAUNCH, afterSceneLaunch);
             registry.clear();
             selectionCache.clear();
             presentation?.clearFrame?.();
@@ -283,6 +289,7 @@ export function start(): UpdateStats {
         scheduler.start();
     } catch (error) {
         director.off(Director.EVENT_BEFORE_SCENE_LAUNCH, beforeSceneLaunch);
+        director.off(Director.EVENT_AFTER_SCENE_LAUNCH, afterSceneLaunch);
         running = null;
         registry.clear();
         selectionCache.clear();
