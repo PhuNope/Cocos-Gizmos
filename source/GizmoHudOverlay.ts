@@ -87,7 +87,7 @@ export class GizmoHudOverlay {
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
             const screen = hudRowScreenPosition(projection.screen,
-                (placement?.startRow || 0) + i);
+                (placement?.startRow || 0) + i, projection.viewport);
             let color = this.colors.get(item.color);
             if (!color) {
                 color = new Color(255, 255, 255, 255);
@@ -110,13 +110,25 @@ export class GizmoHudOverlay {
                     Math.abs(parentScale.x) : 1;
                 const sy = parentScale?.y && Math.abs(parentScale.y) > 1e-8 ?
                     Math.abs(parentScale.y) : 1;
+                // A translucent viewport-docked row remains readable over
+                // arbitrary Scene geometry without consuming 3D depth.
+                const backgroundWidth = Math.min(370, Math.max(145, item.text.length * requestedPixels * 0.55 + 26));
+                const backgroundCenter = projection.worldAt(
+                    screen.x + backgroundWidth * 0.5 - 10, screen.y);
+                const backgroundLocal = new Vec3();
+                node.inverseTransformPoint(backgroundLocal, backgroundCenter);
+                Gizmos2D.beginColor(node, new Color(15, 18, 24, 205));
+                Gizmos2D.drawSolidRect(node, backgroundLocal,
+                    backgroundWidth * projection.pixelSize / sx,
+                    21 * projection.pixelSize / sy);
                 Gizmos2D.beginColor(node, color);
                 Gizmos2D.drawLabel(node, id, item.text, local, fontSize,
-                    new Vec2(worldScale / sx, worldScale / sy));
+                    new Vec2(worldScale / sx, worldScale / sy),
+                    item.minSize, item.maxSize);
             } else {
                 Gizmos3D.beginColor(node, color);
                 Gizmos3D.drawLabel(node, id, item.text,
-                    position, fontSize, worldScale);
+                    position, fontSize, worldScale, item.minSize, item.maxSize);
             }
             drawn++;
         }
