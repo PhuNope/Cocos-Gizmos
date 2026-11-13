@@ -444,6 +444,26 @@ components before shipping. Disabling/uninstalling the extension can make
 existing sample-component references appear as Missing Script. These are
 different from the extension's Editor-only Scene Script.
 
+### Scene View overlays, zoom and 2D drag stability
+
+The Editor Scene viewer can draw geometry while failing to render UI text if
+its `RenderRoot2D` labels or sprites use an invisible camera layer. The 3D
+Gizmos helper now uses `UI_3D | GIZMOS` for those overlays, compensates
+parent Node scale in world space and billboards them with the Scene camera.
+Informational HUD labels also clamp their minimum world scale at extreme
+close zoom.
+
+A 2D or 3D Label/Sprite persists for 750ms after its last draw callback
+before it is cleared, avoiding flicker when Cocos runs the Scene Script's
+250ms watchdog rather than receiving every engine frame. The 2D Position
+Handle cube targets roughly 22 screen pixels (previously 10) and uses world
+scale to avoid shrinking under scaled Canvas/Node hierarchies.
+
+The bundled 2D examples bound all draggable test points to a finite test
+area. The bundled 3D example sizes an imported SpriteFrame relative to its
+native dimensions so large textures no longer render hundreds of world units
+wide. See `docs/EDITOR_SMOKE_TEST.md` for manual zoom, idle and drag tests.
+
 ### Creator 3.8.8 Scene camera and missing HUD
 
 If Gizmos lines or shapes render but **HUD text and draggable points are
