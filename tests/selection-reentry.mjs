@@ -49,5 +49,13 @@ selected = [];
 await extension.methods.onSelectionSelect('node', 'first-click');
 assert.deepEqual(calls.at(-1)[0], ['first-click'],
     'First click uses event UUID even if Editor selection snapshot is stale');
+selected = [];
+await extension.methods.onSelectionSelect('node', ['first-from-array']);
+assert.deepEqual(calls.at(-1)[0], ['first-from-array'],
+    'Creator 3.8.8 array selection event also activates on the first click');
+selected = ['first-from-array'];
+await extension.methods.onSelectionUnselect('node', ['first-from-array']);
+assert.deepEqual(calls.at(-1)[0], [],
+    'Array unselect events clear all handles on the first deselection');
 delete globalThis.Editor;
 console.log('[selection-reentry] native select/unselect + same-node reactivation OK');
