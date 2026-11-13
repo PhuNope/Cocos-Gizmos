@@ -17,7 +17,7 @@ globalThis.Editor = {
         assert.equal(channel, 'scene');
         assert.equal(method, 'execute-scene-script');
         assert.equal(message.method, 'gizmosSelectionChanged');
-        calls.push(message.args[0]);
+        calls.push(message.args);
     } },
 };
 await extension.methods.onSelectionSelect('node', 'node-2d');
@@ -25,17 +25,29 @@ selected = [];
 await extension.methods.onSelectionUnselect('node', 'node-2d');
 selected = ['node-2d'];
 await extension.methods.onSelectionSelect('node', 'node-2d');
-assert.deepEqual(calls, [['node-2d'], [], ['node-2d']],
-    'Selected -> empty -> same node must synchronise every transition');
+assert.deepEqual(calls.slice(0, 6).map(call => call[0]),
+    [['node-2d'], ['node-2d'], [], [], ['node-2d'], ['node-2d']],
+    'Select, empty and reselect are synchronized on initial event and next tick');
 selected = [];
 await extension.methods.onSelectionUnselect('node', 'node-2d');
 selected = ['other-node'];
 await extension.methods.onSelectionSelect('node', 'other-node');
 selected = ['node-2d'];
 await extension.methods.onSelectionUnselect('node', 'other-node');
-assert.deepEqual(calls.slice(-3), [[], ['other-node'], ['node-2d']],
-    'Replacing a node must read the final selection, not the stale unselected UUID');
+assert.deepEqual(calls.slice(-6).map(call => call[0]),
+    [[], [], ['other-node'], ['other-node'], ['node-2d'], ['node-2d']],
+    'Replacing a node resolves the final selected UUID');
 assert.deepEqual(await extension.methods.onSelectionSelect('asset', 'sprite'), undefined);
-assert.equal(calls.length, 6, 'Non-node selections must not touch Scene gizmos');
+assert.equal(calls.length, 12, 'Non-node selections must not touch Scene gizmos');
+assert.ok(calls.every(call => typeof call[1] === 'number'),
+    'Every synchronization has an ordering revision');
+for (let i = 1; i < calls.length; i++) {
+    assert.ok(calls[i][1] > calls[i - 1][1], 'Selection revisions are monotonic');
+}
+// Scene may receive select before Editor.Selection.getSelected() is updated.
+selected = [];
+await extension.methods.onSelectionSelect('node', 'first-click');
+assert.deepEqual(calls.at(-1)[0], ['first-click'],
+    'First click uses event UUID even if Editor selection snapshot is stale');
 delete globalThis.Editor;
 console.log('[selection-reentry] native select/unselect + same-node reactivation OK');
