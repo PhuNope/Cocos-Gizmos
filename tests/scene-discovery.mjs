@@ -25,6 +25,7 @@ let scene = null;
 let selected = [];
 let beforeUpdate = null;
 let timer = null;
+const sceneListeners = new Map();
 let scanCount = 0;
 let selectionLookups = 0;
 const calls = { first: 0, second: 0, selected: 0 };
@@ -48,8 +49,22 @@ const rootNode = createNode('scene', [firstComponent]);
 scene = rootNode;
 const director = {
     getScene: () => scene,
-    on: (event, fn) => { assert.equal(event, 'before-update'); beforeUpdate = fn; },
-    off: (event, fn) => { assert.equal(beforeUpdate, fn); beforeUpdate = null; },
+    on: (event, fn) => {
+        if (event === 'before-update') beforeUpdate = fn;
+        else {
+            assert.ok(['before-scene-launch', 'after-scene-launch'].includes(event));
+            sceneListeners.set(event, fn);
+        }
+    },
+    off: (event, fn) => {
+        if (event === 'before-update') {
+            assert.equal(beforeUpdate, fn);
+            beforeUpdate = null;
+        } else {
+            assert.equal(sceneListeners.get(event), fn);
+            sceneListeners.delete(event);
+        }
+    },
 };
 const sandbox = {
     exports: {},
@@ -65,7 +80,11 @@ const sandbox = {
     require: (id) => {
         if (id === './SceneUpdateScheduler') return schedulerExports;
         assert.equal(id, 'cc');
-        return { Component: class {}, Node: class {}, director, Director: { EVENT_BEFORE_UPDATE: 'before-update' } };
+        return { Component: class {}, Node: class {}, director, Director: {
+            EVENT_BEFORE_UPDATE: 'before-update',
+            EVENT_BEFORE_SCENE_LAUNCH: 'before-scene-launch',
+            EVENT_AFTER_SCENE_LAUNCH: 'after-scene-launch',
+        } };
     },
 };
 vm.runInNewContext(compiled, sandbox, { filename: 'ExecuteGizmos.js' });
@@ -118,7 +137,29 @@ try {
     assert.equal(calls.selected, 1);
     assert.equal(scanCount, 3);
 
+    // Mask.onLoad can throw during a Scene switch before the next engine
+    // update. The before-launch event must detach old native controllers
+    // before the engine destroys the old Scene graph.
+    const clearsBeforeFailedLaunch = clearedHandles;
+    sceneListeners.get('before-scene-launch')();
+    assert.ok(clearedHandles > clearsBeforeFailedLaunch,
+        'Before-scene-launch proactively detaches old picking Gizmos');
+    const refreshesBeforeInvalid = handleRefreshes.length;
+    scene = createNode('partially-activated-mask-scene', []);
+    now += 16;
+    beforeUpdate();
+    assert.equal(handleRefreshes.length, refreshesBeforeInvalid,
+        'Do not register controllers on a Scene whose Mask.onLoad failed');
+    now += 251;
+    timer();
+    assert.equal(handleRefreshes.length, refreshesBeforeInvalid,
+        'Even the watchdog cannot reactivate broken Scene Gizmos');
     scene = createNode('replacement', []);
+    // A subsequent successful Scene launch must unlock scanning and mount
+    // a fresh adapter; merely returning to a scene should not need an
+    // extension reinstall.
+    sceneListeners.get('before-scene-launch')();
+    sceneListeners.get('after-scene-launch')();
     now += 16;
     beforeUpdate();
     assert.equal(scanCount, 4, 'Scene changes invalidate the registry');
@@ -153,4 +194,6 @@ try {
 }
 assert.equal(beforeUpdate, null);
 assert.equal(timer, null);
+assert.equal(sceneListeners.size, 0,
+    'Extension unload deregisters both Scene launch callbacks');
 console.log('[scene-discovery] callback discovery is cached, refreshes on scene change, and respects selection');
