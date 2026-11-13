@@ -237,7 +237,8 @@ assert.deepEqual(graphics.map((g) => g.clearCount), beforeClears,
 now += 751;
 debug.lateUpdate(0); // Renderer clears only after the idle grace interval.
 const afterClears = graphics.map((g) => g.clearCount);
-assert.equal(afterClears[0], beforeClears[0], 'Inactive renderer should not clear repeatedly');
+assert.equal(afterClears[0], beforeClears[0] + 1,
+    'Previously inactive renderer expires once after the geometry grace window');
 assert.ok(afterClears.slice(1).every((value, index) => value === beforeClears[index + 1] + 1));
 debug.lateUpdate(0);
 assert.deepEqual(graphics.map((g) => g.clearCount), afterClears);
