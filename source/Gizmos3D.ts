@@ -320,7 +320,61 @@ class GizmosDebugDraw extends Component {
         this.orientToEditorCamera(sprite.node);
     }
 
-    public drawLabel(id: string, text: string, position: Vec3, fontSize: number = 40, scale: number = 1) {
+    private worldUnitsPerScreenPixel(world: Vec3): number | null {
+        const global = globalThis as any;
+        const editor = (global.window?.cce || global.cce || cce)?.Camera;
+        const wrapped = editor?._camera?.camera || editor?.camera?.camera;
+        const raw = wrapped || editor?.camera;
+        if (typeof raw?.worldToScreen !== 'function' ||
+            typeof raw?.screenPointToRay !== 'function') return null;
+        const rendererCamera = !!wrapped ||
+            typeof raw.initGeometryRenderer === 'function' ||
+            raw.geometryRenderer !== undefined || raw.matViewProj !== undefined;
+        try {
+            const screen = new Vec3();
+            if (rendererCamera) raw.worldToScreen(screen, world);
+            else raw.worldToScreen(world, screen);
+            if (!Number.isFinite(screen.x) || !Number.isFinite(screen.y)) return null;
+            const makeRay = (x: number) => {
+                const out = { o: new Vec3(), d: new Vec3() };
+                const result = rendererCamera ?
+                    raw.screenPointToRay(out, x, screen.y) :
+                    raw.screenPointToRay(x, screen.y, out);
+                return result?.o && result?.d ? result : out;
+            };
+            const rayA = makeRay(screen.x);
+            const rayB = makeRay(screen.x + 1);
+            const normal = raw.node?.forward || rayA.d;
+            const dot = (a: Vec3, b: Vec3): number =>
+                a.x * b.x + a.y * b.y + a.z * b.z;
+            const hit = (ray: { o: Vec3; d: Vec3 }): Vec3 | null => {
+                const denominator = dot(ray.d, normal);
+                if (!Number.isFinite(denominator) ||
+                    Math.abs(denominator) <= 1e-10) return null;
+                const delta = new Vec3(world.x - ray.o.x,
+                    world.y - ray.o.y, world.z - ray.o.z);
+                const distance = dot(delta, normal) / denominator;
+                if (!Number.isFinite(distance) || distance < 0) return null;
+                return new Vec3(ray.o.x + distance * ray.d.x,
+                    ray.o.y + distance * ray.d.y,
+                    ray.o.z + distance * ray.d.z);
+            };
+            const a = hit(rayA);
+            const b = hit(rayB);
+            if (!a || !b) return null;
+            const pixel = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+            return Number.isFinite(pixel) && pixel > 1e-10 ? pixel : null;
+        } catch {
+            // Scene camera can be replaced while switching 2D and 3D.
+            return null;
+        }
+    }
+
+    public drawLabel(
+        id: string, text: string, position: Vec3,
+        fontSize: number = 40, scale: number = 1,
+        minSize?: number, maxSize?: number,
+    ) {
         const label = this.getLabel(id);
         this._lastLabelUsed.set(id, Date.now());
         if (label.string !== text) label.string = text;
@@ -329,7 +383,23 @@ class GizmosDebugDraw extends Component {
         if (label.lineHeight !== fontSize) label.lineHeight = fontSize;
         if (this._useLocalPosition) label.node.setPosition(position);
         else label.node.setWorldPosition(position);
-        this.setOverlayWorldScale(label.node, scale, scale);
+        let worldScale = scale;
+        if (Number.isFinite(fontSize) && fontSize > 0 &&
+            Number.isFinite(scale) && scale > 0 &&
+            (Number.isFinite(minSize) || Number.isFinite(maxSize))) {
+            const world = this._useLocalPosition ? this.localToWorld(position) : position;
+            const pixel = this.worldUnitsPerScreenPixel(world);
+            if (pixel) {
+                const min = Number.isFinite(minSize) ?
+                    Math.max(1, minSize as number) : 1;
+                const max = Number.isFinite(maxSize) ?
+                    Math.max(min, maxSize as number) : Infinity;
+                const projected = fontSize * scale / pixel;
+                const bounded = Math.max(min, Math.min(max, projected));
+                worldScale = pixel * bounded / fontSize;
+            }
+        }
+        this.setOverlayWorldScale(label.node, worldScale, worldScale);
         this.orientToEditorCamera(label.node);
     }
 
@@ -695,8 +765,13 @@ export class Gizmos3D {
         position: Vec3,
         fontSize: number = 15,
         scale: number = 1,
+        /** Minimum font height in Scene screen pixels while zooming. */
+        minSize?: number,
+        /** Maximum font height in Scene screen pixels while zooming. */
+        maxSize?: number,
     ) {
-        this.getDebugNode(node)?.drawLabel(id, text, position, fontSize, scale);
+        this.getDebugNode(node)?.drawLabel(id, text, position,
+            fontSize, scale, minSize, maxSize);
     }
 
     public static drawLine(node: Node, point1: Vec3, point2: Vec3) {
