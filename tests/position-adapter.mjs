@@ -14,6 +14,8 @@ const planes = { exports: {} };
 vm.runInNewContext(compile('PlaneHandleGeometry'), planes);
 const axes = { exports: {} };
 vm.runInNewContext(compile('AxisHandleGeometry'), axes);
+const hit = { exports: {} };
+vm.runInNewContext(compile('MoveHitGeometry'), hit);
 const math = { exports: {} };
 vm.runInNewContext(compile('PositionDragSolver'), math);
 const edits = { exports: {} };
@@ -60,6 +62,7 @@ vm.runInNewContext(compile('GizmoHudProjection'), {
     exports: projection.exports,
     require(name) {
         if (name === 'cc') return { Vec3 };
+        if (name === './MoveHitGeometry') return hit.exports;
         if (name === './AxisHandleGeometry') return axes.exports;
         if (name === './PlaneHandleGeometry') return planes.exports;
         if (name === './PositionDragSolver') return math.exports;
@@ -214,6 +217,7 @@ const sandbox = {
             drawLine() {},
             drawPositionLabel(...args) { visibleDots.scene3d.push(args); },
         } };
+        if (name === './MoveHitGeometry') return hit.exports;
         if (name === './AxisHandleGeometry') return axes.exports;
         if (name === './PlaneHandleGeometry') return planes.exports;
         if (name === './PositionDragSolver') return math.exports;
