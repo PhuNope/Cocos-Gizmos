@@ -7,7 +7,8 @@ import {
 import { Gizmos3D } from './Gizmos3D';
 import { Gizmos2D } from './Gizmos2D';
 import { GizmoHudText } from './GizmoPresentation';
-import { hudGrid, hudRowScreenPosition } from './GizmoHudControls';
+import { hudGrid, hudRowScreenPosition, hudControlScreenRect,
+    hudSliderScreenTrack } from './GizmoHudControls';
 import { createSceneHudProjection, SceneHudCamera } from './GizmoHudProjection';
 import type { GizmoHudPlacement } from './GizmoHudLayout';
 import { resolveSceneCamera } from './SceneCameraBridge';
@@ -169,8 +170,10 @@ class ScreenHudMesh {
                     const font = hudTextPixels(row.fontSize, row.minSize, row.maxSize);
                     if (row.isControl) {
                         ctx.fillStyle = 'rgba(48,73,97,0.65)';
-                        ctx.fillRect((x - 5) * scale, (y - 11) * scale,
-                            (grid.columnWidth - 14) * scale, 22 * scale);
+                        const hit = hudControlScreenRect(viewport, row.index, totalRows);
+                        ctx.fillRect(hit.left * scale,
+                            (height - hit.top) * scale,
+                            hit.width * scale, hit.height * scale);
                     }
                     ctx.font = font * scale + 'px sans-serif';
                     ctx.fillStyle = /^#[a-fA-F0-9]{6,8}$/.test(row.color) ?
@@ -183,8 +186,9 @@ class ScreenHudMesh {
                             (row.max as number) > (row.min as number) ?
                             Math.max(0, Math.min(1, (value - (row.min as number)) /
                                 ((row.max as number) - (row.min as number)))) : 0;
-                        const trackX = x + grid.columnWidth * 0.36;
-                        const trackWidth = Math.max(50, grid.columnWidth * 0.38);
+                        const track = hudSliderScreenTrack(viewport, row.index, totalRows);
+                        const trackX = track.left;
+                        const trackWidth = track.width;
                         ctx.fillText(label, x * scale, y * scale, grid.columnWidth * 0.32 * scale);
                         ctx.fillStyle = '#566577';
                         ctx.fillRect(trackX * scale, (y - 2) * scale,
