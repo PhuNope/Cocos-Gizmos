@@ -127,6 +127,31 @@ ensure that old Gizmo instances and operation listeners are no longer active.
 If the errors remain, copy the full Scene Console stack trace and the results
 from **Extensions → Gizmos Settings → Check Scene integration**.
 
+## Diagnose missing HUD and point handles (Creator 3.8.8)
+
+The Scene Editor may expose `cce.Camera._camera.camera`, a
+`renderer.scene.Camera` with **out-first** signatures:
+`worldToScreen(out, world)` and `screenPointToRay(out, x, y)`. A game
+`cc.Camera` Component uses `worldToScreen(world, out)` and
+`screenPointToRay(x, y, out)`. Mixing these conventions can leave ordinary
+Gizmos geometry visible while HUD labels and point picking fail.
+
+The extension now resolves the correct convention automatically. In
+**Extensions → Gizmos Settings → Check Scene integration**, confirm:
+- `bridge.cameraConvention` is `render-camera` when the Scene View uses its
+  internal renderer camera; `component-camera` is also supported.
+- `bridge.cameraWorldToScreen` and `bridge.cameraScreenPointToRay` are true.
+- Select a demo Node and inspect `scene.hudDrawn`: this cumulative value should
+  increase during updates that submit HUD labels. If it stays at zero, check
+  `scene.selectedNodeCount` and the component's HUD setting.
+- `handles.positionHandles`, `handles.hudControls`, and `handles.active`
+  help identify whether the controller bridge created any editable markers.
+
+A nonzero `scene.hudDrawn` confirms that the extension submitted labels, not
+that Cocos rendered them visibly. A registered controller is not proof that
+the Editor routed mouse events to it. The exact remaining failure should be
+diagnosed from the Scene report and Scene Console.
+
 ## Diagnose Scene mouse picking
 
 1. Select a Node with Gizmo handles and open
