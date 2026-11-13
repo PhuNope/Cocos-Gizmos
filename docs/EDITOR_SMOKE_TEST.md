@@ -127,6 +127,26 @@ ensure that old Gizmo instances and operation listeners are no longer active.
 If the errors remain, copy the full Scene Console stack trace and the results
 from **Extensions → Gizmos Settings → Check Scene integration**.
 
+## Re-selecting a 2D Node and bounded Label sizes
+
+1. Select the Node with `CocosGizmos2DDemo`, confirm three visible
+   22px draggable markers, then select another Node and immediately select
+   the original Node again. Repeat rapidly and after leaving it unselected
+   for at least 250ms. Its points and picking listeners must return each time.
+2. With each demo selected, zoom close and far. HUD text should stay in
+   the default 12–24px height range. The 2D and 3D example labels use
+   optional explicit min/max values in `drawLabel()`.
+3. Check both kinds of HUD: one component nested beneath **Canvas** and
+   another in a 3D Scene. The Canvas HUD now uses the existing 2D
+   `RenderRoot2D`, not an extra 3D UI root.
+4. If labels are still invisible, click **Check Scene integration**.
+   Inspect `scene.hudDrawn`, `hud.lastPath`, `hud.drawn2D`,
+   `hud.drawn3D`, `hud.cameraMissing` and `hud.projectionFailed`.
+   A nonzero `hud.drawn2D` or `hud.drawn3D` means the label was
+   submitted to the renderer, not necessarily visible in the actual Scene
+   camera. `hud.projectionFailed` indicates invalid camera/ray geometry.
+   Capture the report and Console errors if a HUD remains invisible.
+
 ## Zoom, UI layers, drag-point and Sprite sizing regression
 
 - **HUD and Labels:** With the demo Node selected, zoom extremely close and
