@@ -24,7 +24,7 @@ function size(value: number | undefined, fallback: number, min: number, max: num
 }
 
 export function makeMoveGizmo(
-    property: string, options: GizmoMoveHandleOptions = {},
+    property: string, options: GizmosMoveHandleOptions = {},
 ): GizmoHandleDescriptor[] {
     const name = propertyName(property);
     const axisSize = size(options.axisSize, 86, 24, 200, 'axisSize');
