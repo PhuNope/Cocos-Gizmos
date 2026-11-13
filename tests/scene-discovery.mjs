@@ -165,6 +165,24 @@ try {
     assert.equal(scanCount, 4, 'Scene changes invalidate the registry');
     assert.ok(clearedHandles >= 2, 'Scene switch must clear controllers immediately');
 
+    // Unsaved Scene tabs may omit EVENT_AFTER_SCENE_LAUNCH entirely.
+    // A new, stable and activated Scene should recover without Reset menu,
+    // but should never render against the first unstable frames.
+    const beforeUnsaved = handleRefreshes.length;
+    sceneListeners.get('before-scene-launch')();
+    scene = createNode('unsaved-return-scene', [firstComponent]);
+    now += 16;
+    beforeUpdate();
+    now += 16;
+    beforeUpdate();
+    assert.equal(handleRefreshes.length, beforeUnsaved,
+        'Partial transition cannot mount native BoxControllers');
+    now += 520;
+    beforeUpdate(); // Third stable engine frame, AFTER event never fired.
+    assert.ok(handleRefreshes.length > beforeUnsaved,
+        'Stable unsaved Scene is recovered even without AFTER_SCENE_LAUNCH');
+    assert.equal(sandbox.exports.status().scene, 'unsaved-return-scene');
+
     scene = null;
     now += 16;
     beforeUpdate();
@@ -188,7 +206,7 @@ try {
     assert.equal(sandbox.exports.status().frames, beforeTimer + 1,
         'Watchdog must keep the Scene responsive when the engine is paused');
     assert.equal(sandbox.exports.status().fallbackFrames, 1);
-    assert.equal(sandbox.exports.status().engineFrames, 14);
+    assert.equal(sandbox.exports.status().engineFrames, 15);
 } finally {
     stop();
 }
