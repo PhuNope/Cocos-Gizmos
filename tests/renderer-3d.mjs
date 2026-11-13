@@ -242,6 +242,28 @@ Gizmos3D.drawLabel(node, 'bounded', 'Bounded zoom', new Vec3(0, 0, 0),
 assert.ok(Math.abs(bounded.node.worldScaleSet[0] - 12) < 1e-7,
     'Far zoom scales 3D label up to minimum 12 on-screen pixels');
 sceneCamera.pixelWorld = 1;
+// The public component Camera uses worldToScreen(world,out) and
+// screenPointToRay(x,y,out), unlike its private renderer camera.
+const directCamera = {
+    node: sceneCamera.node,
+    pixelWorld: 0.01,
+    worldToScreen(world, out) {
+        out.x = world.x / this.pixelWorld;
+        out.y = world.y / this.pixelWorld;
+        out.z = 1;
+    },
+    screenPointToRay(x, y, out) {
+        out.o = new Vec3(x * this.pixelWorld, y * this.pixelWorld, 100);
+        out.d = new Vec3(0, 0, -1);
+        return out;
+    },
+};
+sandbox.cce.Camera.camera = directCamera;
+Gizmos3D.drawLabel(node, 'bounded', 'Active camera',
+    new Vec3(0, 0, 0), 20, 0.5, 12, 24);
+assert.ok(Math.abs(bounded.node.worldScaleSet[0] - 0.012) < 1e-8,
+    '3D bounds use the public Scene Camera instead of a stale renderer camera');
+delete sandbox.cce.Camera.camera;
 
 const vertices = [
     new Vec3(0, 0, 0), new Vec3(1, 0, 0),
