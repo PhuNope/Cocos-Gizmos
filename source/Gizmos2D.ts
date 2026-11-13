@@ -63,14 +63,25 @@ class GizmosDebugDraw extends Component {
     private _useLocalPosition = false;
     private _layer: Layers.Enum = Gizmos2D.DEFAULT_LAYER;
     private _drawCallsNoneGeometry: (() => void)[] = [];
+    private static readonly OVERLAY_GRACE_MS = 750;
+    private readonly _lastLabelUsed = new Map<string, number>();
+    private readonly _lastSpriteUsed = new Map<string, number>();
 
     protected lateUpdate(dt: number): void {
-        this._labelMap.forEach((label) => {
-            label.string = '';
+        // The Scene updater can render at 250ms intervals during idle editing.
+        // Clearing 2D Labels/Sprites every engine frame hides them immediately.
+        const now = Date.now();
+        this._labelMap.forEach((label, id) => {
+            if (now - (this._lastLabelUsed.get(id) ?? -Infinity) >
+                GizmosDebugDraw.OVERLAY_GRACE_MS && label.string) {
+                label.string = '';
+            }
         });
-
-        this._spriteMap.forEach((sprite) => {
-            sprite.spriteFrame = null;
+        this._spriteMap.forEach((sprite, id) => {
+            if (now - (this._lastSpriteUsed.get(id) ?? -Infinity) >
+                GizmosDebugDraw.OVERLAY_GRACE_MS && sprite.spriteFrame) {
+                sprite.spriteFrame = null;
+            }
         });
 
         this._renderers.forEach((renderer) => renderer.draw());
@@ -163,6 +174,7 @@ class GizmosDebugDraw extends Component {
         this._drawCallsNoneGeometry.push(() => {
             sprite.color = color;
             sprite.spriteFrame = spriteFrame;
+            this._lastSpriteUsed.set(id, Date.now());
             sprite.node.setScale(new Vec3(scale.x, scale.y));
             const p = new Vec3(position.x, position.y);
             if (local) sprite.node.setPosition(p);
@@ -180,6 +192,7 @@ class GizmosDebugDraw extends Component {
             label.fontSize = fontSize;
             label.lineHeight = fontSize;
             label.string = text;
+            this._lastLabelUsed.set(id, Date.now());
             label.node.setScale(new Vec3(scale.x, scale.y));
             const p = new Vec3(position.x, position.y);
             if (local) label.node.setPosition(p);
