@@ -70,6 +70,7 @@ class Base {
             _cubeNode: { name: 'marker', active: false,
                 setScale(scale) { this.scale = scale; } },
             _cubeNodeMR: { enabled: false },
+            shape: { active: true },
             _editHandlesShape: { children: [{ name: 'x', active: true }, { name: 'y', active: true }] },
             _wireFrameBoxNode: { active: true },
             _wireFrameBoxMeshRenderer: { enabled: true },
@@ -109,7 +110,7 @@ class Base {
                     }
                 }
             },
-            show() { this.showCount++; },
+            show() { this.showCount++; this.shape.active = true; },
             setPosition(v) { this.position = v; },
             setRotation() {},
             updateSize() { throw new Error('topNode: unsafe BoxController.updateSize'); },
@@ -340,6 +341,8 @@ ctrl.onMouseDown({ handleName: 'position:target:single', x: 150, y: 0 });
 ctrl.onMouseMove({ handleName: 'position:target:single', x: -400, y: 180 });
 assert.notEqual(component.target.x, 150);
 adapter.refresh([component], new Set(), 1300);
+assert.equal(ctrl.shape.active, false,
+    'Deselecting Test2D turns off the entire native hit-test shape');
 assert.deepEqual([component.target.x, component.target.y, component.target.z], [150, 0, 0],
     'Selection change must cancel an active drag and restore original property');
 assert.equal(adapter.status().active, 0);
@@ -349,6 +352,8 @@ assert.equal(adapter.status().active, 0);
 adapter.refresh([component], selected, 1316);
 assert.equal(adapter.status().active, 1, 'Reselecting a Node restores its Gizmo immediately');
 assert.equal(gizmo.isHandleVisible(), true);
+assert.equal(ctrl.shape.active, true,
+    'Reselecting the Gizmo restores the native hit-test shape');
 assert.equal(ctrl.registerCount, 3, 'Reselection reinstalls the owning controller listener');
 assert.equal(ctrl._cubeNode.active, true);
 // Cocos Editor may hide the picking MeshRenderer without calling onHide.
@@ -421,8 +426,26 @@ assert.ok(component.gizmo.controllers[0]._cubeNode.active,
 // and editor-only gizmo pointer belongs to the *old* Scene and must be
 // destroyed, even if the next Scene reuses a component type/UUID.
 const oldSceneGizmo = component.gizmo;
+// Test2D -> Test3D selection before switching Scene view: the 2D Gizmo is
+// hidden, but still owned by this adapter and must not leak when the user
+// opens a different, possibly unsaved, Scene.
+const otherNode = { ...node, uuid: 'selected-node-3d' };
+const otherComponent = {
+    ...component, node: otherNode, target: new Vec3(10, 20, 0),
+    gizmo: null,
+};
+adapter.refresh([component, otherComponent], new Set([otherNode.uuid]), 1730);
+const selected3DGizmo = otherComponent.gizmo;
+assert.ok(selected3DGizmo?.isHandleVisible());
+assert.equal(oldSceneGizmo.isHandleVisible(), false);
+assert.equal(oldSceneGizmo.controllers[0].shape.active, false,
+    'Hidden 2D Gizmo must not intercept the next 3D object click');
 adapter.clear();
 assert.equal(adapter.status().active, 0);
+assert.equal(selected3DGizmo.isHandleDisposed(), true,
+    'Scene transition disposes the active 3D Gizmo');
+assert.equal(otherComponent.gizmo, null,
+    'Scene transition clears 3D component gizmo pointer');
 assert.equal(oldSceneGizmo.isHandleDisposed(), true,
     'Scene transition destroys native BoxController from previous Scene');
 assert.equal(component.gizmo, null,
@@ -433,6 +456,24 @@ assert.ok(component.gizmo !== oldSceneGizmo,
 assert.equal(component.gizmo.isHandleVisible(), true);
 assert.equal(component.gizmo.controllers[0]._editHandlesShape.children[1].active, true,
     'Recovered Scene handle exposes the working +Y native hit proxy');
+// Switching the Scene toolbar from 2D to 3D swaps the camera, but must not
+// allocate new native Gizmos on each frame or leave the +Y proxy unmounted.
+const current3DGizmo = component.gizmo;
+const cameraSwitchController = current3DGizmo.controllers[0];
+current3DGizmo.refreshSceneCamera();
+const previousShow = cameraSwitchController.showCount;
+const oldCamera = sandbox.cce.Camera._camera.camera;
+const switched = { ...oldCamera, node: { forward: new Vec3(-1, 0, -1) },
+    projectionType: 1 };
+sandbox.cce.Camera._camera.camera = switched;
+current3DGizmo.refreshSceneCamera();
+assert.equal(cameraSwitchController.showCount, previousShow + 1,
+    '2D -> 3D View remounts the existing native controller exactly once');
+assert.equal(cameraSwitchController._editHandlesShape.children[1].active, true);
+current3DGizmo.refreshSceneCamera();
+assert.equal(cameraSwitchController.showCount, previousShow + 1,
+    'Camera orbit/repeated frames never reallocate native Gizmo faces');
+sandbox.cce.Camera._camera.camera = oldCamera;
 adapter.dispose();
 assert.equal(adapter.status().reason, 'disposed');
 assert.equal(componentPool.typeDefs.ProbePosition, undefined,
