@@ -56,9 +56,8 @@ declare global {
         planeOffset?: number;
     }
 
-    /** Shared options for Gizmos3D.moveHandles(property, options).
-     * Generates six editable handles for one Vec3 property.
-     */
+    /** Settings for Gizmos3D.move(property, options). */
+
     interface GizmosMoveHandleOptions {
         space?: GizmoHandleSpace;
         snap?: number;
@@ -69,6 +68,16 @@ declare global {
         hoverColor?: string;
         showPositionLabel?: boolean;
         positionLabelOffset?: number;
+        bounds?: GizmoHandleDescriptor['bounds'];
+    }
+
+    /** Options for Gizmos2D.point() and Gizmos2D.points(). */
+    interface GizmoPointOptions {
+        plane?: GizmoHandlePlane;
+        space?: GizmoHandleSpace;
+        snap?: number;
+        color?: string;
+        pickSize?: number;
         bounds?: GizmoHandleDescriptor['bounds'];
     }
 
