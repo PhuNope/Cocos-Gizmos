@@ -32,8 +32,12 @@ class Vec3 {
 }
 class Quat {}
 class Color {
+    constructor(r = 255, g = 255, b = 255, a = 255) {
+        Object.assign(this, { r, g, b, a });
+    }
     static fromHEX(out, hex) { out.hex = hex; }
-    set() {}
+    set(r, g, b, a = 255) { Object.assign(this, { r, g, b, a }); }
+    clone() { return new Color(this.r, this.g, this.b, this.a); }
 }
 Color.BLACK = new Color();
 class Node {
@@ -43,9 +47,16 @@ class Node {
         this.isValid = true;
         this.active = true;
         this.hideFlags = 0;
+        this.components = [];
     }
     addChild(node) { node.parent = this; this.children.push(node); }
-    addComponent(Type) { const value = new Type(); value.node = this; return value; }
+    addComponent(Type) {
+        const value = new Type();
+        value.node = this;
+        this.components.push(value);
+        return value;
+    }
+    getComponent(Type) { return this.components.find(c => c instanceof Type) || null; }
     setWorldPosition(value) { this.worldPosition = value; }
     setWorldRotation(value) { this.worldRotation = value; }
     setWorldScale(value) { this.worldScale = value; }
@@ -56,8 +67,26 @@ class Node {
     destroy() { this.isValid = false; }
 }
 class MeshRenderer {
-    constructor() { this.isValid = true; }
+    constructor() { this.isValid = true; this.enabled = true; }
     setMaterial(value) { this.material = value; }
+}
+class RenderRoot2D {}
+class Sprite {
+    constructor() { this.isValid = true; this.spriteFrame = null; }
+}
+class ImageAsset {
+    constructor(canvas) { this.canvas = canvas; }
+    destroy() { this.destroyed = true; }
+}
+class Texture2D {
+    destroy() { this.destroyed = true; }
+}
+class SpriteFrame {
+    destroy() { this.destroyed = true; }
+}
+class UITransform {
+    setAnchorPoint(x, y) { this.anchor = [x, y]; }
+    setContentSize(w, h) { this.size = [w, h]; }
 }
 class Material {
     initialize(value) { this.options = value; }
@@ -71,12 +100,29 @@ const director = {
     off() { beforeDraw = null; },
 };
 const meshInstances = [];
+const uiDrawCalls = [];
+const document = {
+    createElement(name) {
+        assert.equal(name, 'canvas');
+        return {
+            width: 0, height: 0,
+            getContext() {
+                return {
+                    clearRect() {},
+                    beginPath() {}, arc() {}, fill() {}, stroke() {},
+                    moveTo() {}, lineTo() {},
+                };
+            },
+        };
+    },
+};
 const cc = {
     CCObject: { Flags: { DontSave: 1, HideInHierarchy: 2 } },
     Color, Vec3, Quat, Node, Material, MeshRenderer, Mesh: class Mesh {},
+    ImageAsset, Sprite, SpriteFrame, Texture2D, UITransform,
     gfx: { CullMode: { NONE: 0 } },
-    RenderRoot2D: class RenderRoot2D {},
-    Layers: { Enum: { GIZMOS: 4, UI_2D: 16 } },
+    RenderRoot2D,
+    Layers: { Enum: { GIZMOS: 4, UI_2D: 16, UI_3D: 32 } },
     director, Director: { EVENT_BEFORE_DRAW: 'before-draw' },
     utils: { createMesh(geometry) {
         const mesh = { geometry, destroy() { this.destroyed = true; } };
@@ -148,6 +194,7 @@ const manager = {
 };
 const sandbox = {
     exports: {},
+    document,
     cce: { Camera: { _camera: { camera: rendererCamera } }, Gizmo: manager },
     console: { warn(...args) { throw new Error(args.join(' ')); } },
     require(id) {
@@ -266,6 +313,12 @@ const dragController = dragGizmo.controllers[0];
 const positionDisc = gizmoRootNode.children.find(node =>
     node.name === 'CocosGizmosPositionPoint' && node.active);
 assert.ok(positionDisc, '3D selected drag point has its own visible mesh');
+const dragSprite3D = positionDisc.children[0]?.children[0]?.getComponent(Sprite);
+assert.ok(dragSprite3D?.spriteFrame,
+    '3D drag point must be visible through the same Sprite UI pipeline as HUD');
+assert.equal(dragSprite3D.node.active, true);
+assert.equal(positionDisc.getComponent(MeshRenderer).enabled, false,
+    'Mesh-only drag point is disabled when the UI sprite is available');
 assert.equal(positionDisc.worldPosition.x, 100);
 assert.equal(positionDisc.worldPosition.y, 100);
 assert.ok(positionDisc.worldScale.x > 0);
@@ -304,6 +357,10 @@ dragAdapter2D.refresh([drag2D], new Set([dragNode2D.uuid]), 3000);
 const visual2D = gizmoRootNode.children.find(node =>
     node.name === 'CocosGizmosPositionPoint' && node.active);
 assert.ok(visual2D, 'Canvas 2D selected point also owns a scene-visible disc');
+const dragSprite2D = visual2D.children[0]?.children[0]?.getComponent(Sprite);
+assert.ok(dragSprite2D?.spriteFrame,
+    '2D drag point must use a UI Sprite, just like the working Scene HUD');
+assert.equal(dragSprite2D.node.active, true);
 assert.ok(twoDDraws.length >= 2, 'Canvas 2D fallback still draws Graphics markers');
 drag2D.gizmo.onNotGizmoMouseDown({ x: 50, y: 60 });
 drag2D.gizmo.onNotGizmoMouseMove({ x: 75, y: 70 });
