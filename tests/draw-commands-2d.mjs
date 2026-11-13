@@ -122,6 +122,8 @@ class Node {
         return null;
     }
     setPosition() {}
+    setScale(...args) { this.scale = args; }
+    setWorldPosition(pos) { this.worldPosition = pos; }
     inverseTransformPoint(out, point) {
         out.x = point.x - 10;
         out.y = point.y - 20;
@@ -129,6 +131,8 @@ class Node {
     }
 }
 class Component {}
+class Label { constructor() { this.string = ''; } }
+class Sprite { constructor() { this.spriteFrame = null; } }
 class Graphics extends Sink {
     constructor() { super(); this.clearCount = 0; }
     clear() { this.clearCount++; }
@@ -136,13 +140,15 @@ class Graphics extends Sink {
 const cc = {
     _decorator: { ccclass: () => (target) => target, executeInEditMode: (target) => target },
     CCObject: { Flags: { DontSave: 1, HideInHierarchy: 2 } },
-    Color, Component, Graphics, Node, Vec3,
+    Color, Component, Graphics, Node, Vec3, Label, Sprite,
     Vec2: { ONE: { x: 1, y: 1 } },
     Layers: { Enum: { GIZMOS: 4, DEFAULT: 1 } },
     toRadian: (degrees) => degrees * Math.PI / 180,
 };
+let now = 1000;
 const moduleSandbox = {
     exports: {},
+    Date: class extends Date { static now() { return now; } },
     require(name) {
         if (name === 'cc') return cc;
         if (name === './DrawCommandBuffer2D') return { DrawCommandBuffer2D };
@@ -210,5 +216,25 @@ assert.equal(afterClears[0], beforeClears[0], 'Inactive renderer should not clea
 assert.ok(afterClears.slice(1).every((value, index) => value === beforeClears[index + 1] + 1));
 debug.lateUpdate(0); // Subsequent idle frames do not clear again.
 assert.deepEqual(graphics.map((g) => g.clearCount), afterClears);
+
+// Scene updates may fall back to 250ms. Labels/Sprites should not be erased
+// on every lateUpdate, otherwise 2D annotations remain visible for one frame.
+const frame = { width: 256, height: 128 };
+Gizmos2D.drawLabel(rootNode, 'persistent', 'HUD annotation', { x: 5, y: 10 }, 16);
+Gizmos2D.drawSprite(rootNode, 'preview', frame, { x: 12, y: 18 });
+debug.lateUpdate(0);
+const label = debug._labelMap.get('persistent');
+const sprite = debug._spriteMap.get('preview');
+assert.equal(label.string, 'HUD annotation');
+assert.equal(sprite.spriteFrame, frame);
+now += 300;
+debug.lateUpdate(0);
+assert.equal(label.string, 'HUD annotation',
+    '2D label persists across a 250ms Scene watchdog gap');
+assert.equal(sprite.spriteFrame, frame);
+now += 451;
+debug.lateUpdate(0);
+assert.equal(label.string, '', '2D label expires only when idle longer than 750ms');
+assert.equal(sprite.spriteFrame, null);
 
 console.log('[draw-commands-2d] 164 paths/one stroke, local/world endpoints, render-state partitioning, idle reuse OK');
