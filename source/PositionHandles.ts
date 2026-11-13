@@ -21,7 +21,8 @@ import {
 
 type Point = { x: number; y: number; z: number };
 type Field = GizmoHandleDescriptor;
-type Entry = { field: Field; controller: any; key: string };
+type PositionVisual = { node: Node; renderer: MeshRenderer; material: Material; mesh: Mesh };
+type Entry = { field: Field; controller: any; key: string; visual?: PositionVisual | null };
 type DragState = { entry: Entry; solver: PositionDragSolver; session: GizmoEditSession<Point> };
 type HudPickingQuad = { node: Node; renderer: MeshRenderer; material: Material; mesh: Mesh };
 type HudEntry = { control: HudControl; controller: any; key: string; index: number;
@@ -239,6 +240,66 @@ function drawSelectedPositionMarkers(component: Component): void {
  * HUD hit geometry must be a screen-facing quad, not a stretched BoxCollider
  * cube. The same viewport rectangle is used for drawing, hit-test and picking.
  */
+/**
+ * Visual drag dots live under the Editor's gizmo root rather than within
+ * BoxController._cubeNode. The native cube is only a picking fallback:
+ * Cocos Creator may disable that private renderer during selection changes.
+ * The disc is depth-free and camera-facing for both 2D and 3D Scene modes.
+ */
+function createPositionVisual(color: Color): PositionVisual | null {
+    const parent = cceNamespace()?.Gizmo?.gizmoRootNode;
+    if (!parent?.isValid || typeof Node !== 'function' ||
+        typeof MeshRenderer !== 'function' || typeof utils?.createMesh !== 'function') return null;
+    let node: Node | null = null;
+    let material: Material | null = null;
+    let mesh: Mesh | null = null;
+    try {
+        node = new Node('CocosGizmosPositionPoint');
+        node.layer = Layers.Enum.GIZMOS;
+        node.hideFlags |= CCObject.Flags.DontSave | CCObject.Flags.HideInHierarchy;
+        parent.addChild(node);
+        const renderer = node.addComponent(MeshRenderer);
+        material = new Material();
+        material.initialize({
+            effectName: 'builtin-unlit', technique: 1,
+            states: {
+                depthStencilState: { depthTest: false, depthWrite: false },
+                rasterizerState: { cullMode: gfx.CullMode.NONE },
+            },
+        });
+        material.setProperty('mainColor', color);
+        renderer.setMaterial(material, 0);
+        (renderer as any).priority = 32760;
+        // Unit circle. A stable mesh is kept throughout drag/zoom; only the
+        // Scene-world transform changes, avoiding a GPU allocation per frame.
+        const positions = [0, 0, 0];
+        const indices: number[] = [];
+        const segments = 20;
+        for (let i = 0; i <= segments; i++) {
+            const angle = i * Math.PI * 2 / segments;
+            positions.push(Math.cos(angle) * 0.5, Math.sin(angle) * 0.5, 0);
+        }
+        for (let i = 1; i <= segments; i++) indices.push(0, i, i + 1);
+        mesh = utils.createMesh({ positions, indices }, undefined, { calculateBounds: true });
+        renderer.mesh = mesh;
+        return { node, renderer, material, mesh };
+    } catch (error) {
+        console.warn('[cocos-gizmos/handles] Native point visual fallback:', error);
+        mesh?.destroy();
+        material?.destroy();
+        if (node?.isValid) node.destroy();
+        return null;
+    }
+}
+
+function disposePositionVisual(visual?: PositionVisual | null): void {
+    if (!visual) return;
+    if (visual.renderer.isValid) visual.renderer.mesh = null;
+    visual.mesh.destroy();
+    visual.material.destroy();
+    if (visual.node.isValid) visual.node.destroy();
+}
+
 function createHudPickingQuad(): HudPickingQuad | null {
     const parent = cceNamespace()?.Gizmo?.gizmoRootNode;
     if (!parent?.isValid || typeof Node !== 'function' ||
@@ -479,6 +540,7 @@ function createEditorGizmo(
                     if (controller._handleDataMap?.[key]) controller.removeHandle?.(key);
                     controller.initHandle(controller._cubeNode, key);
                     repairNativeHandleColors(controller, key, color);
+                    entry.visual = createPositionVisual(color);
                     const down = (event: any) => { input.record('controllerDown'); this.begin(entry, event); };
                     const move = (event: any) => { input.record('controllerMove'); this.move(entry, event); };
                     const up = () => {
@@ -592,6 +654,20 @@ function createEditorGizmo(
                 entry.controller.setRotation?.(new Quat());
                 const size = markerSize(world);
                 setMarkerSize(entry.controller, size);
+                if (!entry.visual?.node?.isValid) {
+                    const color = new Color(255, 174, 66, 255);
+                    if (entry.field.color && Color.fromHEX)
+                        Color.fromHEX(color, entry.field.color);
+                    entry.visual = createPositionVisual(color);
+                }
+                if (entry.visual?.node?.isValid) {
+                    const visible = entry.visual.node;
+                    visible.active = true;
+                    visible.setWorldPosition(new Vec3(world.x, world.y, world.z));
+                    const rotation = camera()?.node?.worldRotation;
+                    if (rotation) visible.setWorldRotation(rotation);
+                    visible.setWorldScale(new Vec3(size * 0.8, size * 0.8, 1));
+                }
             }
             if (!this.hudEntries.length) return;
             const view = camera();
@@ -994,6 +1070,8 @@ function createEditorGizmo(
                     const hud = this.hudEntries.find(entry => entry.controller === controller);
                     if (hud?.picking?.node?.isValid) hud.picking.node.active = true;
                     else this.ensureMarkerVisible(controller);
+                    const point = this.entries.find(entry => entry.controller === controller);
+                    if (point?.visual?.node?.isValid) point.visual.node.active = true;
                     this.registerController(controller);
                 }
             }
@@ -1007,6 +1085,9 @@ function createEditorGizmo(
             }
             for (const entry of this.hudEntries) {
                 if (entry.picking?.node?.isValid) entry.picking.node.active = false;
+            }
+            for (const entry of this.entries) {
+                if (entry.visual?.node?.isValid) entry.visual.node.active = false;
             }
             this.finish(true);
             this.finishHud(true);
@@ -1046,8 +1127,16 @@ function createEditorGizmo(
                     suspendNativeController(controller, hud?.picking);
                     controller.removeHandle?.(key);
                     disposeHudPickingQuad(hud?.picking);
+                    const point = this.entries.find(item => item.controller === controller);
+                    disposePositionVisual(point?.visual);
                 } catch (error) {
                     // The Editor can destroy a controller during a Scene switch.
+                    // Disposal must not leak a visible marker when Cocos
+                    // destroys the native BoxController halfway through cleanup.
+                    const point = this.entries.find(item => item.controller === controller);
+                    disposePositionVisual(point?.visual);
+                    const hud = this.hudEntries.find(item => item.controller === controller);
+                    disposeHudPickingQuad(hud?.picking);
                     console.warn('[cocos-gizmos/handles] Discarding a stale controller:', error);
                 }
             }
