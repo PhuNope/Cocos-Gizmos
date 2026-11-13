@@ -403,8 +403,10 @@ const initialUnregister = button.unregisterCount;
 sandbox.cce.Camera._camera.camera = null;
 hudGizmo.refreshHandles();
 hudGizmo.refreshHandles();
-assert.equal(button.hideCount, initialHide + 1,
-    'Missing camera hides a HUD marker only once');
+assert.equal(button.hideCount, initialHide,
+    'Missing camera must not call unsafe native BoxController.hide()');
+assert.equal(button._cubeNode.active, false,
+    'Missing camera disables picking volume without resetting private handle colors');
 assert.equal(button.unregisterCount, initialUnregister + 1,
     'Camera loss unregisters its picking listener');
 const initialRegister = button.registerCount;
@@ -412,8 +414,8 @@ sandbox.cce.Camera._camera.camera = originalCamera;
 hudGizmo.refreshHandles();
 assert.equal(button.registerCount, initialRegister + 1,
     'Restored camera registers HUD picking listener again');
-assert.equal(button.showCount > 0, true,
-    'Restored camera shows the hidden marker again');
+assert.equal(button._cubeNode.active, true,
+    'Restored camera reactivates the picking marker');
 hudGizmo.refreshHandles();
 assert.equal(button.registerCount, initialRegister + 1,
     'Repeated frames never duplicate listeners');
