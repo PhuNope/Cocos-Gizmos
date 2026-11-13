@@ -148,12 +148,19 @@ const sceneCamera = {
     },
 };
 let now = 1000;
+const presetsSource = readFileSync(path.join(root, 'source/GizmoHandlePresets.ts'), 'utf8');
+const presetsJs = ts.transpileModule(presetsSource, {
+    compilerOptions: { target: ts.ScriptTarget.ES2017, module: ts.ModuleKind.CommonJS },
+}).outputText;
+const presets = { exports: {} };
+vm.runInNewContext(presetsJs, presets);
 const sandbox = {
     exports: {},
     Date: class extends Date { static now() { return now; } },
     require: mod => {
         if (mod === 'cc') return cc;
         if (mod === './Define') return { cce: { Camera: { _camera: { camera: sceneCamera } } } };
+        if (mod === './GizmoHandlePresets') return presets.exports;
         throw new Error('Unexpected module ' + mod);
     },
     console: { log() {}, warn: msg => { throw new Error(String(msg)); }, error() {} },
@@ -162,13 +169,13 @@ const sandbox = {
 vm.runInNewContext(compiled, sandbox, { filename: 'Gizmos3D.js' });
 const { Gizmos3D } = sandbox.exports;
 const node = new Node('owner');
-const moveHandles = Gizmos3D.moveHandles('waypoint', {
+const moveHandles = Gizmos3D.move('waypoint', {
     space: 'local', snap: 0.25, pickSize: 32, hoverColor: '#ffff66',
 });
 assert.equal(moveHandles.length, 6, 'Default Move Tool exports XYZ + XY/XZ/YZ controls');
 assert.deepEqual(Array.from(moveHandles, h => h.id),
-    ['move-axis-x', 'move-axis-y', 'move-axis-z',
-        'move-plane-xy', 'move-plane-xz', 'move-plane-yz']);
+    ['axis-x', 'axis-y', 'axis-z',
+        'plane-xy', 'plane-xz', 'plane-yz']);
 assert.ok(moveHandles.every(h => h.property === 'waypoint' &&
     h.pickSize === 32 && h.snap === 0.25 && h.hoverColor === '#ffff66'));
 assert.deepEqual(Array.from(moveHandles.slice(0, 3), h => h.axis), ['x', 'y', 'z']);
