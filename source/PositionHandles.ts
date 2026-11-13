@@ -874,10 +874,15 @@ function createEditorGizmo(
                 try {
                     controller.show?.();
                     controller.__cocosGizmosNativeShown = true;
-                    // Rebind the same native +Y face after the Scene camera
-                    // changes. No new BoxController or Gizmo is allocated.
-                    configurePositionHitProxy(controller, color, false);
-                    configurePositionHitProxy(controller, color, true);
+                    // Native handle binding stays on the registered
+                    // transparent Move quad across camera-mode changes.
+                    // Only the legacy point marker needs a +Y face refresh.
+                    if (!entry.picking) {
+                        configurePositionHitProxy(controller, color, false);
+                        configurePositionHitProxy(controller, color, true);
+                    } else if (controller._editHandlesShape) {
+                        controller._editHandlesShape.active = false;
+                    }
                 } catch (error) {
                     console.warn('[cocos-gizmos/handles] Camera switch hit proxy:', error);
                 }
@@ -1825,13 +1830,16 @@ function createEditorGizmo(
                         const color = new Color(255, 174, 66, 255);
                         if (point.field.color && Color.fromHEX)
                             Color.fromHEX(color, point.field.color);
-                        configurePositionHitProxy(controller, color, true);
+                        if (!point.picking)
+                            configurePositionHitProxy(controller, color, true);
                     }
                     const hud = this.hudEntries.find(entry => entry.controller === controller);
-                    if (hud?.picking?.node?.isValid) hud.picking.node.active = true;
+                    const picker = hud?.picking || point?.picking;
+                    if (picker?.node?.isValid) picker.node.active = true;
                     else this.ensureMarkerVisible(controller);
-                    if (hud && controller.shape) controller.shape.active = true;
-                    if (point?.visual?.node?.isValid) point.visual.node.active = true;
+                    if (picker && controller.shape) controller.shape.active = true;
+                    if (point?.visual?.node?.isValid)
+                        point.visual.node.active = !isMoveHandle(point.field);
                     this.registerController(controller);
                 }
             }
@@ -1855,7 +1863,9 @@ function createEditorGizmo(
             }
             for (const entry of this.entries) {
                 if (entry.visual?.node?.isValid) entry.visual.node.active = false;
-                configurePositionHitProxy(entry.controller, new Color(255,255,255,255), false);
+                if (entry.picking?.node?.isValid) entry.picking.node.active = false;
+                if (!entry.picking)
+                    configurePositionHitProxy(entry.controller, new Color(255,255,255,255), false);
                 // The native BoxController keeps a separate raycast shape.
                 // Disabling only its cube and +Y face leaves an invisible hit
                 // proxy over the 3D View after switching from Test2D.
@@ -1867,7 +1877,8 @@ function createEditorGizmo(
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 this.unregisterController(controller);
                 const hud = this.hudEntries.find(entry => entry.controller === controller);
-                suspendNativeController(controller, hud?.picking);
+                const move = this.entries.find(entry => entry.controller === controller);
+                suspendNativeController(controller, hud?.picking || move?.picking);
                 // Even an invisible HUD Controller's native shape can block
                 // 3D picking. Only selected Gizmos may own active raycast.
                 if (controller?.shape) controller.shape.active = false;
@@ -1901,13 +1912,14 @@ function createEditorGizmo(
                 try {
                     this.unregisterController(controller);
                     const hud = this.hudEntries.find(item => item.controller === controller);
-                    suspendNativeController(controller, hud?.picking);
                     const point = this.entries.find(item => item.controller === controller);
-                    if (point) configurePositionHitProxy(controller,
+                    suspendNativeController(controller, hud?.picking || point?.picking);
+                    if (point && !point.picking) configurePositionHitProxy(controller,
                         new Color(255, 255, 255, 255), false);
                     if (controller?.shape) controller.shape.active = false;
                     controller.removeHandle?.(key);
                     disposeHudPickingQuad(hud?.picking);
+                    disposeHudPickingQuad(point?.picking);
                     disposePositionVisual(point?.visual);
                 } catch (error) {
                     // The Editor can destroy a controller during a Scene switch.
@@ -1917,6 +1929,7 @@ function createEditorGizmo(
                     disposePositionVisual(point?.visual);
                     const hud = this.hudEntries.find(item => item.controller === controller);
                     disposeHudPickingQuad(hud?.picking);
+                    disposeHudPickingQuad(point?.picking);
                     console.warn('[cocos-gizmos/handles] Discarding a stale controller:', error);
                 }
             }
