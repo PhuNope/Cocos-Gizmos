@@ -723,7 +723,68 @@ class GizmosDebugDraw extends Component {
     }
 }
 
+export interface GizmosMoveHandleOptions {
+    /** Node local or absolute world coordinates (default local). */
+    space?: GizmoHandleSpace;
+    /** Shared snap value for all axis and plane handles. */
+    snap?: number;
+    /** Approximate length of each colored axis arrow in Scene pixels. */
+    axisSize?: number;
+    /** Larger invisible pick footprint in Scene pixels (default 24). */
+    pickSize?: number;
+    /** Side length of each plane selection square in pixels (default 24). */
+    planeSize?: number;
+    /** Distance of plane square centers from the common origin (default 25). */
+    planeOffset?: number;
+    /** Show the live Vec3 label above the selected object (default true). */
+    showPositionLabel?: boolean;
+    /** Pixels above the position where the label is placed (default 94). */
+    positionLabelOffset?: number;
+    /** Override the highlight while the axis or plane is hovered/dragged. */
+    hoverColor?: string;
+    /** Optional coordinate bounds; applied to all six handles. */
+    bounds?: GizmoHandleDescriptor['bounds'];
+}
+
 export class Gizmos3D {
+    /** Creator Move Tool-style preset: three X/Y/Z arrow handles and three
+     * small XY/XZ/YZ plane squares, all editing the SAME Vec3 field.
+     * Use it inside onGizmoHandles() without adding any scene components.
+     */
+    public static moveHandles(
+        property: string, options: GizmosMoveHandleOptions = {},
+    ): GizmoHandleDescriptor[] {
+        const base = {
+            property, space: options.space || 'local',
+            snap: options.snap,
+            bounds: options.bounds,
+            pickSize: options.pickSize ?? 24,
+            hoverColor: options.hoverColor ?? '#ffff65',
+        };
+        const axisColor = { x: '#ff595e', y: '#43df66', z: '#4b8fff' };
+        const planeColor = { xy: '#fff16e', xz: '#58dfff', yz: '#ff78de' };
+        const arrows: GizmoHandleDescriptor[] =
+            (['x', 'y', 'z'] as const).map((axis, index) => ({
+                ...base,
+                id: 'move-axis-' + axis,
+                visual: 'axis' as const, plane: 'view' as const,
+                axis, color: axisColor[axis],
+                axisSize: options.axisSize ?? 86,
+                showPositionLabel: index === 0 && options.showPositionLabel !== false,
+                positionLabelOffset: options.positionLabelOffset ?? 94,
+            }));
+        const planes: GizmoHandleDescriptor[] =
+            (['xy', 'xz', 'yz'] as const).map(plane => ({
+                ...base,
+                id: 'move-plane-' + plane,
+                visual: 'plane' as const, plane,
+                color: planeColor[plane],
+                planeSize: options.planeSize ?? 24,
+                planeOffset: options.planeOffset ?? 25,
+            }));
+        return [...arrows, ...planes];
+    }
+
     public static readonly DEFAULT_COLOR = Color.BLUE;
     public static readonly DEFAULT_LAYER = Layers.Enum.GIZMOS;
     private static readonly _debugNodes = new WeakMap<Node, GizmosDebugDraw>();
@@ -787,6 +848,34 @@ export class Gizmos3D {
     ) {
         this.getDebugNode(node)?.drawLabel(id, text, position,
             fontSize, scale, minSize, maxSize);
+    }
+
+    /** Draw a stable, screen-size-clamped world position label above an object.
+     * ID reuse ensures that repeated Scene frames do not leak Label nodes.
+     */
+    public static drawPositionLabel(
+        node: Node, id: string, position: Vec3,
+        options: { offsetPixels?: number; digits?: number; minSize?: number;
+            maxSize?: number; color?: Color } = {},
+    ): void {
+        if (!position || ![position.x, position.y, position.z].every(Number.isFinite))
+            return;
+        const debug = this.getDebugNode(node);
+        const pixel = (debug as any).worldUnitsPerScreenPixel?.(position) || 0.01;
+        const cam = (globalThis as any).window?.cce?.Camera?._camera?.camera ||
+            (globalThis as any).cce?.Camera?._camera?.camera;
+        const up = cam?.node?.up || { x: 0, y: 1, z: 0 };
+        const distance = pixel * Math.max(14, options.offsetPixels ?? 94);
+        const at = new Vec3(position.x + up.x * distance,
+            position.y + up.y * distance, position.z + up.z * distance);
+        const digits = Math.min(5, Math.max(0, Math.floor(options.digits ?? 2)));
+        const text = 'Pos  X: ' + position.x.toFixed(digits) +
+            '  Y: ' + position.y.toFixed(digits) +
+            '  Z: ' + position.z.toFixed(digits);
+        this.beginColor(node, options.color || Color.WHITE);
+        this.drawLabel(node, id, text, at, 16, 1,
+            options.minSize ?? 12, options.maxSize ?? 22);
+        this.beginColor(node, this.DEFAULT_COLOR);
     }
 
     public static drawLine(node: Node, point1: Vec3, point2: Vec3) {
