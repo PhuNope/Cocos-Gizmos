@@ -414,6 +414,17 @@ This attaches the Component; there is no need to manually copy the script into
 your project's `assets/` folder. The extension mount remains read-only.
 You can also add the Component by class name in Inspector if Creator lists it.
 
+To verify that Creator has actually imported the mounted scripts, open
+**Extensions → Gizmos Settings → Check example assets**. This performs
+read-only `asset-db/query-asset-info` checks on the three exact demo URLs.
+Each result distinguishes `imported`, `missing`, `not-imported`, `invalid`,
+`uuid-mismatch`, `wrong-importer`, `query-failed` and
+`database-not-ready`. A reported `imported` status means the script asset
+was registered in Asset DB; it **does not** prove that the class has compiled
+successfully, that Inspector drag-and-drop works, or that native Gizmo
+controllers work. Those steps still require testing in the real Editor.
+No Scene, Prefab or project asset is modified by this check.
+
 The mounted samples have `CocosGizmos*` class names to avoid conflicts with
 previously copied `Gizmos2DApiTest`, `Gizmos3DApiTest`, and `GizmoSmokeProbe`
 scripts. Their committed `.meta` UUIDs remain stable across extension
