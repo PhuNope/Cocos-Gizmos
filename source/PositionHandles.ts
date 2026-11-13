@@ -7,7 +7,7 @@ import {
     PositionDragSolver,
 } from './PositionDragSolver';
 import { HudControl, HudSliderDrag, hudRowScreenPosition, normalizeHudControls, hudControlLayoutSignature } from './GizmoHudControls';
-import { createSceneHudProjection } from './GizmoHudProjection';
+import { createSceneHudProjection, createViewportHudProjection } from './GizmoHudProjection';
 import { normalizeHudItems } from './GizmoPresentation';
 import { GizmoEditSession } from './GizmoEditSession';
 import { GizmoHudLayout } from './GizmoHudLayout';
@@ -474,7 +474,8 @@ function createEditorGizmo(
                 for (const entry of this.hudEntries) this.hideUnavailableMarker(entry.controller);
                 return;
             }
-            const projection = createSceneHudProjection(view, component.node.worldPosition);
+            const projection = (view.viewport && createViewportHudProjection(view)) ||
+                createSceneHudProjection(view, component.node.worldPosition);
             if (!projection) {
                 for (const entry of this.hudEntries) this.hideUnavailableMarker(entry.controller);
                 return;
@@ -492,7 +493,7 @@ function createEditorGizmo(
                 this.ensureMarkerVisible(entry.controller);
                 const row = hudRowScreenPosition(
                     projection.screen, startRow + textCount + entry.index,
-                    projection.viewport);
+                    projection.viewport, hudLayout?.totalRows);
                 const world = projection.worldAt(row.x - 14, row.y);
                 entry.controller.setPosition?.(world);
                 setMarkerSize(entry.controller, size);
