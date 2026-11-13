@@ -393,11 +393,17 @@ assert.ok(adapter.status().input.controllerDown >= 4,
 assert.ok(adapter.status().input.controllerMove >= 4,
     'Diagnostics count actual controller movement');
 const missingBefore = adapter.status().input.missingPointer;
-gizmo.onShow();
-ctrl.onMouseDown({ handleName: 'position:target:single' });
+// A replaced Gizmo is now disposed immediately instead of being retained
+// as an invisible native hit target, so use the current component instance.
+const currentGizmo = component.gizmo;
+const currentCtrl = currentGizmo.controllers[0];
+currentGizmo.onShow();
+currentCtrl.onMouseDown({ handleName: 'position:target:single' });
 assert.equal(adapter.status().input.missingPointer, missingBefore + 1,
     'Missing Cocos pointer coordinates are explicitly diagnosed');
-gizmo.onHide();
+currentGizmo.onHide();
+assert.equal(previousGizmo.isHandleDisposed(), true,
+    'Replacing the selected Gizmo releases its old ghost picking controller');
 // Creator can destroy the native instance when selection becomes empty.
 // The same Node must get a fresh Controller when selected again.
 adapter.refresh([component], selected, 1700);
