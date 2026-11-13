@@ -483,5 +483,107 @@ assert.equal(drag2D.handlePosition.x, 75);
 assert.equal(drag2D.handlePosition.y, 70);
 dragAdapter2D.dispose();
 
+// Realistic Move Gizmo integration: unlike the legacy +Y edit face, each
+// arrow, plane tile and body box registers its own invisible MeshRenderer
+// surface with Creator's native GizmoOperation. Screen picking can still
+// choose a plane in preference to an overlapping arrow/box.
+const moveNode = new Node('Move3DNode');
+moveNode.uuid = 'move-3d-selected';
+moveNode.activeInHierarchy = true;
+moveNode.worldMatrix = {};
+moveNode.worldPosition = new Vec3();
+const moveComponent = {
+    __classname__: 'MoveProbe',
+    constructor: { name: 'MoveProbe' },
+    isValid: true, enabled: true, node: moveNode,
+    moveObject: new Vec3(100, 100, 0),
+    onGizmoHandles() {
+        const base = { property: 'moveObject', space: 'local',
+            pickSize: 28, snap: 1 };
+        return [
+            { ...base, id: 'axis-x', visual: 'axis', axis: 'x',
+                plane: 'view', axisSize: 78 },
+            { ...base, id: 'plane-xy', visual: 'plane', plane: 'xy',
+                planeSize: 24, planeOffset: 25 },
+            { ...base, id: 'body', visual: 'box', plane: 'view',
+                boxSize: 0.7 },
+        ];
+    },
+};
+const moveAdapter = createPositionHandleAdapter(() => true);
+moveAdapter.refresh([moveComponent], new Set([moveNode.uuid]), 4000);
+const moveGizmo = moveComponent.gizmo;
+assert.equal(moveGizmo.controllers.length, 3);
+const [arrowControl, planeControl, boxControl] = moveGizmo.controllers;
+for (const controller of moveGizmo.controllers) {
+    assert.equal(controller._cubeNode.active, false,
+        'No native plus/cube visuals for Move Gizmo');
+    assert.equal(controller._editHandlesShape.active, false,
+        'No native +Y face that used to draw a colored + marker');
+    assert.ok(controller.hitTarget?.name === 'CocosGizmosMoveHit',
+        'Creator registers transparent mesh rather than an unrelated cube');
+    assert.equal(controller.hitTarget.active, true);
+    assert.ok(controller.hitTarget.getComponent(MeshRenderer)?.mesh,
+        'Actual transparent pick geometry has a mesh for raycast');
+    assert.ok(controller.hitTarget.worldScale?.x > 0 &&
+        controller.hitTarget.worldScale?.y > 0);
+}
+assert.ok(arrowControl.hitTarget.worldScale.x >
+    arrowControl.hitTarget.worldScale.y,
+    'Native arrow picker covers the entire shaft, not a tiny center point');
+assert.ok(planeControl.hitTarget.worldScale.x > 0 &&
+    planeControl.hitTarget.worldScale.y > 0,
+    'Native plane picker covers the projected square');
+const click = (controller, x, y) => controller.onControllerMouseDown({
+    button: 0, handleName: controller.key, x, y,
+});
+const move = (controller, x, y) =>
+    controller.onControllerMouseMove({ button: 0, x, y });
+const release = controller => controller.onControllerMouseUp({ button: 0 });
+// A click anywhere on the arrow shaft locks X, not just the head or middle.
+click(arrowControl, 147, 100);
+assert.equal(moveGizmo.diagnosticState().draggingPosition, true,
+    'Arrow shaft acquires a native dragging session');
+move(arrowControl, 162, 113);
+release(arrowControl);
+assert.deepEqual([moveComponent.moveObject.x, moveComponent.moveObject.y,
+    moveComponent.moveObject.z], [115, 100, 0],
+    'Dragging arrow affects its axis only');
+moveComponent.moveObject = new Vec3(100, 100, 0);
+moveGizmo.refreshHandles();
+// Native overlapping rectangles can route to the arrow/controller, but the
+// exact inner plane polygon must select XY instead of the nearby X arrow.
+click(arrowControl, 125, 125);
+assert.equal(moveGizmo.drag?.entry?.field.plane, 'xy',
+    'Projected plane interior takes priority over overlapping native arrow');
+move(arrowControl, 135, 132);
+release(arrowControl);
+assert.deepEqual([moveComponent.moveObject.x, moveComponent.moveObject.y,
+    moveComponent.moveObject.z], [110, 107, 0],
+    'Plane interior drags X/Y while preserving Z');
+moveComponent.moveObject = new Vec3(100, 100, 0);
+moveGizmo.refreshHandles();
+// The selectable orange wireframe has its own view-plane command; a large
+// arrow pick radius must not consume the dead zone at its origin.
+click(boxControl, 100, 100);
+assert.equal(moveGizmo.drag?.entry?.field.visual, 'box',
+    'Clicking object box selects free-view body drag, not an axis');
+move(boxControl, 106, 108);
+release(boxControl);
+assert.deepEqual([moveComponent.moveObject.x, moveComponent.moveObject.y,
+    moveComponent.moveObject.z], [106, 108, 0]);
+moveAdapter.refresh([moveComponent], new Set(), 4500);
+assert.equal(arrowControl.hitTarget.active, false,
+    'Deselecting disables all transparent arrow/plane/box surfaces');
+assert.equal(planeControl.hitTarget.active, false);
+assert.equal(boxControl.hitTarget.active, false);
+moveAdapter.refresh([moveComponent], new Set([moveNode.uuid]), 4550);
+assert.equal(arrowControl.hitTarget.active, true,
+    'Reselecting restores exact native hit targets without rebuilding them');
+moveAdapter.dispose();
+assert.equal(arrowControl.hitTarget.isValid, false,
+    'Switching scenes destroys old native Move picking nodes');
+console.log('[move-picking-native] full arrow, polygon plane, object box, lifecycle and no plus glyph OK');
+
 console.log('[position-visual] 2D/3D marker Sprite + native +Y BoxController drag proxy OK');
 console.log('[hud-picking-plane] exact native HUD quad geometry, zoom and click OK');
