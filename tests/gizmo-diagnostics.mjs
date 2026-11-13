@@ -75,6 +75,12 @@ const report = buildGizmoSmokeReport(Editor, cce, {
         outsideDown: 0, outsideUp: 3, missingPointer: 0,
         recent: ['controllerDown', 'controllerUp'],
     },
+}, {
+    hudLabels: 20,
+    overlay: {
+        drawn2D: 12, drawn3D: 8, cameraMissing: 0,
+        projectionFailed: 0, lastPath: '2d',
+    },
 });
 assert.equal(selections, 1);
 assert.equal(pools, 1);
@@ -89,6 +95,10 @@ assert.equal(report.bridge.hasNativeControlCancel, false,
 assert.equal(report.bridge.cameraSource, 'direct');
 assert.equal(report.bridge.cameraConvention, 'component-camera');
 assert.equal(report.scene.hudDrawn, 0);
+assert.equal(report.hud.labelsSubmitted, 20);
+assert.equal(report.hud.drawn2D, 12);
+assert.equal(report.hud.drawn3D, 8);
+assert.equal(report.hud.lastPath, '2d');
 const wrapped = buildGizmoSmokeReport(Editor, {
     ...cce,
     Camera: { _camera: { camera: cce.Camera.camera } },
@@ -107,6 +117,16 @@ const missingPointer = buildGizmoSmokeReport(Editor, cce, {
 }, { reason: 'ready', input: { missingPointer: 2 } });
 assert.ok(missingPointer.concerns.some(x => x.includes('pointer coordinates')),
     'Unsupported Cocos mouse event shapes must be visible in diagnostics');
+const projectionFailed = buildGizmoSmokeReport(Editor, cce, {
+    started: true, scene: 'Scene', selectionApi: true,
+}, { reason: 'ready' }, {
+    hudLabels: 0,
+    overlay: { drawn2D: 0, drawn3D: 0, cameraMissing: 1,
+        projectionFailed: 2, lastPath: 'none' },
+});
+assert.equal(projectionFailed.hud.projectionFailed, 2);
+assert.ok(projectionFailed.concerns.some(x => x.includes('HUD screen projection')));
+assert.ok(projectionFailed.concerns.some(x => x.includes('HUD camera')));
 assert.deepEqual(Array.from(report.concerns), []);
 assert.ok(report.requiresManualVerification.length >= 4,
     'Probe must never claim it has verified actual click/Undo behavior');
