@@ -65,6 +65,11 @@
                 "methods": [
                     "getDiagnostics"
                 ]
+            },
+            "get-example-assets": {
+                "methods": [
+                    "getExampleAssets"
+                ]
             }
         }
     },
