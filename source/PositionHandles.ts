@@ -1348,10 +1348,28 @@ function createEditorGizmo(
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 if (!this.unavailableMarkers.has(controller)) {
                     repairNativeHandleColors(controller);
+                    const point = this.entries.find(entry => entry.controller === controller);
+                    if (point && (!controller.__cocosGizmosNativeShown ||
+                        controller.shape?.active === false)) {
+                        // Creator's BoxController.show() mounts its native
+                        // raycast shape. Merely enabling _cubeNode and
+                        // registerEvents does NOT make the editable face
+                        // clickable. This is the key lifecycle step used
+                        // by the working Cocos Gizmo Kit implementation.
+                        try {
+                            controller.show?.();
+                            controller.__cocosGizmosNativeShown = true;
+                        } catch (error) {
+                            console.warn('[cocos-gizmos/handles] Native controller show unavailable:', error);
+                        }
+                        const color = new Color(255, 174, 66, 255);
+                        if (point.field.color && Color.fromHEX)
+                            Color.fromHEX(color, point.field.color);
+                        configurePositionHitProxy(controller, color, true);
+                    }
                     const hud = this.hudEntries.find(entry => entry.controller === controller);
                     if (hud?.picking?.node?.isValid) hud.picking.node.active = true;
                     else this.ensureMarkerVisible(controller);
-                    const point = this.entries.find(entry => entry.controller === controller);
                     if (point?.visual?.node?.isValid) point.visual.node.active = true;
                     this.registerController(controller);
                 }
@@ -1370,6 +1388,7 @@ function createEditorGizmo(
             for (const entry of this.entries) {
                 if (entry.visual?.node?.isValid) entry.visual.node.active = false;
                 configurePositionHitProxy(entry.controller, new Color(255,255,255,255), false);
+                entry.controller.__cocosGizmosNativeShown = false;
             }
             this.finish(true);
             this.finishHud(true);
