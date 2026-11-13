@@ -173,6 +173,8 @@ const moduleSandbox = {
     require(name) {
         if (name === 'cc') return cc;
         if (name === './DrawCommandBuffer2D') return { DrawCommandBuffer2D };
+        if (name === './GizmoHandlePresets') return { makePointGizmo() {},
+            makePointGizmos() {} };
         throw new Error('Unexpected import ' + name);
     },
 };
