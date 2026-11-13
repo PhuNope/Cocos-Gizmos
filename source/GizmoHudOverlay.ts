@@ -1,3 +1,4 @@
+import * as cocos from 'cc';
 import {
     CCObject, Color, Component, director, Director, gfx, ImageAsset, Layers,
     Material, Mesh, MeshRenderer, Node, Quat, RenderRoot2D,
@@ -73,6 +74,7 @@ class ScreenHudMesh {
     private canvas: any = null;
     private contentSignature = '';
     private geometrySignature = '';
+    private geometryMode: 'local' | 'world' | null = null;
     private camera: SceneHudCamera | null = null;
     private height = 0;
     private width = 0;
@@ -112,6 +114,14 @@ class ScreenHudMesh {
             });
             renderer.setMaterial(material, 0);
             (renderer as any).priority = 32770;
+            // A depth-disabled material alone does not guarantee that the HUD
+            // is drawn after other GIZMOS meshes. Match Creator Gizmo Kit's
+            // renderer sorting order, so HUD stays above other 2D/3D gizmos.
+            const Sorting = (cocos as any).Sorting;
+            if (typeof Sorting === 'function') {
+                const sorting = node.addComponent(Sorting);
+                if (sorting) sorting.sortingOrder = 32770;
+            }
             this.root = root;
             this.renderer = renderer;
             this.material = material;
@@ -218,14 +228,50 @@ class ScreenHudMesh {
 
     private updateGeometry(): void {
         if (!this.camera || !this.renderer || !this.root?.isValid) return;
+        // The render camera caches inverse VP. Wheel navigation changes the
+        // camera transform before its matrices are updated in the Scene pass.
+        this.camera.sync?.();
         const verts = projectHudPlane(this.camera, 0, 0, this.width, this.height);
         if (!verts) {
             this.root.active = false;
             return;
         }
-        const signature = verts.join(',');
-        if (signature === this.geometrySignature) return;
+        const target = this.renderer.node;
+        const rotation = this.camera.node && (this.camera.node as any).worldRotation;
+        const canTransform = rotation && typeof target?.setWorldPosition === 'function' &&
+            typeof target?.setWorldRotation === 'function' &&
+            typeof target?.setWorldScale === 'function';
         try {
+            if (canTransform) {
+                // Use one immutable unit quad. Only its Node transform changes
+                // during scroll, instead of creating/destroying GPU meshes
+                // every frame. This removes zoom stutter and picker drift.
+                if (this.geometryMode !== 'local') {
+                    const mesh = utils.createMesh({
+                        positions: [0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0],
+                        indices: [0, 3, 1, 3, 2, 1],
+                        uvs: [0, 1, 0, 0, 1, 0, 1, 1],
+                    }, undefined, { calculateBounds: true });
+                    this.renderer.mesh = mesh;
+                    this.mesh?.destroy();
+                    this.mesh = mesh;
+                    this.geometryMode = 'local';
+                }
+                const dx = Math.hypot(verts[9] - verts[0],
+                    verts[10] - verts[1], verts[11] - verts[2]);
+                const dy = Math.hypot(verts[3] - verts[0],
+                    verts[4] - verts[1], verts[5] - verts[2]);
+                target.setWorldPosition(new Vec3(verts[0], verts[1], verts[2]));
+                target.setWorldRotation(rotation);
+                target.setWorldScale(new Vec3(dx, dy, 1));
+                return;
+            }
+            // Fallback for editors with an alternate Scene camera wrapper.
+            const signature = verts.join(',');
+            if (signature === this.geometrySignature && this.geometryMode === 'world') return;
+            target?.setWorldPosition?.(new Vec3());
+            target?.setWorldRotation?.(new Quat());
+            target?.setWorldScale?.(new Vec3(1, 1, 1));
             const mesh = utils.createMesh({
                 positions: verts, indices: [0, 3, 1, 3, 2, 1],
                 uvs: [0, 1, 0, 0, 1, 0, 1, 1],
@@ -234,8 +280,9 @@ class ScreenHudMesh {
             this.mesh?.destroy();
             this.mesh = mesh;
             this.geometrySignature = signature;
+            this.geometryMode = 'world';
         } catch (error) {
-            console.warn('[cocos-gizmos/hud] HUD mesh update failed:', error);
+            console.warn('[cocos-gizmos/hud] HUD geometry update failed:', error);
         }
     }
 
@@ -261,6 +308,7 @@ class ScreenHudMesh {
         this.image = null;
         this.camera = null;
         this.geometrySignature = '';
+        this.geometryMode = null;
         this.contentSignature = '';
     }
 }
