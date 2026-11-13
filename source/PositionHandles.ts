@@ -190,6 +190,21 @@ function createEditorGizmo(
             this.registerController(controller);
         }
 
+        /** Creator may hide the cube MeshRenderer while keeping the Gizmo instance. */
+        private ensureMarkerVisible(controller: any): void {
+            const cube = controller?._cubeNode;
+            if (!cube || cube.isValid === false || this.unavailableMarkers.has(controller)) return;
+            cube.active = true;
+            if (controller._cubeNodeMR?.isValid !== false && controller._cubeNodeMR) {
+                controller._cubeNodeMR.enabled = true;
+            }
+        }
+
+        private hasDestroyedMarkers(): boolean {
+            return [...this.entries, ...this.hudEntries].some(({ controller }) =>
+                !controller?._cubeNode || controller._cubeNode.isValid === false);
+        }
+
         private registerController(controller: any): void {
             if (!this.shown || !controller || this.registeredControllers.has(controller)) return;
             controller.registerEvents?.();
@@ -353,7 +368,8 @@ function createEditorGizmo(
         public refreshHandles(): void {
             const fields = this.descriptors();
             const controls = this.hudDescriptors();
-            if (this.signature(fields, controls) !== this.layout && !this.drag && !this.hudDrag && !this.pendingClick) {
+            if (!this.drag && !this.hudDrag && !this.pendingClick &&
+                (this.hasDestroyedMarkers() || this.signature(fields, controls) !== this.layout)) {
                 this.rebuild();
             } else this.updateMarkers();
         }
@@ -374,6 +390,7 @@ function createEditorGizmo(
                     continue;
                 }
                 this.restoreMarker(entry.controller);
+                this.ensureMarkerVisible(entry.controller);
                 entry.controller.setPosition?.(new Vec3(world.x, world.y, world.z));
                 entry.controller.setRotation?.(new Quat());
                 const size = markerSize(world);
@@ -401,6 +418,7 @@ function createEditorGizmo(
             const size = Math.min(1000, projection.pixelSize * 14);
             for (const entry of this.hudEntries) {
                 this.restoreMarker(entry.controller);
+                this.ensureMarkerVisible(entry.controller);
                 const row = hudRowScreenPosition(
                     projection.screen, startRow + textCount + entry.index);
                 const world = projection.worldAt(row.x - 14, row.y);
@@ -696,9 +714,11 @@ function createEditorGizmo(
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 if (!this.unavailableMarkers.has(controller)) {
                     controller.show?.();
+                    this.ensureMarkerVisible(controller);
                     this.registerController(controller);
                 }
             }
+            this.updateMarkers();
         }
 
         public onHide(): void {
@@ -733,9 +753,14 @@ function createEditorGizmo(
 
         private clearEntries(): void {
             for (const { controller, key } of [...this.entries, ...this.hudEntries]) {
-                this.unregisterController(controller);
-                controller.removeHandle?.(key);
-                controller.hide?.();
+                try {
+                    this.unregisterController(controller);
+                    controller.removeHandle?.(key);
+                    controller.hide?.();
+                } catch (error) {
+                    // The Editor can destroy a controller during a Scene switch.
+                    console.warn('[cocos-gizmos/handles] Discarding a stale controller:', error);
+                }
             }
             this.entries.length = 0;
             this.hudEntries.length = 0;
@@ -849,7 +874,10 @@ export function createPositionHandleAdapter(
                 if (!installed) continue;
                 const previous = active.get(component);
                 if (previous) {
-                    if (previous.isHandleVisible?.() === false) {
+                    // Creator can replace component.gizmo while the adapter still
+                    // holds the previous instance after an A -> B -> A selection.
+                    if (previous !== (component as any).gizmo ||
+                        previous.isHandleVisible?.() === false) {
                         const restored = show(component);
                         if (restored) active.set(component, restored);
                         else active.delete(component);
