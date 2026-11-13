@@ -65,7 +65,8 @@ try {
         'One readiness query, three exact asset lookups, and one Scene registry query');
     assert.equal(healthy.sceneRegistry, 'available');
     assert.ok(healthy.examples.every((entry) => entry.classStatus === 'registered'));
-    assert.ok(healthy.guidance.includes('does not validate Scene compilation'));
+    assert.ok(healthy.guidance.includes('Confirm drag-and-drop'),
+        'Successful registry checks still require manual Inspector interaction');
     assert.doesNotMatch(JSON.stringify(healthy), /private-project/,
         'Asset diagnostics must not reveal local project paths');
 
