@@ -6,7 +6,7 @@ import {
     intersectHandlePlane,
     PositionDragSolver,
 } from './PositionDragSolver';
-import { HudControl, HudSliderDrag, hudRowScreenPosition, normalizeHudControls, hudControlLayoutSignature } from './GizmoHudControls';
+import { HudControl, HudSliderDrag, hudGrid, hudRowScreenPosition, normalizeHudControls, hudControlLayoutSignature } from './GizmoHudControls';
 import { createSceneHudProjection, createViewportHudProjection } from './GizmoHudProjection';
 import { normalizeHudItems } from './GizmoPresentation';
 import { GizmoEditSession } from './GizmoEditSession';
@@ -143,20 +143,20 @@ function markerSize(world: Point): number {
  * re-enters editable box handles and assumes their private topNode exists.
  * These handles are not initialized by this Gizmo, so updateSize is unsafe.
  */
-function setMarkerSize(controller: any, size: number): void {
+function setMarkerSize(controller: any, size: number, height = size, depth = size): void {
     const cube = controller?._cubeNode;
     if (!cube || !Number.isFinite(size) || size <= 0) return;
     // The built-in Controller may be attached beneath a transformed target
     // Node. Setting *local* scale makes points vanish on scaled 2D canvases.
     // World scale keeps the picking cube size independent of target scale.
     if (typeof cube.setWorldScale === 'function') {
-        cube.setWorldScale(size, size, size);
+        cube.setWorldScale(size, height, depth);
     } else {
         const parent = cube.parent?.worldScale;
         const parentX = parent?.x && Math.abs(parent.x) > 1e-8 ? Math.abs(parent.x) : 1;
         const parentY = parent?.y && Math.abs(parent.y) > 1e-8 ? Math.abs(parent.y) : 1;
         const parentZ = parent?.z && Math.abs(parent.z) > 1e-8 ? Math.abs(parent.z) : 1;
-        const scale = new Vec3(size / parentX, size / parentY, size / parentZ);
+        const scale = new Vec3(size / parentX, height / parentY, depth / parentZ);
         if (typeof cube.setScale === 'function') cube.setScale(scale);
         else cube.scale = scale;
     }
@@ -400,7 +400,9 @@ function createEditorGizmo(
                     if (typeof Color.fromHEX === 'function') Color.fromHEX(color, control.color);
                     else color.set(58, 182, 255, 255);
                     controller.setColor?.(color);
-                    controller.setOpacity?.(255);
+                    // HUD is painted in a texture; its native cube must be
+                    // invisible, while remaining enabled for Scene picking.
+                    controller.setOpacity?.(0);
                     if (controller._wireFrameBoxNode) controller._wireFrameBoxNode.active = false;
                     if (controller._wireFrameBoxMeshRenderer) controller._wireFrameBoxMeshRenderer.enabled = false;
                     if (controller._editHandlesShape) controller._editHandlesShape.active = false;
@@ -496,9 +498,20 @@ function createEditorGizmo(
                 const row = hudRowScreenPosition(
                     projection.screen, startRow + textCount + entry.index,
                     projection.viewport, hudLayout?.totalRows);
-                const world = projection.worldAt(row.x - 14, row.y);
+                // Cover the whole HUD control row instead of a tiny 14px
+                // dot. Cocos Gizmo Kit similarly uses invisible handle quads.
+                const grid = projection.viewport ?
+                    hudGrid(projection.viewport,
+                        Math.max(hudLayout?.totalRows || 0, startRow + textCount +
+                            this.hudEntries.length)) : null;
+                const hitWidth = grid ? Math.max(40, grid.columnWidth - 28) : 14;
+                const world = projection.worldAt(
+                    grid ? row.x + hitWidth * 0.5 : row.x - 14, row.y);
                 entry.controller.setPosition?.(world);
-                setMarkerSize(entry.controller, size);
+                setMarkerSize(entry.controller,
+                    grid ? projection.pixelSize * hitWidth : size,
+                    grid ? projection.pixelSize * 21 : size,
+                    grid ? projection.pixelSize * 6 : size);
             }
         }
 
