@@ -1068,15 +1068,31 @@ function createEditorGizmo(
                         // Creator reports the editable face as 'y', not our
                         // custom cube handle. Translate it before begin().
                         const name = readSceneHandleName(event);
-                        this.begin(entry, name === 'y' ?
-                            { ...event, handleName: entry.key } : event);
+                        const candidate = entry.picking ?
+                            this.positionEntryAt(event) : null;
+                        // Native transparent picking rectangles may overlap.
+                        // The exact plane polygon / closest arrow wins when
+                        // multiple quads share the same edited Vec3.
+                        const selected = candidate &&
+                            candidate.field.property === entry.field.property &&
+                            isMoveHandle(candidate.field) ? candidate : entry;
+                        const location = readScenePointer(event);
+                        this.begin(selected, name === selected.key ? event : {
+                            ...event, ...(location || {}), handleName: selected.key,
+                        });
                     };
-                    const move = (event: any) => { input.record('controllerMove'); this.move(entry, event); };
+                    const move = (event: any) => {
+                        input.record('controllerMove');
+                        this.move(this.drag?.entry || entry, event);
+                    };
                     const up = (event?: any) => {
                         input.record('controllerUp');
                         if (!isPrimaryScenePointer(event)) return;
                         // An unrelated controller may receive the same Scene mouse-up.
-                        if (this.drag?.entry === entry) this.finish(false);
+                        if (this.drag?.entry === entry ||
+                            (entry.picking && this.drag &&
+                             this.drag.entry.field.property === entry.field.property))
+                            this.finish(false);
                         else if (this.drag || this.hudDrag || this.pendingClick)
                             input.record('ignoredUp');
                     };
@@ -1718,10 +1734,14 @@ function createEditorGizmo(
             input.record('gizmoDown');
             if (!isPrimaryScenePointer(event)) return;
             const name = readSceneHandleName(event);
-            const entry = this.entries.find((item) => item.key === name) ||
-                (name === 'y' || !name ? this.positionEntryAt(event) : null);
+            const named = this.entries.find((item) => item.key === name);
+            const projected = this.positionEntryAt(event);
+            const entry = named && isMoveHandle(named.field) && projected &&
+                isMoveHandle(projected.field) &&
+                projected.field.property === named.field.property ?
+                projected : named || (name === 'y' || !name ? projected : null);
             if (entry) this.begin(entry, name === entry.key ? event : {
-                ...event, ...readScenePointer(event), handleName: entry.key,
+                ...event, ...(readScenePointer(event) || {}), handleName: entry.key,
             });
             const hud = this.hudEntries.find((item) => item.key === name) ||
                 (!name ? this.hudEntryAt(event) : null);
