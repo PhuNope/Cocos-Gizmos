@@ -182,10 +182,66 @@ class GizmosDebugDraw extends Component {
         });
     }
 
-    public drawLabel(id: string, text: string, position: IVec2Like, fontSize: number = 40, scale: Vec2 = Vec2.ONE): void {
+    /**
+     * Map one local Label unit to Scene screen pixels. This is only needed
+     * when the caller opts into min/max screen size; ordinary drawing stays
+     * independent of the Editor camera and works in game builds.
+     */
+    private screenSizedLabelScale(
+        position: IVec2Like, local: boolean, fontSize: number,
+        scale: Vec2, minSize?: number, maxSize?: number,
+    ): Vec2 {
+        if (!(Number.isFinite(fontSize) && fontSize > 0) ||
+            !Number.isFinite(scale.x) || !Number.isFinite(scale.y) ||
+            (!Number.isFinite(minSize) && !Number.isFinite(maxSize))) return scale;
+        const global = globalThis as any;
+        const editor = (global.window?.cce || global.cce)?.Camera;
+        const wrapped = editor?._camera?.camera || editor?.camera?.camera;
+        const raw = wrapped || editor?.camera;
+        if (typeof raw?.worldToScreen !== 'function') return scale;
+        try {
+            const world = new Vec3(position.x, position.y, 0);
+            if (local) Vec3.transformMat4(world, world, this.node.worldMatrix);
+            const pointA = new Vec3();
+            const pointB = new Vec3();
+            const neighbor = new Vec3(world.x + 1, world.y, world.z);
+            const renderer = !!wrapped ||
+                typeof raw.initGeometryRenderer === 'function' ||
+                raw.geometryRenderer !== undefined || raw.matViewProj !== undefined;
+            if (renderer) {
+                raw.worldToScreen(pointA, world);
+                raw.worldToScreen(pointB, neighbor);
+            } else {
+                raw.worldToScreen(world, pointA);
+                raw.worldToScreen(neighbor, pointB);
+            }
+            const pixelsPerWorld = Math.hypot(pointB.x - pointA.x, pointB.y - pointA.y);
+            const worldScale = this.node.worldScale;
+            const parentFactor = worldScale?.x && Number.isFinite(worldScale.x) ?
+                Math.abs(worldScale.x) : 1;
+            const currentPixels = fontSize * Math.abs(scale.x) * parentFactor * pixelsPerWorld;
+            if (!Number.isFinite(currentPixels) || currentPixels <= 1e-8) return scale;
+            const minimum = Number.isFinite(minSize) ? Math.max(1, minSize as number) : 1;
+            const maximum = Number.isFinite(maxSize) ?
+                Math.max(minimum, maxSize as number) : Infinity;
+            const desired = Math.max(minimum, Math.min(maximum, currentPixels));
+            const factor = desired / currentPixels;
+            return new Vec2(scale.x * factor, scale.y * factor);
+        } catch {
+            return scale; // The Editor camera can change during Scene switches.
+        }
+    }
+
+    public drawLabel(
+        id: string, text: string, position: IVec2Like,
+        fontSize: number = 40, scale: Vec2 = Vec2.ONE,
+        minSize?: number, maxSize?: number,
+    ): void {
         const label = this.getLabel(id);
         const local = this._useLocalPosition;
         const color = this._color.clone();
+        const requestedScale = this.screenSizedLabelScale(
+            position, local, fontSize, scale, minSize, maxSize);
         label.node.layer = this._layer;
         this._drawCallsNoneGeometry.push(() => {
             label.color = color;
@@ -193,7 +249,7 @@ class GizmosDebugDraw extends Component {
             label.lineHeight = fontSize;
             label.string = text;
             this._lastLabelUsed.set(id, Date.now());
-            label.node.setScale(new Vec3(scale.x, scale.y));
+            label.node.setScale(new Vec3(requestedScale.x, requestedScale.y));
             const p = new Vec3(position.x, position.y);
             if (local) label.node.setPosition(p);
             else label.node.setWorldPosition(p);
@@ -382,8 +438,13 @@ export class Gizmos2D {
         point: IVec2Like,
         fontSize: number = 40,
         scale: Vec2 = Vec2.ONE,
+        /** Minimum visible font height in Scene screen pixels. */
+        minSize?: number,
+        /** Maximum visible font height in Scene screen pixels. */
+        maxSize?: number,
     ) {
-        this.getDebugNode(node).drawLabel(id, text, point, fontSize, scale);
+        this.getDebugNode(node).drawLabel(id, text, point,
+            fontSize, scale, minSize, maxSize);
     }
 
     public static beginLayer(node: Node, layer: Layers.Enum) {
