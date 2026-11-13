@@ -123,6 +123,7 @@ exports.ready = async function ready() {
             const report = await editor.Message.request('cocos-gizmos', 'get-example-assets');
             const details = (report?.examples || []).map((entry) =>
                 entry.name + ': ' + entry.status +
+                ' | Scene class: ' + (entry.classStatus || 'not-checked') +
                 (entry.importer ? ' (importer: ' + entry.importer + ')' : '') +
                 (entry.error ? ' — ' + entry.error : ''));
             output.textContent = [
