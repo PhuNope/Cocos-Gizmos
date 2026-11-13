@@ -624,9 +624,13 @@ function createEditorGizmo(
                 sceneCamera?._camera?.camera || sceneCamera?.camera || null;
             const mode = raw?.projectionType ?? raw?.projection ??
                 sceneCamera?.is2D ?? undefined;
-            if (this.lastSceneCamera === raw && this.lastProjectionMode === mode) return;
+            // Creator can return a fresh wrapper for the same Scene camera on
+            // each frame. Prefer the stable camera Node to avoid mounting a
+            // native BoxController every BEFORE_DRAW (severe Editor lag).
+            const identity = raw?.node || raw;
+            if (this.lastSceneCamera === identity && this.lastProjectionMode === mode) return;
             const changed = this.lastSceneCamera !== null;
-            this.lastSceneCamera = raw;
+            this.lastSceneCamera = identity;
             this.lastProjectionMode = mode;
             if (!changed || !raw) return;
             for (const entry of this.entries) {
