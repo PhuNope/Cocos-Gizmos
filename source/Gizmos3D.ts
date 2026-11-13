@@ -883,6 +883,63 @@ export class Gizmos3D {
         debugNode?.drawLine(point1, point2);
     }
 
+    /** Editor-only arrow example similar to a Point3D vector in Gizmo Kit.
+     * Uses the current beginColor() color and does not create game objects.
+     */
+    public static drawArrow(
+        node: Node, from: Vec3, to: Vec3, headSize = 0.18,
+    ): void {
+        if (![from.x, from.y, from.z, to.x, to.y, to.z].every(Number.isFinite))
+            return;
+        this.drawLine(node, from, to);
+        const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+        const length = Math.hypot(dx, dy, dz);
+        if (length < 1e-8) return;
+        const ux = dx / length, uy = dy / length, uz = dz / length;
+        const helper = Math.abs(uz) > 0.85 ?
+            { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 };
+        let px = uy * helper.z - uz * helper.y;
+        let py = uz * helper.x - ux * helper.z;
+        let pz = ux * helper.y - uy * helper.x;
+        const normal = Math.hypot(px, py, pz) || 1;
+        px /= normal; py /= normal; pz /= normal;
+        const size = Math.min(Math.max(0, headSize), length * 0.4);
+        const back = new Vec3(to.x - ux * size, to.y - uy * size, to.z - uz * size);
+        this.drawLine(node, to, new Vec3(back.x + px * size * 0.45,
+            back.y + py * size * 0.45, back.z + pz * size * 0.45));
+        this.drawLine(node, to, new Vec3(back.x - px * size * 0.45,
+            back.y - py * size * 0.45, back.z - pz * size * 0.45));
+    }
+
+    /** Plane3D-style orientation preview: a square aligned to its normal.
+     * For an interactive plane, use moveHandles() or visual:'plane' instead.
+     */
+    public static drawPlanePreview(
+        node: Node, center: Vec3, normal: Vec3,
+        size = 2, wireFrame = false,
+    ): void {
+        const len = Math.hypot(normal.x, normal.y, normal.z);
+        if (!Number.isFinite(len) || len <= 1e-8 || !Number.isFinite(size) ||
+            size <= 0) return;
+        const nx = normal.x / len, ny = normal.y / len, nz = normal.z / len;
+        const helper = Math.abs(ny) < 0.9 ?
+            { x: 0, y: 1, z: 0 } : { x: 1, y: 0, z: 0 };
+        let ux = ny * helper.z - nz * helper.y;
+        let uy = nz * helper.x - nx * helper.z;
+        let uz = nx * helper.y - ny * helper.x;
+        const ul = Math.hypot(ux, uy, uz) || 1;
+        ux /= ul; uy /= ul; uz /= ul;
+        const vx = ny * uz - nz * uy, vy = nz * ux - nx * uz,
+            vz = nx * uy - ny * ux;
+        const half = size / 2;
+        const p = (a: number, b: number) => new Vec3(
+            center.x + (ux * a + vx * b) * half,
+            center.y + (uy * a + vy * b) * half,
+            center.z + (uz * a + vz * b) * half);
+        this.drawQuad(node, p(-1, -1), p(1, -1),
+            p(1, 1), p(-1, 1), wireFrame);
+    }
+
     public static drawLineList(node: Node, points: Vec3[], close: boolean = false) {
         const debugNode = this.getDebugNode(node);
         debugNode?.drawLineList(points, close);
