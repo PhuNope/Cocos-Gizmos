@@ -10,7 +10,20 @@ const filename = path.join(root, 'source/GizmoDiagnostics.ts');
 const code = ts.transpileModule(readFileSync(filename, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2017 },
 }).outputText;
-const scope = { exports: {} };
+const bridgeModule = { exports: {} };
+const bridgeCode = ts.transpileModule(
+    readFileSync(path.join(root, 'source/SceneCameraBridge.ts'), 'utf8'), {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2017 },
+    },
+).outputText;
+vm.runInNewContext(bridgeCode, bridgeModule);
+const scope = {
+    exports: {},
+    require(name) {
+        assert.equal(name, './SceneCameraBridge');
+        return bridgeModule.exports;
+    },
+};
 vm.runInNewContext(code, scope);
 const { buildGizmoSmokeReport } = scope.exports;
 
@@ -74,11 +87,14 @@ assert.equal(report.bridge.hasNativeControlEnd, true);
 assert.equal(report.bridge.hasNativeControlCancel, false,
     'Do not claim native cancellation support when the hook is missing');
 assert.equal(report.bridge.cameraSource, 'direct');
+assert.equal(report.bridge.cameraConvention, 'component-camera');
+assert.equal(report.scene.hudDrawn, 0);
 const wrapped = buildGizmoSmokeReport(Editor, {
     ...cce,
     Camera: { _camera: { camera: cce.Camera.camera } },
 }, { started: true, scene: 'Scene', selectionApi: true }, { reason: 'ready' });
 assert.equal(wrapped.bridge.cameraSource, 'wrapped');
+assert.equal(wrapped.bridge.cameraConvention, 'render-camera');
 assert.equal(wrapped.bridge.cameraScreenPointToRay, true);
 assert.equal(wrapped.bridge.cameraWorldToScreen, true);
 assert.equal(report.handles.positionHandles, 2);
