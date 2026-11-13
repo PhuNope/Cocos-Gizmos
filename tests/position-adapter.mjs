@@ -293,6 +293,7 @@ const replacement = new componentPool.typeDefs.ProbePosition();
 replacement.target = component;
 replacement.init();
 component.gizmo = replacement;
+adapter.refresh([component], new Set(), 1601);
 adapter.refresh([component], selected, 1602);
 assert.equal(adapter.status().active, 1);
 assert.equal(component.gizmo, replacement);
