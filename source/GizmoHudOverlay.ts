@@ -4,13 +4,11 @@ import { GizmoHudText } from './GizmoPresentation';
 import { hudRowScreenPosition } from './GizmoHudControls';
 import { createSceneHudProjection, SceneHudCamera } from './GizmoHudProjection';
 import type { GizmoHudPlacement } from './GizmoHudLayout';
+import { resolveSceneCamera } from './SceneCameraBridge';
 
 function sceneCamera(): SceneHudCamera | null {
     const global = globalThis as any;
-    const editorCamera = (global.window?.cce || global.cce)?.Camera;
-    const view = editorCamera?.camera || editorCamera?._camera?.camera;
-    return view && typeof view.worldToScreen === 'function' &&
-        typeof view.screenPointToRay === 'function' ? view as SceneHudCamera : null;
+    return resolveSceneCamera(global.window?.cce || global.cce).camera;
 }
 
 /**
