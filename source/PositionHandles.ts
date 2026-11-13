@@ -672,6 +672,7 @@ function createEditorGizmo(
             const hud = this.hudEntries.find(entry => entry.controller === controller);
             if (hud?.picking?.node?.isValid) hud.picking.node.active = true;
             else this.ensureMarkerVisible(controller);
+            if (hud && controller.shape) controller.shape.active = true;
             this.registerController(controller);
         }
 
@@ -1484,6 +1485,7 @@ function createEditorGizmo(
                     const hud = this.hudEntries.find(entry => entry.controller === controller);
                     if (hud?.picking?.node?.isValid) hud.picking.node.active = true;
                     else this.ensureMarkerVisible(controller);
+                    if (hud && controller.shape) controller.shape.active = true;
                     if (point?.visual?.node?.isValid) point.visual.node.active = true;
                     this.registerController(controller);
                 }
@@ -1519,6 +1521,9 @@ function createEditorGizmo(
                 this.unregisterController(controller);
                 const hud = this.hudEntries.find(entry => entry.controller === controller);
                 suspendNativeController(controller, hud?.picking);
+                // Even an invisible HUD Controller's native shape can block
+                // 3D picking. Only selected Gizmos may own active raycast.
+                if (controller?.shape) controller.shape.active = false;
             }
         }
 
@@ -1548,9 +1553,12 @@ function createEditorGizmo(
                     this.unregisterController(controller);
                     const hud = this.hudEntries.find(item => item.controller === controller);
                     suspendNativeController(controller, hud?.picking);
+                    const point = this.entries.find(item => item.controller === controller);
+                    if (point) configurePositionHitProxy(controller,
+                        new Color(255, 255, 255, 255), false);
+                    if (controller?.shape) controller.shape.active = false;
                     controller.removeHandle?.(key);
                     disposeHudPickingQuad(hud?.picking);
-                    const point = this.entries.find(item => item.controller === controller);
                     disposePositionVisual(point?.visual);
                 } catch (error) {
                     // The Editor can destroy a controller during a Scene switch.
