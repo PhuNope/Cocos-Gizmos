@@ -492,6 +492,74 @@ function createEditorGizmo(
         private destroyed = false;
         private beforeDrawRegistered = false;
         private globalMouseRegistered = false;
+        private domMouseRegistered = false;
+        /** Map browser events from the Editor's Scene canvas to the same
+         * bottom-left pixel space as cce.Camera.worldToScreen. The Engine input
+         * backend is not always connected to the embedded Scene WebView.
+         */
+        private domPointer(event: any): ScenePointer | null {
+            if (!event || typeof event.clientX !== 'number' ||
+                typeof event.clientY !== 'number') return null;
+            const view = camera();
+            const viewport = view?.viewport;
+            if (!viewport) return null;
+            const doc = (globalThis as any).document;
+            const canvas = event.target?.tagName?.toLowerCase?.() === 'canvas' ?
+                event.target : (doc?.querySelector?.('#GameCanvas') ||
+                    doc?.querySelector?.('canvas'));
+            const rect = canvas?.getBoundingClientRect?.();
+            if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+            const x = (event.clientX - rect.left) * viewport.width / rect.width;
+            const y = (rect.bottom - event.clientY) * viewport.height / rect.height;
+            if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 ||
+                y < 0 || x > viewport.width || y > viewport.height) return null;
+            return { x, y };
+        }
+        private readonly onDomMouseDown = (event: any): void => {
+            if (!this.shown || this.destroyed || this.drag || this.hudDrag ||
+                this.pendingClick || (event.button !== undefined && event.button !== 0))
+                return;
+            const point = this.domPointer(event);
+            if (!point || this.hudEntryAt(point)) return;
+            const entry = this.positionEntryAt(point);
+            if (!entry) return;
+            this.begin(entry, point);
+            if (this.drag) {
+                // A visible overlay Sprite can otherwise let the Editor's
+                // selection tool steal the click before a drag starts.
+                event.preventDefault?.();
+                event.stopPropagation?.();
+            }
+        };
+        private readonly onDomMouseMove = (event: any): void => {
+            if (!this.drag) return;
+            const point = this.domPointer(event);
+            if (point) this.move(this.drag.entry, point);
+            if (point) event.preventDefault?.();
+        };
+        private readonly onDomMouseUp = (event: any): void => {
+            if (!this.drag) return;
+            const point = this.domPointer(event);
+            if (point) this.move(this.drag.entry, point);
+            this.finish(false);
+        };
+        private registerDomMouse(): void {
+            const doc = (globalThis as any).document;
+            if (this.domMouseRegistered || typeof doc?.addEventListener !== 'function') return;
+            doc.addEventListener('pointerdown', this.onDomMouseDown, true);
+            doc.addEventListener('pointermove', this.onDomMouseMove, true);
+            doc.addEventListener('pointerup', this.onDomMouseUp, true);
+            this.domMouseRegistered = true;
+        }
+        private unregisterDomMouse(): void {
+            if (!this.domMouseRegistered) return;
+            const doc = (globalThis as any).document;
+            doc?.removeEventListener?.('pointerdown', this.onDomMouseDown, true);
+            doc?.removeEventListener?.('pointermove', this.onDomMouseMove, true);
+            doc?.removeEventListener?.('pointerup', this.onDomMouseUp, true);
+            this.domMouseRegistered = false;
+        }
+
         /** Cocos input is independent of private Scene BoxController picking.
          * Only initiate gestures inside the selected screen-space drag disc.
          * Never swallow the event: the standard Editor transform tool works
@@ -780,6 +848,7 @@ function createEditorGizmo(
                 if (!this.shown || this.destroyed || this.drag) return;
                 if (typeof event?.getButton === 'function' && event.getButton() !== 0) return;
                 this.begin(entry, event);
+                if (this.drag?.entry === entry) event.propagationStopped = true;
             });
             node.on(types.MOUSE_MOVE, (event: any) => {
                 if (this.drag?.entry === entry) this.move(entry, event);
@@ -1303,6 +1372,7 @@ function createEditorGizmo(
             if (this.destroyed) return;
             this.shown = true;
             this.registerGlobalMouse();
+            this.registerDomMouse();
             if (!this.beforeDrawRegistered && typeof director?.on === 'function') {
                 director.on(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
                 this.beforeDrawRegistered = true;
@@ -1324,6 +1394,7 @@ function createEditorGizmo(
 
         public onHide(): void {
             this.unregisterGlobalMouse();
+            this.unregisterDomMouse();
             if (this.beforeDrawRegistered) {
                 director.off(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
                 this.beforeDrawRegistered = false;
@@ -1391,6 +1462,7 @@ function createEditorGizmo(
 
         public onDestroy(): void {
             this.unregisterGlobalMouse();
+            this.unregisterDomMouse();
             if (this.beforeDrawRegistered) {
                 director.off(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
                 this.beforeDrawRegistered = false;
