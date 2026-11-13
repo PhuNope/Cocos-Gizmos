@@ -35,12 +35,12 @@ export interface AxisRayGeometry {
     unit: AxisPoint;
 }
 
-/** Draw a compact 78px ray, leaving 10px at the origin free of overlap.
+/** Draw a compact 66px ray, leaving 8px at the origin free of overlap.
  * The arrow tip has two visible 9px wings. It does not render extra dots.
  */
 export function axisHandleGeometry(
     origin: AxisPoint, basis: AxisBasis, axis: Axis3D,
-    worldPerPixel: number, lengthPixels = 78,
+    worldPerPixel: number, lengthPixels = 66,
 ): AxisRayGeometry | null {
     if (!Number.isFinite(worldPerPixel) || worldPerPixel <= 0 ||
         !Number.isFinite(lengthPixels) || lengthPixels < 24 ||
@@ -48,7 +48,7 @@ export function axisHandleGeometry(
     const u = axisUnit(basis[axis]);
     if (!u) return null;
     const length = worldPerPixel * lengthPixels;
-    const start = add(origin, scale(u, worldPerPixel * 10));
+    const start = add(origin, scale(u, worldPerPixel * 8));
     const end = add(origin, scale(u, length));
     const center = add(origin, scale(u, length * 0.57));
     // Choose a stable perpendicular that also works when looking down an axis.
@@ -67,7 +67,7 @@ export function axisHandleGeometry(
 }
 
 /** Squared distance to a projected ray (in Scene pixels).
- * The 10px center exclusion avoids overlapping the other two rays.
+ * The 8px center exclusion avoids overlapping the other two rays.
  */
 export function axisSegmentDistanceSquared(
     point: { x: number; y: number },

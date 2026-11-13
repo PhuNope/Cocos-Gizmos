@@ -30,8 +30,8 @@ export default class CocosGizmos2DDemo extends Component {
 
     @property({ type: [Vec3] })
     public waypoints: Vec3[] = [
-        new Vec3(-130, -175, 0),
-        new Vec3(130, -175, 0),
+        new Vec3(-75, -90, 0),
+        new Vec3(75, -90, 0),
     ];
 
     /** Runtime-only diagnostic; nothing is serialized for this field. */
@@ -85,7 +85,7 @@ export default class CocosGizmos2DDemo extends Component {
         this.showLabels = true;
         this.showSprite = true;
         this.point = new Vec3();
-        this.waypoints = [new Vec3(-130, -175, 0), new Vec3(130, -175, 0)];
+        this.waypoints = [new Vec3(-75, -90, 0), new Vec3(75, -90, 0)];
         this.lastEvent = 'reset button';
     }
 

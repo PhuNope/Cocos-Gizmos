@@ -43,17 +43,17 @@ export default class Gizmos3DApiTest extends Component {
     public testMesh: Mesh | null = null;
 
     @property({ type: Vec3 })
-    public xyPoint = new Vec3(0, 1.5, 0);
+    public xyPoint = new Vec3(0, 0.8, 0);
 
     @property({ type: Vec3 })
-    public xzPoint = new Vec3(2, 0, 2);
+    public xzPoint = new Vec3(1, 0, 0.9);
 
     @property({ type: Vec3 })
-    public yzPoint = new Vec3(0, 2, -2);
+    public yzPoint = new Vec3(0, 1, -0.9);
 
     /** One object moved using three small XYZ axis arrows. */
     @property({ type: Vec3, displayName: 'Move Object Position' })
-    public moveObject = new Vec3(4, 2, 1);
+    public moveObject = new Vec3(2.6, 1.1, 0.8);
 
     @property({ type: Enum(MovePlane3D), displayName: 'Move Plane' })
     public movePlane: MovePlane3D = MovePlane3D.XY;
@@ -64,10 +64,10 @@ export default class Gizmos3DApiTest extends Component {
 
     @property({ type: [Vec3] })
     public controlPoints: Vec3[] = [
-        new Vec3(-2, 0, 0),
-        new Vec3(-1, 1, 0),
-        new Vec3(1, 1, 0),
-        new Vec3(2, 0, 0),
+        new Vec3(-1.2, 0, 0),
+        new Vec3(-0.6, 0.6, 0),
+        new Vec3(0.6, 0.6, 0),
+        new Vec3(1.2, 0, 0),
     ];
 
     public lastEvent = 'none';
@@ -92,11 +92,11 @@ export default class Gizmos3DApiTest extends Component {
             // The preset keeps all six regions in sync with moveObject.
             ...Gizmos3D.move('moveObject', {
                 space: 'local', snap: 0.25,
-                axisSize: 86, pickSize: 24,
-                planeSize: 24, planeOffset: 25,
+                axisSize: 66, pickSize: 24,
+                planeSize: 22, planeOffset: 22,
                 boxSize: 0.7, // Same size as the orange moveObject wire box.
                 hoverColor: '#ffff65',
-                showPositionLabel: true, positionLabelOffset: 94,
+                showPositionLabel: true, positionLabelOffset: 82,
             }),
             { property: 'xyPoint', plane: 'xy', space: 'local', snap: 0.25,
                 color: '#ffcc00' },
@@ -139,11 +139,17 @@ export default class Gizmos3DApiTest extends Component {
         this.wireframe = true;
         this.depthTest = true;
         this.showLabels = true;
-        this.xyPoint = new Vec3(0, 1.5, 0);
-        this.xzPoint = new Vec3(2, 0, 2);
-        this.yzPoint = new Vec3(0, 2, -2);
-        this.moveObject = new Vec3(4, 2, 1);
+        this.xyPoint = new Vec3(0, 0.8, 0);
+        this.xzPoint = new Vec3(1, 0, 0.9);
+        this.yzPoint = new Vec3(0, 1, -0.9);
+        this.moveObject = new Vec3(2.6, 1.1, 0.8);
         this.movePlane = MovePlane3D.XY;
+        this.controlPoints = [
+            new Vec3(-1.2, 0, 0),
+            new Vec3(-0.6, 0.6, 0),
+            new Vec3(0.6, 0.6, 0),
+            new Vec3(1.2, 0, 0),
+        ];
         this.lastEvent = 'reset button';
     }
 

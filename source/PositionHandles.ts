@@ -206,7 +206,7 @@ function planePlacement(component: Component, field: Field,
     return planeHandleGeometry(world, {
         x: basis('x'), y: basis('y'), z: basis('z'),
     }, field.plane, pixel,
-    field.planeSize ?? 36, field.planeOffset ?? 48);
+    field.planeSize ?? 22, field.planeOffset ?? 22);
 }
 
 /** Position of a compact X/Y/Z ray on the same local/world basis as the
@@ -224,7 +224,7 @@ function axisPlacement(component: Component, field: Field,
         direction;
     const axes = { x: unit, y: unit, z: unit };
     return axisHandleGeometry(world, axes, field.axis,
-        markerSize(world) / 22, field.axisSize ?? 78);
+        markerSize(world) / 22, field.axisSize ?? 66);
 }
 
 function isMoveHandle(field: Field): boolean {
@@ -883,6 +883,7 @@ function createEditorGizmo(
                     if (!entry.picking) {
                         configurePositionHitProxy(controller, color, false);
                         configurePositionHitProxy(controller, color, true);
+                        controller.setOpacity?.(0);
                     } else if (controller._editHandlesShape) {
                         controller._editHandlesShape.active = false;
                     }
@@ -1060,6 +1061,10 @@ function createEditorGizmo(
                     if (controller._handleDataMap?.[key]) controller.removeHandle?.(key);
                     controller.initHandle(entry.picking?.node || controller._cubeNode, key);
                     repairNativeHandleColors(controller, key, color);
+                    // Native mesh only receives pointer events; the circular
+                    // point is rendered separately. Keep saved snapshots valid.
+                    controller.setOpacity?.(0);
+                    if (!entry.picking) controller.setHandleColor?.('y', color, 0);
                     if (entry.picking && controller.shape)
                         controller.shape.active = true;
                     if (!isMoveHandle(field)) {
@@ -1880,8 +1885,11 @@ function createEditorGizmo(
                         const color = new Color(255, 174, 66, 255);
                         if (point.field.color && Color.fromHEX)
                             Color.fromHEX(color, point.field.color);
-                        if (!point.picking)
+                        if (!point.picking) {
                             configurePositionHitProxy(controller, color, true);
+                            controller.setOpacity?.(0);
+                            controller.setHandleColor?.('y', color, 0);
+                        }
                     }
                     const hud = this.hudEntries.find(entry => entry.controller === controller);
                     const picker = hud?.picking || point?.picking;

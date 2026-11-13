@@ -46,6 +46,10 @@ assert.ok(planeHandleGeometry(origin, axes, 'xy', 0, 40, 52) === null);
 assert.ok(planeHandleGeometry(origin, {
     ...axes, y: { x: 0, y: 0, z: 0 },
 }, 'xy', 0.01, 40, 52) === null);
+const compactPlane = planeHandleGeometry(origin, axes, 'xy', 0.01);
+assert.ok(Math.abs(compactPlane.center.x - 4.22) < 1e-8 &&
+    Math.abs(compactPlane.size - 0.22) < 1e-8,
+    'Default plane selection is closer to the gizmo center');
 const rotated = {
     x: { x: 0, y: 1, z: 0 },
     y: { x: -1, y: 0, z: 0 },
@@ -57,7 +61,7 @@ assert.ok(Math.abs(localXY.normal.z - 1) < 1e-8,
 const sample = readFileSync(path.join(root, 'editor-assets/Examples/CocosGizmos3DDemo.ts'), 'utf8');
 assert.ok(sample.includes("Gizmos3D.move('moveObject'"),
     '3D demo uses the public Move Gizmo preset');
-for (const option of ['pickSize: 24', 'planeSize: 24', 'planeOffset: 25',
+for (const option of ['pickSize: 24', 'axisSize: 66', 'planeSize: 22', 'planeOffset: 22',
     'hoverColor:', 'showPositionLabel: true'])
     assert.ok(sample.includes(option),
         '3D demo demonstrates public option ' + option);
@@ -70,6 +74,10 @@ const axisJs = ts.transpileModule(axisSource, {
 const axisModule = { exports: {} };
 vm.runInNewContext(axisJs, axisModule);
 const { axisHandleGeometry, axisSegmentDistanceSquared, axisDragNormal } = axisModule.exports;
+const compactAxis = axisHandleGeometry(origin, axes, 'x', 0.01);
+assert.ok(Math.abs(compactAxis.end.x - (origin.x + 0.66)) < 1e-8 &&
+    Math.abs(compactAxis.start.x - (origin.x + 0.08)) < 1e-8,
+    'Default axis selection stays near origin without covering center');
 const rays = ['x', 'y', 'z'].map(axis =>
     axisHandleGeometry(origin, {
         x: { x: 1, y: 0, z: 0 },

@@ -94,7 +94,7 @@ class Base {
                 }] },
             _wireFrameBoxNode: { active: true },
             _wireFrameBoxMeshRenderer: { enabled: true },
-            setColor() {}, setEditHandlesColor() {}, setOpacity() {},
+            setColor() {}, setEditHandlesColor() {}, setOpacity(value) { this.opacity = value; },
             setHandleColor(name, color, opacity) {
                 this.lastNativeFaceColor = { name, color, opacity };
             },
@@ -258,7 +258,9 @@ assert.equal(gizmo.controllers[0].lastNativeFaceColor?.name, 'y');
 assert.equal(gizmo.controllers[0].lastNativeFaceColor?.opacity, 0,
     'The native +Y hit proxy must remain transparent');
 assert.equal(gizmo.controllers[0]._cubeNode.active, true, 'The rendered point remains visible');
-assert.equal(gizmo.controllers[0]._cubeNodeMR.enabled, true, 'Point mesh rendering is enabled');
+assert.equal(gizmo.controllers[0]._cubeNodeMR.enabled, true, 'Point picking mesh remains enabled');
+assert.equal(gizmo.controllers[0].opacity, 0,
+    'Native cube is hidden while the independent circular point remains visible');
 assert.equal(gizmo.controllers[0]._cubeNode.layer, 4, 'Point marker uses the Gizmos render layer');
 assert.equal(gizmo.controllers[0]._cubeNode.layer, 4,
     'Standalone cube is the only picking marker');
@@ -391,6 +393,7 @@ ctrl._cubeNodeMR.enabled = false;
 gizmo.refreshHandles();
 assert.equal(ctrl._cubeNode.active, true, 'Hidden picking cube is restored on refresh');
 assert.equal(ctrl._cubeNodeMR.enabled, true, 'Marker MeshRenderer is re-enabled');
+assert.equal(ctrl.opacity, 0, 'Native picking cube stays transparent after reselection');
 ctrl._cubeNode.active = false;
 gizmo.onShow();
 assert.equal(ctrl._cubeNode.active, true, 'Repeated show restores the native marker');

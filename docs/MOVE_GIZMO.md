@@ -19,13 +19,13 @@ export class EditableWaypoint3D extends Component {
         return [
             ...Gizmos3D.move('waypoint', {
                 space: 'local', snap: 0.25,
-                axisSize: 86, pickSize: 24,
-                planeSize: 24, planeOffset: 25,
+                axisSize: 66, pickSize: 24,
+                planeSize: 22, planeOffset: 22,
                 // Khi component đã vẽ box, chọn/kéo được cả phần bên trong.
                 boxSize: 0.7,
                 hoverColor: '#ffff65',
                 showPositionLabel: true,
-                positionLabelOffset: 94,
+                positionLabelOffset: 82,
             }),
         ];
     }
@@ -64,7 +64,7 @@ public onGizmoHandles(): GizmoHandleList {
           plane: 'view', visual: 'axis', pickSize: 28,
           color: '#ff5555', hoverColor: '#ffff66' },
         { property: 'waypoint', id: 'move-yz', plane: 'yz',
-          visual: 'plane', planeSize: 24, planeOffset: 25,
+          visual: 'plane', planeSize: 22, planeOffset: 22,
           pickSize: 24, color: '#ff77dd' },
     ];
 }

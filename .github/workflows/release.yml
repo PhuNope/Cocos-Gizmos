@@ -24,17 +24,11 @@ jobs:
       - name: Build, type-check and verify public API
         run: npm test
 
+      # Routine branch pushes and PRs test source without packaging.
+      # Only a version tag builds/publishes a release ZIP.
       - name: Pack Cocos Creator extension ZIP
+        if: ${{ github.ref_type == 'tag' }}
         run: npm run pack
-
-      # Upload a ZIP that Extension Manager can import directly.
-      - name: Upload development extension build
-        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/v2')) }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: Cocos-Gizmos-extension-${{ github.sha }}
-          path: release/Cocos-Gizmos-*.zip
-          if-no-files-found: error
 
       # A version tag is the only trigger for publishing a release.
       - name: Validate release tag

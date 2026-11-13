@@ -28,6 +28,12 @@ assert.equal(move.filter(h => h.showPositionLabel).length, 1);
 assert.equal(move.every(h => h.property === 'position' && h.snap === 0.25 &&
     h.pickSize === 32), true);
 assert.notEqual(move[0], move[1], 'Descriptors never share mutable model objects');
+const compactDefaults = presets.makeMoveGizmo('compact');
+assert.equal(compactDefaults[0].axisSize, 66);
+assert.equal(compactDefaults[0].pickSize, 24);
+assert.equal(compactDefaults[3].planeSize, 22);
+assert.equal(compactDefaults[3].planeOffset, 22);
+assert.equal(compactDefaults[0].positionLabelOffset, 82);
 assert.deepEqual(plain(presets.makePointGizmo('origin')),
     { property: 'origin', visual: 'point', plane: 'xy', space: 'local',
       color: '#ffcc00' });

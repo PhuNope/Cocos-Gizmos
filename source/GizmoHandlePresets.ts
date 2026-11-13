@@ -27,10 +27,10 @@ export function makeMoveGizmo(
     property: string, options: GizmosMoveHandleOptions = {},
 ): GizmoHandleDescriptor[] {
     const name = propertyName(property);
-    const axisSize = size(options.axisSize, 86, 24, 200, 'axisSize');
-    const pickSize = size(options.pickSize, 28, 12, 72, 'pickSize');
-    const planeSize = size(options.planeSize, 24, 12, 120, 'planeSize');
-    const planeOffset = size(options.planeOffset, 25, 16, 180, 'planeOffset');
+    const axisSize = size(options.axisSize, 66, 24, 200, 'axisSize');
+    const pickSize = size(options.pickSize, 24, 12, 72, 'pickSize');
+    const planeSize = size(options.planeSize, 22, 12, 120, 'planeSize');
+    const planeOffset = size(options.planeOffset, 22, 16, 180, 'planeOffset');
     const boxSize = options.boxSize === undefined ? null :
         size(options.boxSize, 0.7, 0.01, 1000, 'boxSize');
     if (options.snap !== undefined && (!Number.isFinite(options.snap) || options.snap <= 0)) {
@@ -55,7 +55,7 @@ export function makeMoveGizmo(
             ...shared, id: 'axis-' + axis, visual: 'axis',
             plane: 'view', axis, axisSize, color,
             showPositionLabel: index === 0 && options.showPositionLabel !== false,
-            positionLabelOffset: options.positionLabelOffset ?? 94,
+            positionLabelOffset: options.positionLabelOffset ?? 82,
         })),
         ...planes.map(([plane, color]): GizmoHandleDescriptor => ({
             ...shared, id: 'plane-' + plane, visual: 'plane',
