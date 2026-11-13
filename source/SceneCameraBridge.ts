@@ -59,6 +59,12 @@ export function resolveSceneCamera(cce: any): SceneCameraResolution {
     const height = Number(viewport?.height);
     const camera: SceneHudCamera = {
         node: raw.node,
+        sync() {
+            // Scene navigation updates the camera node before its render-scene
+            // inverse VP is refreshed. Screen rays otherwise lag the wheel.
+            const render = raw.camera || raw;
+            if (typeof render?.update === 'function') render.update(true);
+        },
         viewport: Number.isFinite(width) && width > 0 &&
             Number.isFinite(height) && height > 0 ? { width, height } : undefined,
         worldToScreen(world, out) {
