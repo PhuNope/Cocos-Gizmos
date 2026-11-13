@@ -1628,55 +1628,69 @@ function createEditorGizmo(
          * The selection/move gizmos use the same screenPointToRay coordinates.
          */
         private positionEntryAt(event: any): Entry | null {
-            if (!this.shown || this.destroyed || !this.entries.length) return null;
-            if (!isPrimaryScenePointer(event)) return null;
+            if (!this.shown || this.destroyed || !this.entries.length ||
+                !isPrimaryScenePointer(event)) return null;
             const pointer = readScenePointer(event);
             const view = camera();
             if (!pointer || typeof view?.worldToScreen !== 'function') return null;
             view.sync?.();
-            let nearest: Entry | null = null;
-            let bestDistanceSquared = Number.POSITIVE_INFINITY;
+            const component = this.target as Component;
+            let plane: Entry | null = null;
+            let axis: Entry | null = null;
+            let box: Entry | null = null;
+            let point: Entry | null = null;
+            let planeDistance = Infinity, axisDistance = Infinity;
+            let boxDistance = Infinity, pointDistance = Infinity;
             for (const entry of this.entries) {
-                const local = readField(this.target as Component, entry.field);
+                const local = readField(component, entry.field);
                 if (!local) continue;
-                const world = spaceFor(this.target as Component, entry.field).toWorld(local);
+                const world = spaceFor(component, entry.field).toWorld(local);
                 if (!validPoint(world)) continue;
-                const tile = planePlacement(this.target as Component, entry.field, local, world);
-                const ray = axisPlacement(this.target as Component, entry.field, local, world);
-                const center = ray?.center || tile?.center || world;
-                const screen = new Vec3();
-                try {
-                    if (ray) {
-                        const a = new Vec3();
-                        const b = new Vec3();
-                        view.worldToScreen(new Vec3(ray.start.x, ray.start.y, ray.start.z), a);
-                        view.worldToScreen(new Vec3(ray.end.x, ray.end.y, ray.end.z), b);
-                        const distanceSquared = axisSegmentDistanceSquared(
-                            pointer, a, b);
-                        const width = entry.field.pickSize ?? 24;
-                        if (distanceSquared <= width * width &&
-                            distanceSquared < bestDistanceSquared) {
-                            nearest = entry;
-                            bestDistanceSquared = distanceSquared;
+                const projected = projectedMoveGeometry(
+                    component, entry.field, local, world, view);
+                if (projected?.type === 'plane' && projected.corners) {
+                    // The exact visible parallelogram takes precedence over
+                    // overlapping strips and the large selectable object box.
+                    if (insideProjectedPlane(pointer, projected.corners, 3)) {
+                        const distance = centerDistanceSquared(pointer, projected.rect);
+                        if (distance < planeDistance) {
+                            plane = entry;
+                            planeDistance = distance;
                         }
-                        continue;
                     }
-                    view.worldToScreen(new Vec3(center.x, center.y, center.z), screen);
-                } catch {
                     continue;
                 }
-                const dx = screen.x - pointer.x;
-                const dy = screen.y - pointer.y;
-                const distanceSquared = dx * dx + dy * dy;
-                const radius = tile ? Math.max(20, entry.field.pickSize ?? 24) : 18;
-                if (Number.isFinite(distanceSquared) &&
-                    distanceSquared < radius * radius &&
-                    distanceSquared < bestDistanceSquared) {
-                    nearest = entry;
-                    bestDistanceSquared = distanceSquared;
+                if (projected?.type === 'axis' && projected.axis) {
+                    const distance = distanceToSegmentSquared(pointer,
+                        projected.axis.start, projected.axis.end);
+                    const radius = entry.field.pickSize ?? 28;
+                    if (distance <= radius * radius && distance < axisDistance) {
+                        axis = entry;
+                        axisDistance = distance;
+                    }
+                    continue;
+                }
+                if (projected?.type === 'box') {
+                    if (rectContains(pointer, projected.rect, 0)) {
+                        const distance = centerDistanceSquared(pointer, projected.rect);
+                        if (distance < boxDistance) {
+                            box = entry;
+                            boxDistance = distance;
+                        }
+                    }
+                    continue;
+                }
+                const screen = projectMovePoint(view, world);
+                if (!screen) continue;
+                const distance = (screen.x - pointer.x) ** 2 +
+                    (screen.y - pointer.y) ** 2;
+                const radius = entry.field.pickSize ?? 18;
+                if (distance <= radius * radius && distance < pointDistance) {
+                    point = entry;
+                    pointDistance = distance;
                 }
             }
-            return nearest;
+            return plane || axis || box || point;
         }
 
         /** Fallback hit-test when Creator consumes a HUD pointer event before
