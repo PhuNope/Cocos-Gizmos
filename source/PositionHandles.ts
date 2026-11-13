@@ -1351,8 +1351,7 @@ function createEditorGizmo(
             const drag = this.hudDrag;
             this.hudDrag = null;
             if (!drag || drag.entry.control.type !== 'slider') return;
-            if (cancelled) drag.command.cancel();
-            else drag.command.end();
+            drag.session.finish(cancelled);
         }
 
         private begin(entry: Entry, event: any): void {
@@ -1449,7 +1448,8 @@ function createEditorGizmo(
             const drag = this.drag;
             if (!drag) return;
             this.drag = null;
-            drag.session.finish(cancelled);
+            if (cancelled) drag.command.cancel();
+            else drag.command.end();
         }
 
         /** The Editor can hide its native cube even when a component stays
