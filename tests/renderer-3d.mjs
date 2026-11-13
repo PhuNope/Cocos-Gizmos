@@ -77,6 +77,8 @@ class Node {
     }
     get parent() { return this._parent; }
     setScale(...args) { this.scale = args; }
+    setWorldScale(...args) { this.worldScaleSet = args; }
+    setWorldRotation(rotation) { this.worldRotationSet = rotation; }
     setPosition(v) { this.position = v; }
     setWorldPosition(v) { this.worldPositionSet = v; }
     setRotationFromEuler(v) { this.rotationSet = v; }
@@ -114,7 +116,7 @@ const cc = {
     Camera: class Camera {},
     CCObject: { Flags: { DontSave: 1, HideInHierarchy: 2 } },
     Color, Component, Node, Vec3, Label, Sprite, RenderRoot2D,
-    Layers: { Enum: { GIZMOS: 4 } },
+    Layers: { Enum: { GIZMOS: 4, UI_3D: 8, UI_2D: 16 } },
     director: { getScene: () => null },
     toRadian: number => number * Math.PI / 180,
     Mat4: class Mat4 {
@@ -125,7 +127,7 @@ const cc = {
     gfx: { Format: {}, AttributeName: {} },
 };
 const sceneCamera = {
-    node: new Node('camera'),
+    node: Object.assign(new Node('camera'), { worldRotation: { x: 0, y: 0, z: 0, w: 1 } }),
     geometryRenderer,
     initGeometryRenderer() {},
 };
@@ -175,6 +177,16 @@ Gizmos3D.drawLabel(node, 'title', 'Range', new Vec3(1, 1, 0), 20, 0.5);
 Gizmos3D.drawSprite(node, 'icon', frame, new Vec3(0, 0, 0), { x: 1, y: 1 });
 const label = debug._labelMap.get('title');
 const sprite = debug._spriteMap.get('icon');
+assert.equal(debug._root2D.layer, 8, '3D-space UI root uses camera-visible UI_3D instead of UI_2D');
+assert.equal(label.node.layer, 8, '3D labels must be on UI_3D layer');
+assert.equal(sprite.node.layer, 8, '3D sprites must be on UI_3D layer');
+assert.deepEqual(label.node.worldScaleSet, [0.5, 0.5, 1],
+    'Label size must be specified in world space, not multiplied by parent node scale');
+assert.deepEqual(sprite.node.worldScaleSet, [1, 1, 1],
+    'Sprite size must be independent of the root Node transform');
+assert.equal(label.node.worldRotationSet, sceneCamera.node.worldRotation,
+    'Billboard should use the camera world rotation');
+assert.equal(sprite.node.worldRotationSet, sceneCamera.node.worldRotation);
 assert.equal(label.string, 'Range');
 assert.equal(sprite.spriteFrame, frame);
 const labelWrites = label.stringWrites;
