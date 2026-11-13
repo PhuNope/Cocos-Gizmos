@@ -31,17 +31,19 @@ class Node {
     addComponent(Type) {
         const comp = new Type();
         comp.node = this;
+        if (Type === Sorting) this.sorting = comp;
         return comp;
     }
-    setWorldPosition() {}
-    setWorldRotation() {}
-    setWorldScale() {}
+    setWorldPosition(value) { this.position = value; }
+    setWorldRotation(value) { this.rotation = value; }
+    setWorldScale(value) { this.scale = value; }
     destroy() { this.isValid = false; }
 }
 class MeshRenderer {
     constructor() { this.isValid = true; }
     setMaterial(material) { this.material = material; }
 }
+class Sorting { constructor() { this.sortingOrder = 0; } }
 class Material {
     initialize(value) { this.options = value; }
     setProperty(key, value) { this[key] = value; }
@@ -56,6 +58,7 @@ class Texture2D {
 }
 const rootGizmo = new Node('gizmoRoot');
 const meshes = [], drawCalls = [], directorEvents = [];
+let beforeDrawHook = null;
 const document = {
     createElement(type) {
         assert.equal(type, 'canvas');
@@ -73,8 +76,10 @@ const document = {
 const camera = {
     node: { forward: new Vec3(0, 0, -1) },
     viewport: { width: 960, height: 560 },
+    pixelWorld: 1,
     screenPointToRay(x, y, out) {
-        out.o = new Vec3(x / 100, y / 100, 0);
+        out.o = new Vec3(x * this.pixelWorld / 100,
+            y * this.pixelWorld / 100, 0);
         out.d = new Vec3(0, 0, -1);
         return out;
     },
@@ -89,14 +94,14 @@ const sandbox = {
             Color: class Color {},
             Component: class Component {},
             director: {
-                on(event) { directorEvents.push(['on', event]); },
+                on(event, listener) { directorEvents.push(['on', event]); beforeDrawHook = listener; },
                 off(event) { directorEvents.push(['off', event]); },
                 getScene() { return rootGizmo; },
             },
             Director: { EVENT_BEFORE_DRAW: 'before-draw' },
             gfx: { CullMode: { NONE: 0 } },
             ImageAsset, Layers: { Enum: { GIZMOS: 4, UI_2D: 8 } },
-            Material, Mesh: class Mesh {}, MeshRenderer, Node, Quat,
+            Material, Mesh: class Mesh {}, MeshRenderer, Node, Quat, Sorting,
             RenderRoot2D: class RenderRoot2D {},
             Texture2D,
             utils: { createMesh(geometry) {
@@ -147,8 +152,31 @@ assert.ok(drawCalls.some(call => call[0] === 'text' && call[1] === 'Gizmos2D Tes
 assert.ok(drawCalls.some(call => call[0] === 'text' && call[1] === 'Radius'),
     'Slider is painted with a proper track and numeric value');
 assert.equal(meshes.length, 1);
+assert.equal(rootGizmo.children[0].children[0].sorting?.sortingOrder, 32770,
+    'HUD receives the highest gizmo sorting order');
 assert.equal(meshes[0].geometry.positions.length, 12);
 assert.deepEqual(Array.from(meshes[0].geometry.indices), [0, 3, 1, 3, 2, 1]);
+// Navigation changes should update only the unit quad transform, not
+// destroy/recreate a GPU mesh on every mouse-wheel tick.
+camera.node.worldRotation = { x: 0, y: 0, z: 0, w: 1 };
+overlay.beginFrame();
+overlay.render(component, [
+    { id: 'text:title', text: 'Gizmos2D Test', color: '#ffcc00', fontSize: 16 },
+    { id: 'control:radius', text: 'Radius: 40', color: '#ffffff', fontSize: 14 },
+], { namespace: 'selected', startRow: 0, textCount: 1,
+    controls: [{ type: 'slider', id: 'radius', text: 'Radius',
+        property: 'radius', min: 0, max: 100, color: '#ffffff' }] });
+overlay.finishFrame(2);
+const transformed = rootGizmo.children[0].children[0];
+const unitQuadMeshCount = meshes.length;
+const initialWidth = transformed.scale.x;
+camera.pixelWorld = 2;
+beforeDrawHook?.();
+assert.equal(meshes.length, unitQuadMeshCount,
+    'Wheel zoom never reallocates HUD meshes');
+assert.ok(Math.abs(transformed.scale.x - initialWidth * 2) < 1e-8,
+    'HUD geometry follows Scene camera zoom in the same frame');
+camera.pixelWorld = 1;
 const texBefore = drawCalls.length;
 overlay.beginFrame();
 overlay.render(component, [{ id: 'text:title', text: 'Gizmos2D Test',
