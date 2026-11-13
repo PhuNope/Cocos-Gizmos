@@ -377,6 +377,9 @@ function drawSelectedPositionMarkers(component: Component): void {
                     { offsetPixels: field.positionLabelOffset ?? 94,
                       digits: 2, minSize: 12, maxSize: 22 });
             }
+            // The owning Component already draws the exact editable box.
+            // This descriptor contributes only its invisible hit zone.
+            if (field.visual === 'box') continue;
             const ray = !onCanvas ? axisPlacement(component, field, local, world) : null;
             if (ray) {
                 const point = (v: Point) => new Vec3(v.x, v.y, v.z);
@@ -1004,7 +1007,8 @@ function createEditorGizmo(
                     field.space || 'local', field.axis, field.snap,
                     field.color, field.bounds, field.id,
                     field.visual || 'point', field.planeSize, field.planeOffset,
-                    field.axisSize, field.pickSize, field.hoverColor,
+                    field.axisSize, field.pickSize, field.boxSize,
+                    field.hoverColor,
                     field.showPositionLabel, field.positionLabelOffset,
                 ]),
                 controls: hudControlLayoutSignature(controls),
