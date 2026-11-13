@@ -94,6 +94,7 @@ export default class Gizmos3DApiTest extends Component {
                 space: 'local', snap: 0.25,
                 axisSize: 86, pickSize: 24,
                 planeSize: 24, planeOffset: 25,
+                boxSize: 0.7, // Same size as the orange moveObject wire box.
                 hoverColor: '#ffff65',
                 showPositionLabel: true, positionLabelOffset: 94,
             }),
