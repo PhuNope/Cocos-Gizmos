@@ -444,6 +444,22 @@ components before shipping. Disabling/uninstalling the extension can make
 existing sample-component references appear as Missing Script. These are
 different from the extension's Editor-only Scene Script.
 
+### Creator 3.8.8 Scene camera and missing HUD
+
+If Gizmos lines or shapes render but **HUD text and draggable points are
+missing**, install the current `v2` build. The Editor's internal
+`renderer.scene.Camera` uses `worldToScreen(out, world)` and
+`screenPointToRay(out, x, y)`; the public `cc.Camera` Component uses the
+opposite argument order. The Scene camera compatibility bridge now supports
+both without guessing by calling the wrong signature.
+
+Use **Extensions → Gizmos Settings → Check Scene integration** to inspect
+`bridge.cameraConvention` and `scene.hudDrawn` along with the existing
+`handles.active`, `handles.positionHandles`, `handles.hudControls` and
+`handles.input` counters. `hudDrawn` counts HUD submissions, not confirmed
+on-screen rendering. Cocos 3.8.8's private Gizmo controller picking still
+requires real Editor verification.
+
 ## Verify in Cocos Creator 3.8.8
 
 Open **Extensions → Gizmos Settings → Check Scene integration** to view the
