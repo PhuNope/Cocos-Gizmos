@@ -40,6 +40,16 @@ declare global {
         visual?: 'point' | 'plane' | 'axis';
         /** Visible length of an axis arrow in Scene pixels (default 78). */
         axisSize?: number;
+        /** Radius in Scene pixels used for easier axis/plane selection (default 23). */
+        pickSize?: number;
+        /** Highlight color while hovered or dragged, e.g. '#ffff55'. */
+        hoverColor?: string;
+        /** Show a live coordinate label above this property's position.
+         * When several handles edit the same property, the label is drawn once.
+         */
+        showPositionLabel?: boolean;
+        /** Label's vertical offset in screen pixels (default 92). */
+        positionLabelOffset?: number;
         /** Side length of the plane square in Scene pixels (default 36). */
         planeSize?: number;
         /** Offset of the square along its two axes in pixels (default 48). */
