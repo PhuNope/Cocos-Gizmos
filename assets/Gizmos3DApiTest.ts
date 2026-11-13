@@ -87,17 +87,16 @@ export default class Gizmos3DApiTest extends Component {
 
     public onGizmoHandles(): GizmoHandleList {
         return [
-            // The three arrows all edit the SAME Vec3. Select a ray to
-            // lock movement to X, Y or Z; no large point/plane tiles remain.
-            { property: 'moveObject', id: 'axis-x', visual: 'axis',
-                plane: 'view', axis: 'x', axisSize: 78,
-                space: 'local', snap: 0.25, color: '#ff595e' },
-            { property: 'moveObject', id: 'axis-y', visual: 'axis',
-                plane: 'view', axis: 'y', axisSize: 78,
-                space: 'local', snap: 0.25, color: '#43df66' },
-            { property: 'moveObject', id: 'axis-z', visual: 'axis',
-                plane: 'view', axis: 'z', axisSize: 78,
-                space: 'local', snap: 0.25, color: '#4b8fff' },
+            // Same API pattern as the supplied Cocos Gizmo Kit examples:
+            // one Vec3 property, native XYZ dragging + XY/XZ/YZ plane squares.
+            // The preset keeps all six regions in sync with moveObject.
+            ...Gizmos3D.moveHandles('moveObject', {
+                space: 'local', snap: 0.25,
+                axisSize: 86, pickSize: 24,
+                planeSize: 24, planeOffset: 25,
+                hoverColor: '#ffff65',
+                showPositionLabel: true, positionLabelOffset: 94,
+            }),
             { property: 'xyPoint', plane: 'xy', space: 'local', snap: 0.25,
                 color: '#ffcc00' },
             { property: 'xzPoint', plane: 'xz', space: 'local', snap: 0.25,
@@ -115,7 +114,7 @@ export default class Gizmos3DApiTest extends Component {
         return [
             { id: 'title', text: 'Gizmos3D API Test', order: 0, color: '#ffff88' },
             { id: 'size', text: 'Size: ' + this.size.toFixed(2), order: 1 },
-            { id: 'move-plane', text: 'Drag X (red), Y (green), Z (blue) rays',
+            { id: 'move-plane', text: 'Drag X/Y/Z arrows or XY/XZ/YZ plane squares',
                 order: 1 },
             { id: 'depth', text: 'Depth test: ' + this.depthTest, order: 2 },
             { id: 'event', text: 'Last event: ' + this.lastEvent, order: 3, fontSize: 12 },
@@ -280,7 +279,7 @@ export default class Gizmos3DApiTest extends Component {
         Gizmos3D.drawSphere(n, this.xyPoint, 0.2, false, 12, 8);
 
         // Selected draggable object: PositionHandles draws the three
-        // compact interactive axis rays, not the old plane tiles.
+        // compact axis rays and three small translucent plane squares.
         Gizmos3D.beginColor(n, new Color(255, 185, 70));
         Gizmos3D.drawBox(n, this.moveObject, new Vec3(0.7, 0.7, 0.7),
             Vec3.ZERO, true);
