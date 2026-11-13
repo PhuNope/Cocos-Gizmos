@@ -150,10 +150,46 @@ class GizmosDebugDraw extends Component {
     private readonly _usedLabelIds = new Set<string>();
     private readonly _usedSpriteIds = new Set<string>();
 
+    private static get overlayLayer(): number {
+        // A 3D-space RenderRoot2D must render on a camera-visible UI layer.
+        // Creator's Scene camera commonly excludes UI_2D.
+        return Layers.Enum.UI_3D ?? Layers.Enum.GIZMOS;
+    }
+
+    private orientToEditorCamera(node: Node): void {
+        const editorCce = (globalThis as any).window?.cce || (globalThis as any).cce || cce;
+        const cameraNode = editorCce?.Camera?._camera?.camera?.node ||
+            editorCce?.Camera?.camera?.node || this._camera;
+        if (!cameraNode) return;
+        // Label/Sprite nodes live below the demo Node. World rotation is
+        // required when the user's Node has a non-zero local rotation.
+        if (typeof node.setWorldRotation === 'function' && cameraNode.worldRotation) {
+            node.setWorldRotation(cameraNode.worldRotation);
+        } else if (cameraNode.eulerAngles) {
+            node.setRotationFromEuler(cameraNode.eulerAngles);
+        }
+    }
+
+    private setOverlayWorldScale(node: Node, x: number, y: number): void {
+        // Avoid multiplying the requested world-size by a scaled parent Node.
+        // This keeps projected HUD text at a predictable screen pixel size.
+        if (typeof node.setWorldScale === 'function') {
+            node.setWorldScale(x, y, 1);
+        } else {
+            const parentScale = node.parent?.worldScale;
+            const sx = parentScale?.x && Math.abs(parentScale.x) > 1e-8 ?
+                Math.abs(parentScale.x) : 1;
+            const sy = parentScale?.y && Math.abs(parentScale.y) > 1e-8 ?
+                Math.abs(parentScale.y) : 1;
+            node.setScale(x / sx, y / sy, 1);
+        }
+    }
+
     protected onLoad(): void {
         this._root2D = new Node('Root2D');
-        this._root2D.addComponent(RenderRoot2D);
+        this._root2D.layer = GizmosDebugDraw.overlayLayer;
         this._root2D.setParent(this.node);
+        this._root2D.addComponent(RenderRoot2D);
         this.ensureGeometryRenderer();
     }
 
@@ -245,6 +281,7 @@ class GizmosDebugDraw extends Component {
             sprite = new Node('spriteID: ' + id).addComponent(Sprite);
             this._spriteMap.set(id, sprite);
             sprite.node.setParent(this._root2D);
+            sprite.node.layer = GizmosDebugDraw.overlayLayer;
         }
         return sprite;
     }
@@ -255,6 +292,7 @@ class GizmosDebugDraw extends Component {
             label = new Node('LabelID: ' + id).addComponent(Label);
             this._labelMap.set(id, label);
             label.node.setParent(this._root2D);
+            label.node.layer = GizmosDebugDraw.overlayLayer;
         }
         return label;
     }
@@ -264,10 +302,10 @@ class GizmosDebugDraw extends Component {
         this._usedSpriteIds.add(id);
         if (sprite.spriteFrame !== spriteFrame) sprite.spriteFrame = spriteFrame;
         if (sprite.color !== color) sprite.color = color;
-        sprite.node.setScale(scale.x, scale.y, 1);
         if (this._useLocalPosition) sprite.node.setPosition(position);
         else sprite.node.setWorldPosition(position);
-        if (this._camera) sprite.node.setRotationFromEuler(this._camera.eulerAngles);
+        this.setOverlayWorldScale(sprite.node, scale.x, scale.y);
+        this.orientToEditorCamera(sprite.node);
     }
 
     public drawLabel(id: string, text: string, position: Vec3, fontSize: number = 40, scale: number = 1) {
@@ -277,10 +315,10 @@ class GizmosDebugDraw extends Component {
         label.color = this._color;
         if (label.fontSize !== fontSize) label.fontSize = fontSize;
         if (label.lineHeight !== fontSize) label.lineHeight = fontSize;
-        label.node.setScale(scale, scale, 1);
         if (this._useLocalPosition) label.node.setPosition(position);
         else label.node.setWorldPosition(position);
-        if (this._camera) label.node.setRotationFromEuler(this._camera.eulerAngles);
+        this.setOverlayWorldScale(label.node, scale, scale);
+        this.orientToEditorCamera(label.node);
     }
 
     public drawLine(point1: Vec3, point2: Vec3) {
