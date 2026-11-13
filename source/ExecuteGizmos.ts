@@ -58,13 +58,16 @@ const SELECTION_POLL_INTERVAL_MS = 32;
 class SelectedNodeCache {
     private previous = { ids: new Set<string>(), available: false };
     private mainSelection: { ids: Set<string>; available: true } | null = null;
+    private authoritativeUntil = -Infinity;
     private lastCheckedAt = -Infinity;
 
     public get(now: number): { ids: Set<string>; available: boolean } {
-        // Main-process selection events are authoritative once received.
-        // Scene Editor.Selection can report a stale empty array after the
-        // user clicks a selected node again, overriding a restored Gizmo.
-        if (this.mainSelection) return this.mainSelection;
+        // Main-process select/unselect events are authoritative briefly
+        // while the Scene-side Editor.Selection snapshot catches up.
+        // Never pin these UUIDs forever: a failed scene activation can skip
+        // selection notifications and leave the old scene's UUIDs cached.
+        if (this.mainSelection && now < this.authoritativeUntil) return this.mainSelection;
+        this.mainSelection = null;
         if (now - this.lastCheckedAt >= SELECTION_POLL_INTERVAL_MS) {
             this.previous = selectedNodes();
             this.lastCheckedAt = now;
@@ -76,10 +79,12 @@ class SelectedNodeCache {
         this.mainSelection = { ids: new Set(ids), available: true };
         this.previous = this.mainSelection;
         this.lastCheckedAt = Date.now();
+        this.authoritativeUntil = this.lastCheckedAt + 600;
     }
 
     public clear(): void {
         this.mainSelection = null;
+        this.authoritativeUntil = -Infinity;
         this.previous = { ids: new Set<string>(), available: false };
         this.lastCheckedAt = -Infinity;
     }
@@ -133,6 +138,20 @@ export function start(): UpdateStats {
     const selectionCache = new SelectedNodeCache();
     let activeScene: Node | null = null;
     let firstComponentLog = false;
+    let sceneTransitioning = false;
+    const beforeSceneLaunch = (): void => {
+        // The next scene may throw in Mask.onLoad() before AFTER_SCENE_LAUNCH
+        // or the next update tick. Release old Scene picking proxies now,
+        // while their Node and BoxController resources are still valid.
+        sceneTransitioning = true;
+        selectionCache.clear();
+        registry.clear();
+        try { positionHandles?.clear?.(); }
+        catch (error) { warnOnce('Position handles pre-scene cleanup failed', error); }
+        try { presentation?.clearFrame?.(); }
+        catch (error) { warnOnce('HUD pre-scene cleanup failed', error); }
+        activeScene = null;
+    };
     function warnOnce(key: string, error: unknown): void {
         stats.errors++;
         if (reported.has(key)) return;
@@ -140,6 +159,11 @@ export function start(): UpdateStats {
         console.error('[cocos-gizmos/updater] ' + key, error);
     }
     function update(source: string): void {
+        if (sceneTransitioning) {
+            // Avoid registering Gizmos on a partially activated new Scene.
+            // A failed Mask.onLoad may leave director.getScene() non-null.
+            if (source === 'timer') return;
+        }
         stats.frames++;
         stats.lastSource = source;
         if (source === 'engine') stats.engineFrames++;
@@ -149,6 +173,11 @@ export function start(): UpdateStats {
         try { root = director.getScene(); }
         catch (error) { warnOnce('director.getScene()', error); return; }
         stats.scene = root && (root.name || root.uuid || '(unnamed scene)');
+        if (sceneTransitioning) {
+            // An engine frame proves the Scene process is responsive again.
+            // A new selection snapshot is required before restoring handles.
+            sceneTransitioning = false;
+        }
         if (root !== activeScene) {
             activeScene = root;
             selectionCache.clear();
@@ -223,6 +252,7 @@ export function start(): UpdateStats {
         try { presentation?.finishFrame?.(); }
         catch (error) { warnOnce('Screen HUD flush failed', error); }
     }
+    director.on(Director.EVENT_BEFORE_SCENE_LAUNCH, beforeSceneLaunch);
     const scheduler = new SceneUpdateScheduler({
         now: () => Date.now(),
         subscribe: (listener) => director.on(Director.EVENT_BEFORE_UPDATE, listener),
@@ -243,6 +273,7 @@ export function start(): UpdateStats {
             scheduler.tickOnce();
         },
         dispose: () => {
+            director.off(Director.EVENT_BEFORE_SCENE_LAUNCH, beforeSceneLaunch);
             registry.clear();
             selectionCache.clear();
             presentation?.clearFrame?.();
@@ -251,6 +282,7 @@ export function start(): UpdateStats {
     try {
         scheduler.start();
     } catch (error) {
+        director.off(Director.EVENT_BEFORE_SCENE_LAUNCH, beforeSceneLaunch);
         running = null;
         registry.clear();
         selectionCache.clear();
