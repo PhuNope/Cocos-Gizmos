@@ -100,7 +100,7 @@ class Sprite {
     set spriteFrame(value) { this._frame = value; this.frameWrites++; }
 }
 class RenderRoot2D {}
-const calls = { lines: [], dashed: [], triangles: [] };
+const calls = { lines: [], dashed: [], triangles: [], quads: [] };
 const geometryRenderer = {
     addLine(a, b, color, depth) {
         calls.lines.push({ a: { ...a }, b: { ...b }, color, depth });
@@ -109,6 +109,7 @@ const geometryRenderer = {
         calls.dashed.push({ a: { ...a }, b: { ...b }, color, depth });
     },
     addTriangle(...args) { calls.triangles.push(args); },
+    addQuad(...args) { calls.quads.push(args); },
 };
 
 const cc = {
@@ -161,6 +162,19 @@ const sandbox = {
 vm.runInNewContext(compiled, sandbox, { filename: 'Gizmos3D.js' });
 const { Gizmos3D } = sandbox.exports;
 const node = new Node('owner');
+const moveHandles = Gizmos3D.moveHandles('waypoint', {
+    space: 'local', snap: 0.25, pickSize: 32, hoverColor: '#ffff66',
+});
+assert.equal(moveHandles.length, 6, 'Default Move Tool exports XYZ + XY/XZ/YZ controls');
+assert.deepEqual(moveHandles.map(h => h.id),
+    ['move-axis-x', 'move-axis-y', 'move-axis-z',
+        'move-plane-xy', 'move-plane-xz', 'move-plane-yz']);
+assert.ok(moveHandles.every(h => h.property === 'waypoint' &&
+    h.pickSize === 32 && h.snap === 0.25 && h.hoverColor === '#ffff66'));
+assert.deepEqual(moveHandles.slice(0, 3).map(h => h.axis), ['x', 'y', 'z']);
+assert.deepEqual(moveHandles.slice(3).map(h => h.plane), ['xy', 'xz', 'yz']);
+assert.equal(moveHandles.filter(h => h.showPositionLabel).length, 1,
+    'One object position label, not six stacked duplicate labels');
 const color = new Color(4, 5, 6, 80);
 
 Gizmos3D.beginColor(node, color);
@@ -283,4 +297,27 @@ assert.equal(Vec3.transforms, 4, 'Each unique indexed vertex must be transformed
 assert.deepEqual({ ...calls.triangles[0][0] }, { x: 10, y: 20, z: 30 });
 assert.deepEqual({ ...calls.triangles[1][2] }, { x: 10, y: 21, z: 30 });
 
-console.log('[renderer-3d] primitive state, local transforms, stable overlays and indexed mesh reuse OK');
+Gizmos3D.endLocalPosition(node);
+const startLines = calls.lines.length;
+Gizmos3D.drawArrow(node, new Vec3(1, 2, 3),
+    new Vec3(5, 2, 3), 0.3);
+assert.equal(calls.lines.length, startLines + 3,
+    'drawArrow renders shaft and two arrow-head wings');
+Gizmos3D.drawPlanePreview(node, new Vec3(1, 2, 3),
+    new Vec3(0, 1, 0), 2.5, false);
+assert.equal(calls.quads.length, 1,
+    'drawPlanePreview renders one oriented quad without a MeshRenderer');
+const pos = new Vec3(3.5, -1.25, 2.75);
+Gizmos3D.drawPositionLabel(node, 'object-position', pos, {
+    offsetPixels: 60, digits: 2, minSize: 12, maxSize: 22,
+});
+const positionLabel = debug._labelMap.get('object-position');
+assert.ok(positionLabel.string.includes('X: 3.50') &&
+    positionLabel.string.includes('Y: -1.25') &&
+    positionLabel.string.includes('Z: 2.75'));
+assert.ok(debug._labelMap.size >= 1);
+const positionWrites = positionLabel.stringWrites;
+Gizmos3D.drawPositionLabel(node, 'object-position', pos);
+assert.equal(positionLabel.stringWrites, positionWrites,
+    'Position label is reused without rewriting identical text');
+console.log('[renderer-3d] Move Gizmo presets, new arrow/plane APIs, position labels and existing renderer OK');
