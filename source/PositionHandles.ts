@@ -1,11 +1,13 @@
-import { Color, Component, Layers, Quat, Vec3 } from 'cc';
+import { Color, Component, Layers, Quat, RenderRoot2D, Vec3 } from 'cc';
+import { Gizmos2D } from './Gizmos2D';
+import { Gizmos3D } from './Gizmos3D';
 import {
     handlePlaneNormal,
     intersectHandlePlane,
     PositionDragSolver,
 } from './PositionDragSolver';
-import { HudControl, HudSliderDrag, hudRowScreenPosition, normalizeHudControls, hudControlLayoutSignature } from './GizmoHudControls';
-import { createSceneHudProjection } from './GizmoHudProjection';
+import { HudControl, HudSliderDrag, hudGrid, hudRowScreenPosition, normalizeHudControls, hudControlLayoutSignature } from './GizmoHudControls';
+import { createSceneHudProjection, createViewportHudProjection } from './GizmoHudProjection';
 import { normalizeHudItems } from './GizmoPresentation';
 import { GizmoEditSession } from './GizmoEditSession';
 import { GizmoHudLayout } from './GizmoHudLayout';
@@ -128,7 +130,7 @@ function markerSize(world: Point): number {
         // projection is evaluated again after every drag so the visible point
         // keeps the same size across Scene zoom levels.
         if (Number.isFinite(pixel) && pixel > 1e-10) {
-            return Math.max(0.015, Math.min(1000, pixel * 22));
+            return Math.max(1e-8, pixel * 22);
         }
     } catch {
         // Keep the default marker size if the camera is being replaced.
@@ -141,22 +143,91 @@ function markerSize(world: Point): number {
  * re-enters editable box handles and assumes their private topNode exists.
  * These handles are not initialized by this Gizmo, so updateSize is unsafe.
  */
-function setMarkerSize(controller: any, size: number): void {
+function setMarkerSize(controller: any, size: number, height = size, depth = size): void {
     const cube = controller?._cubeNode;
     if (!cube || !Number.isFinite(size) || size <= 0) return;
     // The built-in Controller may be attached beneath a transformed target
     // Node. Setting *local* scale makes points vanish on scaled 2D canvases.
     // World scale keeps the picking cube size independent of target scale.
     if (typeof cube.setWorldScale === 'function') {
-        cube.setWorldScale(size, size, size);
+        cube.setWorldScale(size, height, depth);
     } else {
         const parent = cube.parent?.worldScale;
         const parentX = parent?.x && Math.abs(parent.x) > 1e-8 ? Math.abs(parent.x) : 1;
         const parentY = parent?.y && Math.abs(parent.y) > 1e-8 ? Math.abs(parent.y) : 1;
         const parentZ = parent?.z && Math.abs(parent.z) > 1e-8 ? Math.abs(parent.z) : 1;
-        const scale = new Vec3(size / parentX, size / parentY, size / parentZ);
+        const scale = new Vec3(size / parentX, height / parentY, depth / parentZ);
         if (typeof cube.setScale === 'function') cube.setScale(scale);
         else cube.scale = scale;
+    }
+}
+
+function isCanvas2D(node: any): boolean {
+    for (let current = node; current; current = current.parent) {
+        if (typeof current.getComponent === 'function' &&
+            current.getComponent(RenderRoot2D)) return true;
+    }
+    return false;
+}
+
+/**
+ * Draw the marker independently from BoxCollider's private cube mesh. Creator
+ * may keep the picking Controller alive while its rendering mesh disappears
+ * after a 2D selection switch. The actual drag still uses initHandle and the
+ * Editor's controller event pipeline; this is the visible representation.
+ */
+function drawSelectedPositionMarkers(component: Component): void {
+    if (!component?.node?.isValid || typeof component.onGizmoHandles !== 'function') return;
+    const fields: Field[] = component.onGizmoHandles() || [];
+    if (!Array.isArray(fields) || !fields.length) return;
+    const node = component.node;
+    const onCanvas = isCanvas2D(node);
+    const nodeScale = node.worldScale || new Vec3(1, 1, 1);
+    const sx = Number.isFinite(nodeScale.x) && Math.abs(nodeScale.x) > 1e-8 ?
+        Math.abs(nodeScale.x) : 1;
+    const sy = Number.isFinite(nodeScale.y) && Math.abs(nodeScale.y) > 1e-8 ?
+        Math.abs(nodeScale.y) : 1;
+    try {
+        if (onCanvas) {
+            Gizmos2D.beginLayer(node, Layers.Enum.UI_2D);
+            Gizmos2D.beginLocalPosition(node);
+        } else {
+            Gizmos3D.setDepTest(node, false);
+        }
+        for (const field of fields) {
+            if (!field || typeof field.property !== 'string') continue;
+            const local = readField(component, field);
+            if (!local) continue;
+            const world = spaceFor(component, field).toWorld(local);
+            if (!validPoint(world)) continue;
+            const diameter = markerSize(world);
+            const radius = diameter * 0.4;
+            const color = new Color(255, 190, 40, 255);
+            if (typeof field.color === 'string' && typeof Color.fromHEX === 'function') {
+                Color.fromHEX(color, field.color);
+            }
+            if (onCanvas) {
+                const at = new Vec3();
+                node.inverseTransformPoint(at, new Vec3(world.x, world.y, world.z));
+                Gizmos2D.beginColor(node, Color.BLACK);
+                Gizmos2D.drawSolidEllipse(node, at, radius * 1.12 / sx, radius * 1.12 / sy);
+                Gizmos2D.beginColor(node, color);
+                Gizmos2D.drawSolidEllipse(node, at, radius / sx, radius / sy);
+            } else {
+                Gizmos3D.beginColor(node, color);
+                Gizmos3D.drawSphere(node, new Vec3(world.x, world.y, world.z),
+                    radius, false, 12, 8);
+            }
+        }
+    } finally {
+        if (onCanvas) {
+            Gizmos2D.endLocalPosition(node);
+            Gizmos2D.beginLayer(node, Gizmos2D.DEFAULT_LAYER);
+            Gizmos2D.beginColor(node, Gizmos2D.DEFAULT_COLOR);
+        } else {
+            Gizmos3D.setDepTest(node, true);
+            Gizmos3D.beginColor(node, Gizmos3D.DEFAULT_COLOR);
+        }
     }
 }
 
@@ -172,6 +243,7 @@ function createEditorGizmo(
         private hudDrag: HudDrag | null = null;
         private pendingClick: HudEntry | null = null;
         private shown = false;
+        private destroyed = false;
         private layout = '';
         private readonly registeredControllers = new WeakSet<object>();
         private readonly unavailableMarkers = new WeakSet<object>();
@@ -188,6 +260,21 @@ function createEditorGizmo(
             this.unavailableMarkers.delete(controller);
             controller.show?.();
             this.registerController(controller);
+        }
+
+        /** Creator may hide the cube MeshRenderer while keeping the Gizmo instance. */
+        private ensureMarkerVisible(controller: any): void {
+            const cube = controller?._cubeNode;
+            if (!cube || cube.isValid === false || this.unavailableMarkers.has(controller)) return;
+            cube.active = true;
+            if (controller._cubeNodeMR?.isValid !== false && controller._cubeNodeMR) {
+                controller._cubeNodeMR.enabled = true;
+            }
+        }
+
+        private hasDestroyedMarkers(): boolean {
+            return [...this.entries, ...this.hudEntries].some(({ controller }) =>
+                !controller?._cubeNode || controller._cubeNode.isValid === false);
         }
 
         private registerController(controller: any): void {
@@ -211,6 +298,7 @@ function createEditorGizmo(
         }
 
         public init(): void {
+            this.destroyed = false;
             this.shouldRegisterGizmoOperationEvent = true;
             this.rebuild();
             this._isInitialized = true;
@@ -312,7 +400,9 @@ function createEditorGizmo(
                     if (typeof Color.fromHEX === 'function') Color.fromHEX(color, control.color);
                     else color.set(58, 182, 255, 255);
                     controller.setColor?.(color);
-                    controller.setOpacity?.(255);
+                    // HUD is painted in a texture; its native cube must be
+                    // invisible, while remaining enabled for Scene picking.
+                    controller.setOpacity?.(0);
                     if (controller._wireFrameBoxNode) controller._wireFrameBoxNode.active = false;
                     if (controller._wireFrameBoxMeshRenderer) controller._wireFrameBoxMeshRenderer.enabled = false;
                     if (controller._editHandlesShape) controller._editHandlesShape.active = false;
@@ -353,7 +443,8 @@ function createEditorGizmo(
         public refreshHandles(): void {
             const fields = this.descriptors();
             const controls = this.hudDescriptors();
-            if (this.signature(fields, controls) !== this.layout && !this.drag && !this.hudDrag && !this.pendingClick) {
+            if (!this.drag && !this.hudDrag && !this.pendingClick &&
+                (this.hasDestroyedMarkers() || this.signature(fields, controls) !== this.layout)) {
                 this.rebuild();
             } else this.updateMarkers();
         }
@@ -374,6 +465,7 @@ function createEditorGizmo(
                     continue;
                 }
                 this.restoreMarker(entry.controller);
+                this.ensureMarkerVisible(entry.controller);
                 entry.controller.setPosition?.(new Vec3(world.x, world.y, world.z));
                 entry.controller.setRotation?.(new Quat());
                 const size = markerSize(world);
@@ -386,7 +478,8 @@ function createEditorGizmo(
                 for (const entry of this.hudEntries) this.hideUnavailableMarker(entry.controller);
                 return;
             }
-            const projection = createSceneHudProjection(view, component.node.worldPosition);
+            const projection = (view.viewport && createViewportHudProjection(view)) ||
+                createSceneHudProjection(view, component.node.worldPosition);
             if (!projection) {
                 for (const entry of this.hudEntries) this.hideUnavailableMarker(entry.controller);
                 return;
@@ -398,14 +491,27 @@ function createEditorGizmo(
             // A HUD row is 22 screen pixels tall. Keep its picking cube about
             // 14 pixels wide; multiplying a 10px world size by 14 creates a
             // ~140px hit box overlapping adjacent buttons and sliders.
-            const size = Math.min(1000, projection.pixelSize * 14);
+            const size = Math.max(1e-8, projection.pixelSize * 14);
             for (const entry of this.hudEntries) {
                 this.restoreMarker(entry.controller);
+                this.ensureMarkerVisible(entry.controller);
                 const row = hudRowScreenPosition(
-                    projection.screen, startRow + textCount + entry.index);
-                const world = projection.worldAt(row.x - 14, row.y);
+                    projection.screen, startRow + textCount + entry.index,
+                    projection.viewport, hudLayout?.totalRows);
+                // Cover the whole HUD control row instead of a tiny 14px
+                // dot. Cocos Gizmo Kit similarly uses invisible handle quads.
+                const grid = projection.viewport ?
+                    hudGrid(projection.viewport,
+                        Math.max(hudLayout?.totalRows || 0, startRow + textCount +
+                            this.hudEntries.length)) : null;
+                const hitWidth = grid ? Math.max(40, grid.columnWidth - 28) : 14;
+                const world = projection.worldAt(
+                    grid ? row.x + hitWidth * 0.5 : row.x - 14, row.y);
                 entry.controller.setPosition?.(world);
-                setMarkerSize(entry.controller, size);
+                setMarkerSize(entry.controller,
+                    grid ? projection.pixelSize * hitWidth : size,
+                    grid ? projection.pixelSize * 21 : size,
+                    grid ? projection.pixelSize * 6 : size);
             }
         }
 
@@ -689,16 +795,20 @@ function createEditorGizmo(
         }
 
         public isHandleVisible(): boolean { return this.shown; }
+        public isHandleDisposed(): boolean { return this.destroyed; }
 
         public onShow(): void {
+            if (this.destroyed) return;
             this.shown = true;
             this.refreshHandles();
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 if (!this.unavailableMarkers.has(controller)) {
                     controller.show?.();
+                    this.ensureMarkerVisible(controller);
                     this.registerController(controller);
                 }
             }
+            this.updateMarkers();
         }
 
         public onHide(): void {
@@ -733,15 +843,21 @@ function createEditorGizmo(
 
         private clearEntries(): void {
             for (const { controller, key } of [...this.entries, ...this.hudEntries]) {
-                this.unregisterController(controller);
-                controller.removeHandle?.(key);
-                controller.hide?.();
+                try {
+                    this.unregisterController(controller);
+                    controller.removeHandle?.(key);
+                    controller.hide?.();
+                } catch (error) {
+                    // The Editor can destroy a controller during a Scene switch.
+                    console.warn('[cocos-gizmos/handles] Discarding a stale controller:', error);
+                }
             }
             this.entries.length = 0;
             this.hudEntries.length = 0;
         }
 
         public onDestroy(): void {
+            this.destroyed = true;
             this.finish(true);
             this.finishHud(true);
             this.shown = false;
@@ -792,16 +908,22 @@ export function createPositionHandleAdapter(
     }
 
     function show(component: Component): any {
+        // Explicitly re-activate on every selection entry, including
+        // A -> no selection -> A. Merely calling gizmo.show() on the stale
+        // component reference does not re-register native Scene operation
+        // picking after an empty selection in Creator 3.8.8.
         let gizmo = (component as any).gizmo;
-        if (!(gizmo instanceof gizmoConstructor)) {
-            try {
-                manager.showComponentGizmo?.(component);
-                gizmo = (component as any).gizmo;
-            } catch {
-                // Use the component pool API when selection has no existing Gizmo.
-            }
+        try {
+            manager.showComponentGizmo?.(component);
+            const mounted = (component as any).gizmo;
+            if (mounted instanceof gizmoConstructor) gizmo = mounted;
+        } catch {
+            // Use createGizmo when Editor keeps a stale component link.
         }
-        if (!(gizmo instanceof gizmoConstructor) && typeof manager.createGizmo === 'function') {
+        if (!(gizmo instanceof gizmoConstructor) || gizmo.isHandleDisposed?.()) {
+            gizmo = null;
+        }
+        if (!gizmo && typeof manager.createGizmo === 'function') {
             for (const key of selectedKeys(component)) {
                 try {
                     gizmo = manager.createGizmo(key, component) || (component as any).gizmo;
@@ -811,7 +933,7 @@ export function createPositionHandleAdapter(
                 }
             }
         }
-        if (!(gizmo instanceof gizmoConstructor)) return null;
+        if (!(gizmo instanceof gizmoConstructor) || gizmo.isHandleDisposed?.()) return null;
         gizmo.show?.();
         // Some Editor Gizmo implementations do not dispatch onShow when
         // reusing a previously hidden component Gizmo. Restore it explicitly.
@@ -824,8 +946,22 @@ export function createPositionHandleAdapter(
         refresh(components, selected, now) {
             const selectionChanged = selected.size !== lastSelection.size ||
                 [...selected].some((id) => !lastSelection.has(id));
-            // A rapid A -> B -> A selection must not be swallowed by the
-            // discovery throttle; selection is a lifecycle event, not a scan.
+            // Paint every Scene tick. 2D Graphics are cleared at lateUpdate,
+            // whereas registering native Controller instances can be throttled.
+            // A rapid A -> B -> A selection still bypasses the controller scan.
+            // Visual markers must not disappear even when the Editor replaces
+            // the native component Gizmo or temporarily unmounts its cube.
+            for (const component of components) {
+                if (component?.isValid && component.enabled &&
+                    component.node?.activeInHierarchy &&
+                    selected.has(component.node.uuid)) {
+                    try { drawSelectedPositionMarkers(component); }
+                    catch (error) {
+                        console.warn('[cocos-gizmos/handles] Cannot paint position markers:', error);
+                    }
+                }
+            }
+            // Native Gizmo discovery and activation are heavier than painting.
             if (!selectionChanged && now - latestScan < 250) return;
             lastSelection = new Set(selected);
             latestScan = now;
@@ -849,7 +985,11 @@ export function createPositionHandleAdapter(
                 if (!installed) continue;
                 const previous = active.get(component);
                 if (previous) {
-                    if (previous.isHandleVisible?.() === false) {
+                    // Creator can replace component.gizmo while the adapter still
+                    // holds the previous instance after an A -> B -> A selection.
+                    if (previous !== (component as any).gizmo ||
+                        previous.isHandleDisposed?.() ||
+                        previous.isHandleVisible?.() === false) {
                         const restored = show(component);
                         if (restored) active.set(component, restored);
                         else active.delete(component);

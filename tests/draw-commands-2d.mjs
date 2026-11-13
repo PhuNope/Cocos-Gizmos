@@ -92,9 +92,9 @@ Color.WHITE = new Color(255, 255, 255);
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
     static transformMat4(out, point, matrix) {
-        out.x = point.x + (matrix?.position?.x || 0);
-        out.y = point.y + (matrix?.position?.y || 0);
-        out.z = point.z + (matrix?.position?.z || 0);
+        out.x = point.x * (matrix?.scale?.x || 1) + (matrix?.position?.x || 0);
+        out.y = point.y * (matrix?.scale?.y || 1) + (matrix?.position?.y || 0);
+        out.z = point.z * (matrix?.scale?.z || 1) + (matrix?.position?.z || 0);
         return out;
     }
 }
@@ -273,5 +273,36 @@ Gizmos2D.drawLabel(rootNode, 'zoom-bound', 'Fixed readable size',
 debug.lateUpdate(0);
 assert.ok(Math.abs(zoomLabel.node.scale[0].x - 12) < 1e-7,
     'Far zoom must enforce minimum 12 screen pixels');
+
+// A parent Canvas with non-uniform scale must clamp the *Y* font height.
+// Sampling world-X and multiplying only worldScale.x made zoom-dependent
+// text shrink/grow incorrectly on scaled and rotated Scene nodes.
+debug.node.worldMatrix = {
+    position: new Vec3(), scale: new Vec3(2, 4, 1),
+};
+viewCamera.pixelWorld = 0.5;
+Gizmos2D.drawLabel(rootNode, 'zoom-bound', 'Transformed parent',
+    { x: 0, y: 0 }, 20, Vec2.ONE, 12, 24);
+debug.lateUpdate(0);
+assert.ok(Math.abs(zoomLabel.node.scale[0].y - 0.15) < 1e-8,
+    'Actual transformed label Y basis clamps the rendered height to 24px');
+debug.node.worldMatrix = undefined;
+
+// Prefer public cce.Camera.camera component when private renderer is also
+// exposed: Scene-view pan/zoom coordinates must not be mixed between cameras.
+const direct = {
+    pixelWorld: 0.01,
+    worldToScreen(world, out) {
+        out.x = world.x / this.pixelWorld;
+        out.y = world.y / this.pixelWorld;
+        out.z = 1;
+    },
+};
+moduleSandbox.cce.Camera.camera = direct;
+Gizmos2D.drawLabel(rootNode, 'zoom-bound', 'Active Scene camera',
+    { x: 0, y: 0 }, 20, Vec2.ONE, 12, 24);
+debug.lateUpdate(0);
+assert.ok(Math.abs(zoomLabel.node.scale[0].y - 0.012) < 1e-8,
+    '2D label bounds use active Scene camera rather than stale private render camera');
 
 console.log('[draw-commands-2d] 164 paths/one stroke, local/world endpoints, render-state partitioning, idle reuse OK');

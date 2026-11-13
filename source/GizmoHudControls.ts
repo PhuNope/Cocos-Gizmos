@@ -85,9 +85,35 @@ export function hudControlLayoutSignature(controls: readonly HudControl[]): stri
     }));
 }
 
-export function hudRowScreenPosition(anchor: { x: number; y: number }, index: number): {
-    x: number; y: number;
+/** Canvas HUD and native picking handles share this bottom-viewport grid. */
+export function hudGrid(viewport: { width: number; height: number }, count: number): {
+    rows: number; columns: number; columnWidth: number; height: number;
 } {
+    const width = Math.max(220, viewport.width);
+    const maxRows = Math.max(3, Math.min(8, Math.floor(viewport.height * 0.34 / 26)));
+    const columns = Math.max(1, Math.ceil(Math.max(1, count) / maxRows));
+    const rows = Math.ceil(Math.max(1, count) / columns);
+    return {
+        rows, columns, columnWidth: width / columns,
+        height: rows * 26 + 22,
+    };
+}
+
+/** Coordinates are bottom-left origin, matching cc.Camera screenPointToRay. */
+export function hudRowScreenPosition(
+    anchor: { x: number; y: number }, index: number,
+    viewport?: { width: number; height: number }, totalRows?: number,
+): { x: number; y: number } {
+    if (viewport && Number.isFinite(viewport.width) && Number.isFinite(viewport.height) &&
+        viewport.width > 220 && viewport.height > 120) {
+        const grid = hudGrid(viewport, Math.max(index + 1, totalRows || index + 1));
+        const column = Math.floor(index / grid.rows);
+        const row = index % grid.rows;
+        return {
+            x: 14 + column * grid.columnWidth,
+            y: grid.height - 14 - row * 26,
+        };
+    }
     return {
         x: anchor.x + HUD_ROW_OFFSET_X,
         y: anchor.y + HUD_ROW_OFFSET_Y - index * HUD_ROW_HEIGHT,

@@ -32,6 +32,7 @@ vm.runInNewContext(compile('SceneGizmoInput'), gizmoInput);
 const cameraBridge = { exports: {} };
 vm.runInNewContext(compile('SceneCameraBridge'), cameraBridge);
 const events = [];
+const visibleDots = { canvas: [], scene3d: [] };
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
     set(x, y, z) { Object.assign(this, { x, y, z }); }
@@ -144,7 +145,16 @@ const sandbox = {
     cce: { Camera: { _camera: { camera: cam } }, Gizmo: manager, Engine: { repaintInEditMode() {} } },
     console: { warn(...args) { throw new Error(args.join(' ')); } },
     require(name) {
-        if (name === 'cc') return { Color, Vec3, Quat, Layers: { Enum: { GIZMOS: 4 } }, Component: class {} };
+        if (name === 'cc') return { Color, Vec3, Quat, Layers: { Enum: { GIZMOS: 4, UI_2D: 16 } }, RenderRoot2D: class {}, Component: class {} };
+        if (name === './Gizmos2D') return { Gizmos2D: {
+            DEFAULT_LAYER: 4, DEFAULT_COLOR: {},
+            beginLayer() {}, beginLocalPosition() {}, endLocalPosition() {},
+            beginColor() {}, drawSolidEllipse(...args) { visibleDots.canvas.push(args); },
+        } };
+        if (name === './Gizmos3D') return { Gizmos3D: {
+            DEFAULT_COLOR: {}, setDepTest() {}, beginColor() {},
+            drawSphere(...args) { visibleDots.scene3d.push(args); },
+        } };
         if (name === './PositionDragSolver') return math.exports;
         if (name === './GizmoEditSession') return edits.exports;
         if (name === './GizmoHudControls') return hud.exports;
@@ -161,6 +171,8 @@ assert.equal(adapter.status().reason, 'not-initialized');
 const selected = new Set([node.uuid]);
 adapter.refresh([component], selected, 1000);
 assert.equal(adapter.status().active, 1, 'A selected component must display its Gizmo');
+assert.ok(visibleDots.scene3d.length >= 1,
+    'Selected marker is explicitly drawn, independent of native BoxController mesh');
 assert.equal(adapter.status().registered, 2, 'Register both plain and cc-prefixed Cocos component names');
 assert.ok(componentPool.typeDefs['cc.ProbePosition']);
 const gizmo = component.gizmo;
@@ -272,11 +284,33 @@ assert.equal(adapter.status().active, 1, 'Reselecting a Node restores its Gizmo 
 assert.equal(gizmo.isHandleVisible(), true);
 assert.equal(ctrl.registerCount, 3, 'Reselection reinstalls the owning controller listener');
 assert.equal(ctrl._cubeNode.active, true);
+// Cocos Editor may hide the picking MeshRenderer without calling onHide.
+ctrl._cubeNode.active = false;
+ctrl._cubeNodeMR.enabled = false;
+gizmo.refreshHandles();
+assert.equal(ctrl._cubeNode.active, true, 'Hidden picking cube is restored on refresh');
+assert.equal(ctrl._cubeNodeMR.enabled, true, 'Marker MeshRenderer is re-enabled');
+ctrl._cubeNode.active = false;
+gizmo.onShow();
+assert.equal(ctrl._cubeNode.active, true, 'Repeated show restores the native marker');
+
 gizmo.hide(); // Cocos may hide a Gizmo directly on a Scene selection event.
 assert.equal(gizmo.isHandleVisible(), false);
 adapter.refresh([component], selected, 1600);
 assert.equal(gizmo.isHandleVisible(), true, 'Refresh restores a Gizmo hidden by native Editor selection');
 assert.equal(adapter.status().active, 1);
+// Native Editor may replace component.gizmo on the same Component.
+const previousGizmo = component.gizmo;
+const replacement = new componentPool.typeDefs.ProbePosition();
+replacement.target = component;
+replacement.init();
+component.gizmo = replacement;
+adapter.refresh([component], new Set(), 1601);
+adapter.refresh([component], selected, 1602);
+assert.equal(adapter.status().active, 1);
+assert.equal(component.gizmo, replacement);
+assert.equal(replacement.isHandleVisible(), true,
+    'Adapter adopts replacement native Gizmo instance after Scene selection');
 const restoredListeners = ctrl.registerCount;
 adapter.refresh([component], selected, 1616);
 assert.equal(ctrl.registerCount, restoredListeners,
@@ -297,6 +331,19 @@ ctrl.onMouseDown({ handleName: 'position:target:single' });
 assert.equal(adapter.status().input.missingPointer, missingBefore + 1,
     'Missing Cocos pointer coordinates are explicitly diagnosed');
 gizmo.onHide();
+// Creator can destroy the native instance when selection becomes empty.
+// The same Node must get a fresh Controller when selected again.
+adapter.refresh([component], selected, 1700);
+const destroyedHandle = component.gizmo;
+destroyedHandle.onDestroy();
+assert.equal(destroyedHandle.isHandleDisposed(), true);
+adapter.refresh([component], new Set(), 1710);
+adapter.refresh([component], selected, 1720);
+assert.notEqual(component.gizmo, destroyedHandle,
+    'Empty -> same-node reentry recreates a native Gizmo destroyed by the Editor');
+assert.equal(component.gizmo.isHandleVisible(), true);
+assert.ok(component.gizmo.controllers[0]._cubeNode.active,
+    'Fresh picking marker is active after complete deselection');
 adapter.dispose();
 assert.equal(adapter.status().reason, 'disposed');
 assert.equal(componentPool.typeDefs.ProbePosition, undefined,

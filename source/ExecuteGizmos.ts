@@ -19,6 +19,7 @@ interface PresentationAdapter {
     planFrame?(components: readonly Component[], selected: ReadonlySet<string>,
         onError?: (component: Component, hook: string, error: unknown) => void): void;
     clearFrame?(): void;
+    finishFrame?(): void;
 }
 
 let positionHandles: PositionHandleAdapter | null = null;
@@ -34,6 +35,7 @@ export function setPresentationAdapter(adapter: PresentationAdapter | null): voi
 let running: {
     stats: UpdateStats;
     scheduler: { stop(): void; tickOnce(): void };
+    forceSelection: (values: string[]) => void;
     dispose: () => void;
 } | null = null;
 
@@ -55,9 +57,14 @@ const SELECTION_POLL_INTERVAL_MS = 32;
 
 class SelectedNodeCache {
     private previous = { ids: new Set<string>(), available: false };
+    private mainSelection: { ids: Set<string>; available: true } | null = null;
     private lastCheckedAt = -Infinity;
 
     public get(now: number): { ids: Set<string>; available: boolean } {
+        // Main-process selection events are authoritative once received.
+        // Scene Editor.Selection can report a stale empty array after the
+        // user clicks a selected node again, overriding a restored Gizmo.
+        if (this.mainSelection) return this.mainSelection;
         if (now - this.lastCheckedAt >= SELECTION_POLL_INTERVAL_MS) {
             this.previous = selectedNodes();
             this.lastCheckedAt = now;
@@ -65,7 +72,14 @@ class SelectedNodeCache {
         return this.previous;
     }
 
+    public force(ids: string[]): void {
+        this.mainSelection = { ids: new Set(ids), available: true };
+        this.previous = this.mainSelection;
+        this.lastCheckedAt = Date.now();
+    }
+
     public clear(): void {
+        this.mainSelection = null;
         this.previous = { ids: new Set<string>(), available: false };
         this.lastCheckedAt = -Infinity;
     }
@@ -205,6 +219,8 @@ export function start(): UpdateStats {
                 catch (error) { warnOnce('onGizmoHud (' + comp.constructor?.name + ')', error); }
             }
         }
+        try { presentation?.finishFrame?.(); }
+        catch (error) { warnOnce('Screen HUD flush failed', error); }
     }
     const scheduler = new SceneUpdateScheduler({
         now: () => Date.now(),
@@ -221,6 +237,10 @@ export function start(): UpdateStats {
     running = {
         stats,
         scheduler,
+        forceSelection: (selected) => {
+            selectionCache.force(selected);
+            scheduler.tickOnce();
+        },
         dispose: () => {
             registry.clear();
             selectionCache.clear();
@@ -250,5 +270,12 @@ export function status(): UpdateStats | { started: false } {
 }
 export function tickOnce(): UpdateStats | { started: false } {
     if (running) running.scheduler.tickOnce();
+    return status();
+}
+
+/** React immediately to main-process Scene selection events (including empty). */
+export function syncSelection(selected: unknown): UpdateStats | { started: false } {
+    if (running) running.forceSelection(Array.isArray(selected) ?
+        selected.filter((id): id is string => typeof id === 'string') : []);
     return status();
 }

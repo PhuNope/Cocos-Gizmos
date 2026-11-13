@@ -47,6 +47,15 @@ export class GizmoHudLayout {
         return this.placements.get(component) || null;
     }
 
+    /** Rows allocated for all selected HUD components in the Scene. */
+    public get totalRows(): number {
+        let total = 0;
+        for (const placement of this.placements.values()) {
+            total = Math.max(total, placement.startRow + placement.rowCount);
+        }
+        return total;
+    }
+
     public clear(): void {
         this.placements.clear();
     }

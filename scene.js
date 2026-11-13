@@ -40,6 +40,7 @@ exports.unload = function unload() {
 exports.methods = {
     gizmosStatus() { return updater ? updater.status() : { started: false }; },
     gizmosTick() { return updater ? updater.tickOnce() : { started: false }; },
+    gizmosSelectionChanged(selected) { return updater ? updater.syncSelection(selected) : { started: false }; },
     gizmosHandleStatus() { return handles ? handles.status() : { registered: 0, active: 0, reason: 'not-loaded' }; },
     gizmosGetViewSettings() { return presentation ? presentation.getSettings() : { display: 'always', hud: 'selected' }; },
     gizmosSetViewSettings(value) { return presentation ? presentation.configure(value) : { display: 'always', hud: 'selected' }; },

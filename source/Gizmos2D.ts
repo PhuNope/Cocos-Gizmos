@@ -196,18 +196,27 @@ class GizmosDebugDraw extends Component {
             (!Number.isFinite(minSize) && !Number.isFinite(maxSize))) return scale;
         const global = globalThis as any;
         const editor = (global.window?.cce || global.cce)?.Camera;
-        const wrapped = editor?._camera?.camera || editor?.camera?.camera;
-        const raw = wrapped || editor?.camera;
+        const direct = editor?.camera;
+        const wrapped = editor?._camera?.camera || direct?.camera;
+        // Use the public Scene view component camera if available. The private
+        // render camera can use different viewport/pointer coordinates.
+        const raw = typeof direct?.worldToScreen === 'function' ? direct : wrapped;
         if (typeof raw?.worldToScreen !== 'function') return scale;
         try {
             const world = new Vec3(position.x, position.y, 0);
             if (local) Vec3.transformMat4(world, world, this.node.worldMatrix);
+            // Sample the actual transformed Label Y basis, not world X.
+            // This includes parent non-uniform scale and rotated 2D nodes.
+            const origin = Vec3.transformMat4(new Vec3(), new Vec3(), this.node.worldMatrix);
+            const unitY = Vec3.transformMat4(new Vec3(), new Vec3(0, 1, 0), this.node.worldMatrix);
+            const neighbor = new Vec3(world.x + unitY.x - origin.x,
+                world.y + unitY.y - origin.y, world.z + unitY.z - origin.z);
             const pointA = new Vec3();
             const pointB = new Vec3();
-            const neighbor = new Vec3(world.x + 1, world.y, world.z);
-            const renderer = !!wrapped ||
+            const renderer = (raw === wrapped && raw !== direct) ||
                 typeof raw.initGeometryRenderer === 'function' ||
-                raw.geometryRenderer !== undefined || raw.matViewProj !== undefined;
+                raw.geometryRenderer !== undefined || raw.matViewProj !== undefined ||
+                raw.projectionType !== undefined;
             if (renderer) {
                 raw.worldToScreen(pointA, world);
                 raw.worldToScreen(pointB, neighbor);
@@ -215,11 +224,8 @@ class GizmosDebugDraw extends Component {
                 raw.worldToScreen(world, pointA);
                 raw.worldToScreen(neighbor, pointB);
             }
-            const pixelsPerWorld = Math.hypot(pointB.x - pointA.x, pointB.y - pointA.y);
-            const worldScale = this.node.worldScale;
-            const parentFactor = worldScale?.x && Number.isFinite(worldScale.x) ?
-                Math.abs(worldScale.x) : 1;
-            const currentPixels = fontSize * Math.abs(scale.x) * parentFactor * pixelsPerWorld;
+            const pixelsPerLocalY = Math.hypot(pointB.x - pointA.x, pointB.y - pointA.y);
+            const currentPixels = fontSize * Math.abs(scale.y) * pixelsPerLocalY;
             if (!Number.isFinite(currentPixels) || currentPixels <= 1e-8) return scale;
             const minimum = Number.isFinite(minSize) ? Math.max(1, minSize as number) : 1;
             const maximum = Number.isFinite(maxSize) ?
