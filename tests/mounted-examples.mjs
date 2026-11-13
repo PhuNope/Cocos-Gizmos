@@ -53,10 +53,11 @@ for (const { src, oldName, name, uuid } of samples) {
     const relative = 'editor-assets/Examples/' + name + '.ts';
     const mounted = read(relative);
     const original = read(src);
-    const expected = original.replace("@ccclass('" + oldName + "')",
+    let expected = original.replace("@ccclass('" + oldName + "')",
         "@ccclass('" + name + "')").replace('class ' + oldName + ' extends Component',
         'class ' + name + ' extends Component')
         .replace("from '../dist/RegisterGizmos'", "from '../RegisterGizmos'");
+    if (oldName === 'GizmosDecoratorTest') expected = expected.replaceAll(oldName, name);
     assert.equal(mounted.endsWith(expected), true,
         name + ' must stay in sync with its corresponding project example');
     assert.match(mounted, /import\s*{[^}]*Component[^}]*}\s*from\s*['"]cc['"]/s);
