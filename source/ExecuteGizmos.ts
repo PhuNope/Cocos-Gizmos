@@ -139,11 +139,17 @@ export function start(): UpdateStats {
     let activeScene: Node | null = null;
     let firstComponentLog = false;
     let sceneTransitioning = false;
+    let transitionStarted = -Infinity;
+    let transitionCandidate: Node | null = null;
+    let stableEngineFrames = 0;
     const beforeSceneLaunch = (): void => {
         // The next scene may throw in Mask.onLoad() before AFTER_SCENE_LAUNCH
         // or the next update tick. Release old Scene picking proxies now,
         // while their Node and BoxController resources are still valid.
         sceneTransitioning = true;
+        transitionStarted = Date.now();
+        transitionCandidate = null;
+        stableEngineFrames = 0;
         selectionCache.clear();
         registry.clear();
         try { positionHandles?.clear?.(); }
@@ -157,6 +163,8 @@ export function start(): UpdateStats {
         // Re-scan and mount fresh editable +Y faces only after activation
         // succeeded. This callback is never reached if Mask.onLoad throws.
         sceneTransitioning = false;
+        transitionCandidate = null;
+        stableEngineFrames = 0;
         registry.clear();
         selectionCache.clear();
         activeScene = null;
@@ -169,10 +177,39 @@ export function start(): UpdateStats {
         console.error('[cocos-gizmos/updater] ' + key, error);
     }
     function update(source: string): void {
-        // A Mask.onLoad exception can abort new-scene activation while
-        // director.getScene() is already pointing to a partial Scene.
-        // Even engine ticks must not mount Gizmos before AFTER_SCENE_LAUNCH.
-        if (sceneTransitioning) return;
+        // Editor scene tabs with unsaved changes sometimes skip the native
+        // AFTER_SCENE_LAUNCH event. Waiting forever disables native handles
+        // until the extension is restarted. Recover only after a new Scene
+        // root has stayed active for 3 engine frames and >=500ms. Do not use
+        // watchdog ticks, which can run against a half-activated Scene.
+        if (sceneTransitioning) {
+            if (source !== 'engine') return;
+            let candidate: Node | null = null;
+            try { candidate = director.getScene(); }
+            catch { return; }
+            if (!candidate || candidate.isValid === false ||
+                candidate.active === false || candidate.activeInHierarchy === false) {
+                transitionCandidate = null;
+                stableEngineFrames = 0;
+                return;
+            }
+            if (candidate !== transitionCandidate) {
+                transitionCandidate = candidate;
+                stableEngineFrames = 1;
+            } else {
+                stableEngineFrames++;
+            }
+            if (Date.now() - transitionStarted < 500 || stableEngineFrames < 3) return;
+            // A stable, activated Scene is the recovery condition when the
+            // official AFTER event is absent. Never reuse old component or
+            // selection snapshots after this transition.
+            sceneTransitioning = false;
+            transitionCandidate = null;
+            stableEngineFrames = 0;
+            registry.clear();
+            selectionCache.clear();
+            activeScene = null;
+        }
         stats.frames++;
         stats.lastSource = source;
         if (source === 'engine') stats.engineFrames++;
