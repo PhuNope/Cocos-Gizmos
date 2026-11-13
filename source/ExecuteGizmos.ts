@@ -122,6 +122,7 @@ class GizmoComponentRegistry {
 
 export function start(): UpdateStats {
     stop();
+    lastSelectionRevision = -1;
     const stats: UpdateStats = {
         started: true, frames: 0, components: 0, drawn: 0, selectedDrawn: 0,
         scene: null, selectionApi: false, lastSource: null, errors: 0,
@@ -274,7 +275,11 @@ export function tickOnce(): UpdateStats | { started: false } {
 }
 
 /** React immediately to main-process Scene selection events (including empty). */
-export function syncSelection(selected: unknown): UpdateStats | { started: false } {
+let lastSelectionRevision = -1;
+export function syncSelection(selected: unknown, revision?: unknown): UpdateStats | { started: false } {
+    const sequence = typeof revision === 'number' && Number.isFinite(revision) ? revision : undefined;
+    if (sequence !== undefined && sequence < lastSelectionRevision) return status();
+    if (sequence !== undefined) lastSelectionRevision = sequence;
     if (running) running.forceSelection(Array.isArray(selected) ?
         selected.filter((id): id is string => typeof id === 'string') : []);
     return status();
