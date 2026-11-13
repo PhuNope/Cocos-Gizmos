@@ -323,13 +323,16 @@ class GizmosDebugDraw extends Component {
     private worldUnitsPerScreenPixel(world: Vec3): number | null {
         const global = globalThis as any;
         const editor = (global.window?.cce || global.cce || cce)?.Camera;
-        const wrapped = editor?._camera?.camera || editor?.camera?.camera;
-        const raw = wrapped || editor?.camera;
+        const direct = editor?.camera;
+        const wrapped = editor?._camera?.camera || direct?.camera;
+        const raw = typeof direct?.worldToScreen === 'function' &&
+            typeof direct?.screenPointToRay === 'function' ? direct : wrapped;
         if (typeof raw?.worldToScreen !== 'function' ||
             typeof raw?.screenPointToRay !== 'function') return null;
-        const rendererCamera = !!wrapped ||
+        const rendererCamera = (raw === wrapped && raw !== direct) ||
             typeof raw.initGeometryRenderer === 'function' ||
-            raw.geometryRenderer !== undefined || raw.matViewProj !== undefined;
+            raw.geometryRenderer !== undefined || raw.matViewProj !== undefined ||
+            raw.projectionType !== undefined;
         try {
             const screen = new Vec3();
             if (rendererCamera) raw.worldToScreen(screen, world);
