@@ -7,6 +7,8 @@ type Ray = { o: Vec3; d: Vec3 };
 export interface SceneHudCamera {
     node?: { forward?: Vec3 };
     viewport?: { width: number; height: number };
+    /** Refresh private renderer matrices after Scene wheel/pan before ray projection. */
+    sync?(): void;
     worldToScreen(point: Vec3, out: Vec3): void;
     screenPointToRay(x: number, y: number, ray: Ray): Ray | void;
 }
