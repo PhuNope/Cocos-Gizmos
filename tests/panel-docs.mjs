@@ -16,8 +16,24 @@ assert.match(doc.template, /Gizmos2D\.point/);
 assert.match(doc.template, /onGizmoHudControls/);
 assert.match(doc.template, /<svg[^>]+role="img"/);
 assert.match(doc.style, /cg-api-card/);
-assert.equal((doc.template.match(/class="cg-api-card"/g) || []).length, 8,
-    'OpenDoc ships eight interactive API cards with diagrams and code');
+assert.equal((doc.template.match(/class="cg-api-card"/g) || []).length, 12,
+    'OpenDoc ships twelve API cards, including four callback examples');
+for (const callback of ['onGizmoChanged', 'onGizmoHudChanged', 'onGizmoHudAction',
+    'onRestore', 'GizmoHandlePhase']) {
+    assert.ok(doc.template.includes(callback), 'OpenDoc documents ' + callback);
+}
+for (const phase of ['begin', 'update', 'end', 'cancel']) {
+    assert.ok(doc.template.includes(phase),
+        'OpenDoc documents the drag phase ' + phase);
+}
+assert.match(doc.template, /data-doc-group="callbacks"/,
+    'Callback cards are filterable in their own category');
+assert.match(doc.template, /index === undefined/,
+    'Array handle callbacks document missing indices');
+assert.match(doc.template, /setWorldPosition/,
+    'Move callback example synchronizes the actual Scene Node');
+assert.match(doc.template, /cg-notes/,
+    'Callback phase guidance is rendered alongside code');
 assert.ok(!doc.template.includes('<script'), 'No untrusted remote scripting');
 
 const originalEditor = globalThis.Editor;
@@ -46,8 +62,9 @@ try {
         { dataset: { docGroup: 'start', docSearch: 'onDrawGizmos begin color' }, hidden: false },
         { dataset: { docGroup: 'handles', docSearch: 'Gizmos3D.move plane arrow' }, hidden: false },
         { dataset: { docGroup: 'hud', docSearch: 'onGizmoHud slider toggle' }, hidden: false },
+        { dataset: { docGroup: 'callbacks', docSearch: 'onGizmoChanged phase update cancel' }, hidden: false },
     ];
-    const tabs = ['all', 'start', '2d', '3d', 'handles', 'hud'].map(id => {
+    const tabs = ['all', 'start', '2d', '3d', 'handles', 'callbacks', 'hud'].map(id => {
         const node = target();
         node.dataset.docTab = id;
         return node;
@@ -58,12 +75,19 @@ try {
     elements.tabs.querySelectorAll = () => tabs;
     const host = { $: elements };
     doc.ready.call(host);
-    assert.equal(cards.filter(c => !c.hidden).length, 3);
+    assert.equal(cards.filter(c => !c.hidden).length, 4);
     elements.search.value = 'move';
     elements.search.trigger('input');
-    assert.deepEqual(cards.map(x => x.hidden), [true, false, true]);
+    assert.deepEqual(cards.map(x => x.hidden), [true, false, true, true]);
     elements.tabs.trigger('click', { target: { closest() { return tabs[4]; } } });
     assert.equal(tabs[4].attrs['aria-pressed'], 'true');
+    assert.equal(elements.empty.hidden, true);
+    elements.search.value = 'cancel';
+    elements.tabs.trigger('click', { target: { closest() { return tabs[5]; } } });
+    elements.search.trigger('input');
+    assert.deepEqual(cards.map(x => x.hidden), [true, true, true, false],
+        'Callback tab supports searching by phase');
+    assert.equal(tabs[5].attrs['aria-pressed'], 'true');
     assert.equal(elements.empty.hidden, true);
     elements.search.value = 'invalid-query';
     elements.search.trigger('input');

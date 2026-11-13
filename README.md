@@ -4,7 +4,9 @@
 
 Open **Gizmos → OpenDoc** (next to **Reset Gizmos**) to browse the dockable
 API guide for Gizmos2D, Gizmos3D, Move/Point handles and HUD callbacks. It includes
-searchable TypeScript examples and self-contained SVG diagrams. It does not need
+searchable TypeScript examples and self-contained SVG diagrams.
+The **Callbacks** tab explains Gizmo lifecycle hooks, begin/update/end/cancel
+phases, Vec3[] index handling, Scene Node synchronization and HUD actions. It does not need
 Internet access and does not change project Scene assets.
 
 The installable extension ZIP does **not** bundle the repository `docs/`
