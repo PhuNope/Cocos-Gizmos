@@ -191,6 +191,9 @@ const solver = evaluate('PositionDragSolver');
 const planes = evaluate('PlaneHandleGeometry');
 const axes = evaluate('AxisHandleGeometry');
 const edit = evaluate('GizmoEditSession');
+const commands = evaluate('GizmoMoveCommand', {
+    './GizmoEditSession': edit, './PositionDragSolver': solver,
+});
 const controls = evaluate('GizmoHudControls');
 const presentation = { normalizeHudItems(value) { return value; } };
 const layoutModule = evaluate('GizmoHudLayout', {
@@ -277,6 +280,7 @@ const sandbox = {
             } },
             './PositionDragSolver': solver,
             './PlaneHandleGeometry': planes, './AxisHandleGeometry': axes,
+            './GizmoMoveCommand': commands,
             './GizmoEditSession': edit,
             './GizmoHudControls': controls, './GizmoHudProjection': projection,
             './GizmoPresentation': presentation, './GizmoHudLayout': layoutModule,
