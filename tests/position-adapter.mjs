@@ -10,6 +10,8 @@ const compile = name => ts.transpileModule(
     readFileSync(path.join(root, 'source', name + '.ts'), 'utf8'),
     { compilerOptions: { target: ts.ScriptTarget.ES2017, module: ts.ModuleKind.CommonJS } },
 ).outputText;
+const planes = { exports: {} };
+vm.runInNewContext(compile('PlaneHandleGeometry'), planes);
 const math = { exports: {} };
 vm.runInNewContext(compile('PositionDragSolver'), math);
 const edits = { exports: {} };
@@ -47,6 +49,7 @@ vm.runInNewContext(compile('GizmoHudProjection'), {
     exports: projection.exports,
     require(name) {
         if (name === 'cc') return { Vec3 };
+        if (name === './PlaneHandleGeometry') return planes.exports;
         if (name === './PositionDragSolver') return math.exports;
         throw new Error('Unknown projection import ' + name);
     },
@@ -185,6 +188,8 @@ const sandbox = {
         if (name === './Gizmos3D') return { Gizmos3D: {
             DEFAULT_COLOR: {}, setDepTest() {}, beginColor() {},
             drawSphere(...args) { visibleDots.scene3d.push(args); },
+            drawQuad(...args) { visibleDots.scene3d.push(args); },
+            drawLine() {},
         } };
         if (name === './PositionDragSolver') return math.exports;
         if (name === './GizmoEditSession') return edits.exports;
