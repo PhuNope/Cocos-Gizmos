@@ -277,8 +277,8 @@ assert.ok(cam.updates > syncBefore,
     'The Scene camera is synchronized before the post-pan raycast');
 gizmo.onNotGizmoMouseMove({ buttons: 1, x: 100, y: -15 });
 gizmo.onNotGizmoMouseUp({ button: 0 });
-assert.deepEqual([component.target.x, component.target.y], [175, 15],
-    'Marker remains draggable at its panned screen location');
+assert.deepEqual([component.target.x, component.target.y], [180, 20],
+    'Marker remains draggable at its panned screen location with snap=10');
 component.target = new Vec3(150, 0, 0);
 cam.panX = 0;
 cam.panY = 0;
