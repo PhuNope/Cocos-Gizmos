@@ -863,7 +863,7 @@ assert.ok(rayGizmo.controllers.slice(0, 3).every(ctrl =>
     ctrl._cubeNode.active === false && ctrl._cubeNodeMR.enabled === false),
     'Ray Gizmo hides chunky native BoxController points');
 const xNative = rayGizmo.controllers[0]._editHandlesShape.children[1];
-assert.ok(xNative.lastScale?.[0] > xNative.lastScale?.[1],
+assert.ok(xNative.lastScale?.[0]?.x > xNative.lastScale?.[0]?.y,
     'Invisible arrow pick proxy covers a long screen-aligned strip');
 assert.ok(rayGizmo.controllers.every(ctrl =>
     ctrl._editHandlesShape.children[1].active === true),
