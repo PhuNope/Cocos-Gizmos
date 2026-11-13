@@ -1,10 +1,24 @@
-import { Color, Component } from 'cc';
+import { Color, Component, Layers, RenderRoot2D, Vec2, Vec3 } from 'cc';
 import { Gizmos3D } from './Gizmos3D';
+import { Gizmos2D } from './Gizmos2D';
 import { GizmoHudText } from './GizmoPresentation';
 import { hudRowScreenPosition } from './GizmoHudControls';
 import { createSceneHudProjection, SceneHudCamera } from './GizmoHudProjection';
 import type { GizmoHudPlacement } from './GizmoHudLayout';
 import { resolveSceneCamera } from './SceneCameraBridge';
+
+function isUnder2DRenderRoot(node: any): boolean {
+    for (let current = node; current; current = current.parent) {
+        if (typeof current.getComponent === 'function' &&
+            current.getComponent(RenderRoot2D)) return true;
+    }
+    return false;
+}
+
+/** A HUD label has a bounded size in actual on-screen pixels. */
+export function hudTextPixels(size: number, minimum = 12, maximum = 24): number {
+    return Math.min(maximum, Math.max(minimum, size));
+}
 
 function sceneCamera(): SceneHudCamera | null {
     const global = globalThis as any;
@@ -31,7 +45,16 @@ export class GizmoHudOverlay {
         const projection = createSceneHudProjection(camera, node.worldPosition);
         if (!projection) return 0;
 
+        // RenderRoot2D on Canvas owns 2D/UI labels in the 2D Scene View.
+        // Creating another 3D RenderRoot for a 2D owner can leave the labels
+        // invisible even while the Node's Gizmos2D primitives draw normally.
+        const render2D = isUnder2DRenderRoot(node);
+        if (render2D) {
+            Gizmos2D.beginLayer(node, Layers.Enum.GIZMOS);
+            Gizmos2D.beginLocalPosition(node);
+        }
         let drawn = 0;
+        try {
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
             const screen = hudRowScreenPosition(projection.screen,
@@ -43,16 +66,33 @@ export class GizmoHudOverlay {
                 if (this.colors.size >= 128) this.colors.clear();
                 this.colors.set(item.color, color);
             }
-            Gizmos3D.beginColor(node, color);
             const id = 'cocos-gizmos:hud:' +
                 (placement ? placement.namespace + ':' : '') + item.id;
-            // Never let the Editor drive a UI_3D label to microscopic
-            // world scale while zooming very close to the selected Node.
-            // World-scale billboarding keeps its visible size consistent.
-            const labelScale = Math.max(0.002, Math.min(4, projection.pixelSize));
-            Gizmos3D.drawLabel(node, id, item.text,
-                projection.worldAt(screen.x, screen.y), item.fontSize, labelScale);
+            const fontSize = item.fontSize || 14;
+            const requestedPixels = hudTextPixels(fontSize, item.minSize, item.maxSize);
+            const worldScale = projection.pixelSize * requestedPixels / fontSize;
+            const position = projection.worldAt(screen.x, screen.y);
+            if (render2D) {
+                // The Scene's Canvas is the correct RenderRoot2D for UI nodes.
+                const local = new Vec3();
+                node.inverseTransformPoint(local, position);
+                const parentScale = node.worldScale;
+                const sx = parentScale?.x && Math.abs(parentScale.x) > 1e-8 ?
+                    Math.abs(parentScale.x) : 1;
+                const sy = parentScale?.y && Math.abs(parentScale.y) > 1e-8 ?
+                    Math.abs(parentScale.y) : 1;
+                Gizmos2D.beginColor(node, color);
+                Gizmos2D.drawLabel(node, id, item.text, local, fontSize,
+                    new Vec2(worldScale / sx, worldScale / sy));
+            } else {
+                Gizmos3D.beginColor(node, color);
+                Gizmos3D.drawLabel(node, id, item.text,
+                    position, fontSize, worldScale);
+            }
             drawn++;
+        }
+        } finally {
+            if (render2D) Gizmos2D.endLocalPosition(node);
         }
         this.drawn += drawn;
         return drawn;
