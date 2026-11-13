@@ -36,13 +36,21 @@ class Color {
 const labels = [];
 const camera = {
     rays: 0,
+    pixelWorld: 1,
     node: { forward: new Vec3(0, 0, -1) },
     geometryRenderer: {},
     // Creator's internal scene camera uses *out-first* signatures.
-    worldToScreen(out, point) { Object.assign(out, { x: point.x + 100, y: point.y + 100, z: 1 }); },
+    worldToScreen(out, point) {
+        Object.assign(out, {
+            x: point.x / this.pixelWorld + 100,
+            y: point.y / this.pixelWorld + 100,
+            z: 1,
+        });
+    },
     screenPointToRay(out, x, y) {
         this.rays++;
-        out.o = new Vec3(x, y, 10);
+        out.o = new Vec3((x - 100) * this.pixelWorld,
+            (y - 100) * this.pixelWorld, 10);
         out.d = new Vec3(0, 0, -1);
         return out;
     },
@@ -110,6 +118,15 @@ assert.ok(ownerLabelA.id.includes('owner-a'));
 assert.ok(ownerLabelB.id.includes('owner-b'));
 assert.equal(ownerLabelA.position.y - ownerLabelB.position.y, 66,
     'HUD rows share one screen-space layout and leave a blank row between owners');
+
+camera.pixelWorld = 0.00005; // extremely close zoom
+overlay.render(component, entries, { namespace: 'zoom', startRow: 0 });
+assert.equal(labels.at(-1).scale, 0.002,
+    'Zooming extremely close should not shrink label scale below a readable minimum');
+camera.pixelWorld = 0.2; // normal zoom
+overlay.render(component, entries, { namespace: 'zoom', startRow: 0 });
+assert.ok(Math.abs(labels.at(-1).scale - 0.2) < 1e-7,
+    'Normal zoom should retain the screen-space text scale');
 
 component.node.isValid = false;
 assert.equal(overlay.render(component, entries), 0);
