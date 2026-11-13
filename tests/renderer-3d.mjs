@@ -177,9 +177,9 @@ Gizmos3D.drawLabel(node, 'title', 'Range', new Vec3(1, 1, 0), 20, 0.5);
 Gizmos3D.drawSprite(node, 'icon', frame, new Vec3(0, 0, 0), { x: 1, y: 1 });
 const label = debug._labelMap.get('title');
 const sprite = debug._spriteMap.get('icon');
-assert.equal(debug._root2D.layer, 8, '3D-space UI root uses camera-visible UI_3D instead of UI_2D');
-assert.equal(label.node.layer, 8, '3D labels must be on UI_3D layer');
-assert.equal(sprite.node.layer, 8, '3D sprites must be on UI_3D layer');
+assert.equal(debug._root2D.layer, 12, '3D-space UI root uses camera-visible UI_3D instead of UI_2D');
+assert.equal(label.node.layer, 12, '3D labels must be on UI_3D layer');
+assert.equal(sprite.node.layer, 12, '3D sprites must be on UI_3D layer');
 assert.deepEqual(label.node.worldScaleSet, [0.5, 0.5, 1],
     'Label size must be specified in world space, not multiplied by parent node scale');
 assert.deepEqual(sprite.node.worldScaleSet, [1, 1, 1],
