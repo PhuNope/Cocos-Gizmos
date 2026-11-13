@@ -46,5 +46,13 @@ assert.match(entries.get('editor-runtime/ExecuteGizmos.js') || '', /syncSelectio
 assert.match(entries.get('editor-runtime/GizmoHudOverlay.js') || '', /CocosGizmosScreenHud/);
 assert.match(entries.get('editor-runtime/GizmoHudOverlay.js') || '', /gizmoRootNode/);
 assert.match(entries.get('editor-runtime/PositionHandles.js') || '', /isHandleDisposed/);
+assert.match(entries.get('editor-runtime/GizmoMoveCommand.js') || '',
+    /GizmoMoveCommand/, 'Installer includes application command');
+assert.match(entries.get('editor-runtime/GizmoHandlePresets.js') || '',
+    /makeMoveGizmo/, 'Editor includes reusable descriptor factories');
+assert.match(entries.get('dist/GizmoHandlePresets.js') || '',
+    /makePointGizmos/, 'Public ESM runtime includes descriptor factories');
+assert.match(entries.get('docs/ARCHITECTURE.md') || '',
+    /Command Pattern/, 'Installer ships architecture documentation');
 assert.ok(!installed.contributions.messages['selection:select'].methods.includes('onSelectionUnselect'));
 console.log('[packaged-selection] extracted ZIP manifest, Scene event bridge, fullscreen HUD & native reentry OK');
