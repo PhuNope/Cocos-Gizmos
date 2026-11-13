@@ -286,6 +286,48 @@ function disposeHudPickingQuad(picking?: HudPickingQuad | null): void {
     if (picking.node.isValid) picking.node.destroy();
 }
 
+/**
+ * Native BoxController.resetHandleColor() assumes initHandle() snapshots
+ * exactly one Color and opacity for each registered renderer. A custom HUD
+ * MeshRenderer (or an Editor-owned cube after a Scene switch) can lack that
+ * snapshot, causing the Cocos Creator 3.8.8 setMeshColor(undefined) crash.
+ */
+function repairNativeHandleColors(controller: any, key?: string, fallback?: Color): void {
+    const handles = controller?._handleDataMap;
+    if (!handles || typeof handles !== 'object') return;
+    const names = key ? [key] : Object.keys(handles);
+    const candidate = fallback && Number.isFinite(fallback.a) ?
+        fallback : new Color(255, 255, 255, 255);
+    for (const name of names) {
+        const data = handles[name];
+        if (!data) continue;
+        const nodes = Array.isArray(data.rendererNodes) ? data.rendererNodes : [];
+        const colors = Array.isArray(data.oriColors) ? data.oriColors : [];
+        const opacities = Array.isArray(data.oriOpacities) ? data.oriOpacities : [];
+        const valid = (color: any): boolean => color &&
+            Number.isFinite(color.r) && Number.isFinite(color.g) &&
+            Number.isFinite(color.b) && Number.isFinite(color.a);
+        data.oriColors = nodes.map((_node: unknown, i: number) =>
+            valid(colors[i]) ? colors[i] : (candidate.clone?.() || candidate));
+        data.oriOpacities = nodes.map((_node: unknown, i: number) =>
+            Number.isFinite(opacities[i]) ? opacities[i] : 255);
+    }
+}
+
+/** Never call BoxController.hide() for a registered custom HUD/position
+ * handle: it mutates private snapshot materials and throws on Creator 3.8.8.
+ * Unregistering native events and disabling visible/picking nodes is enough;
+ * the owning Gizmo is responsible for canceling active drag sessions.
+ */
+function suspendNativeController(controller: any, picking?: HudPickingQuad | null): void {
+    if (!controller) return;
+    repairNativeHandleColors(controller);
+    if (picking?.node?.isValid) picking.node.active = false;
+    if (controller._cubeNode?.isValid !== false && controller._cubeNode)
+        controller._cubeNode.active = false;
+    if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = false;
+}
+
 function createEditorGizmo(
     base: any, allowHud: (component: Component) => boolean,
     input: GizmoInputDiagnostics,
@@ -312,14 +354,17 @@ function createEditorGizmo(
         private hideUnavailableMarker(controller: any): void {
             if (!controller || this.unavailableMarkers.has(controller)) return;
             this.unregisterController(controller);
-            controller.hide?.();
+            const hud = this.hudEntries.find(entry => entry.controller === controller);
+            suspendNativeController(controller, hud?.picking);
             this.unavailableMarkers.add(controller);
         }
 
         private restoreMarker(controller: any): void {
             if (!this.shown || !controller || !this.unavailableMarkers.has(controller)) return;
             this.unavailableMarkers.delete(controller);
-            controller.show?.();
+            const hud = this.hudEntries.find(entry => entry.controller === controller);
+            if (hud?.picking?.node?.isValid) hud.picking.node.active = true;
+            else this.ensureMarkerVisible(controller);
             this.registerController(controller);
         }
 
@@ -433,6 +478,7 @@ function createEditorGizmo(
                     if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
                     if (controller._handleDataMap?.[key]) controller.removeHandle?.(key);
                     controller.initHandle(controller._cubeNode, key);
+                    repairNativeHandleColors(controller, key, color);
                     const down = (event: any) => { input.record('controllerDown'); this.begin(entry, event); };
                     const move = (event: any) => { input.record('controllerMove'); this.move(entry, event); };
                     const up = () => {
@@ -488,6 +534,7 @@ function createEditorGizmo(
                         if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
                     }
                     controller.initHandle(picking?.node || controller._cubeNode, key);
+                    repairNativeHandleColors(controller, key, color);
                     const down = (event: any) => { input.record('controllerDown'); this.beginHud(entry, event); };
                     const move = (event: any) => { input.record('controllerMove'); this.moveHud(entry, event); };
                     const up = (event: any) => {
@@ -943,8 +990,10 @@ function createEditorGizmo(
             this.refreshHandles();
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 if (!this.unavailableMarkers.has(controller)) {
-                    controller.show?.();
-                    this.ensureMarkerVisible(controller);
+                    repairNativeHandleColors(controller);
+                    const hud = this.hudEntries.find(entry => entry.controller === controller);
+                    if (hud?.picking?.node?.isValid) hud.picking.node.active = true;
+                    else this.ensureMarkerVisible(controller);
                     this.registerController(controller);
                 }
             }
@@ -964,7 +1013,8 @@ function createEditorGizmo(
             this.shown = false;
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 this.unregisterController(controller);
-                controller.hide?.();
+                const hud = this.hudEntries.find(entry => entry.controller === controller);
+                suspendNativeController(controller, hud?.picking);
             }
         }
 
@@ -992,9 +1042,9 @@ function createEditorGizmo(
             for (const { controller, key } of [...this.entries, ...this.hudEntries]) {
                 try {
                     this.unregisterController(controller);
-                    controller.removeHandle?.(key);
-                    controller.hide?.();
                     const hud = this.hudEntries.find(item => item.controller === controller);
+                    suspendNativeController(controller, hud?.picking);
+                    controller.removeHandle?.(key);
                     disposeHudPickingQuad(hud?.picking);
                 } catch (error) {
                     // The Editor can destroy a controller during a Scene switch.
