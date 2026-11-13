@@ -55,13 +55,12 @@ const localXY = planeHandleGeometry(origin, rotated, 'xy', 0.01);
 assert.ok(Math.abs(localXY.normal.z - 1) < 1e-8,
     'Local rotated Node plane remains orthogonal to rotated basis');
 const sample = readFileSync(path.join(root, 'editor-assets/Examples/CocosGizmos3DDemo.ts'), 'utf8');
-for (const id of ['axis-x', 'axis-y', 'axis-z'])
-    assert.ok(sample.includes(`id: '${id}'`));
-assert.equal((sample.match(/property: 'moveObject'/g) || []).length, 3,
-    'One object now exposes exactly three short XYZ rays, no center dot');
-assert.equal((sample.match(/visual: 'axis'/g) || []).length, 3);
-assert.ok(!sample.includes("visual: 'plane'"),
-    'Three plane tiles are replaced, not drawn on top of the axis arrows');
+assert.ok(sample.includes("Gizmos3D.moveHandles('moveObject'"),
+    '3D demo uses the public Move Gizmo preset');
+for (const option of ['pickSize: 24', 'planeSize: 24', 'planeOffset: 25',
+    'hoverColor:', 'showPositionLabel: true'])
+    assert.ok(sample.includes(option),
+        '3D demo demonstrates public option ' + option);
 
 const axisSource = readFileSync(path.join(root, 'source/AxisHandleGeometry.ts'), 'utf8');
 const axisJs = ts.transpileModule(axisSource, {
