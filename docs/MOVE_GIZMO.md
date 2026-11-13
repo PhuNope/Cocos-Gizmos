@@ -17,7 +17,7 @@ export class EditableWaypoint3D extends Component {
 
     public onGizmoHandles(): GizmoHandleList {
         return [
-            ...Gizmos3D.moveHandles('waypoint', {
+            ...Gizmos3D.move('waypoint', {
                 space: 'local', snap: 0.25,
                 axisSize: 86, pickSize: 24,
                 planeSize: 24, planeOffset: 25,
@@ -66,7 +66,7 @@ public onGizmoHandles(): GizmoHandleList {
 
 ## Vẽ Gizmos bằng API mới
 
-- `Gizmos3D.moveHandles(property, options)`: tạo sáu handle kéo chung một `Vec3`
+- `Gizmos3D.move(property, options)`: tạo sáu handle kéo chung một `Vec3`
 - `Gizmos3D.drawPositionLabel(node, id, worldPosition, options)`: vẽ nhãn vị trí, điều chỉnh `offsetPixels`, `digits`, `minSize`, `maxSize`, `color`
 - `Gizmos3D.drawArrow(node, from, to, headSize?)`: minh họa vector giống Point3D/Line3D
 - `Gizmos3D.drawPlanePreview(node, center, normal, size?, wireFrame?)`: trực quan mặt phẳng giống Plane3D, không tạo MeshRenderer
