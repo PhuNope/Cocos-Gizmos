@@ -14,8 +14,9 @@ import { createSceneHudProjection, createViewportHudProjection } from './GizmoHu
 import { normalizeHudItems } from './GizmoPresentation';
 import { GizmoEditSession } from './GizmoEditSession';
 import { planeHandleGeometry, PlaneHandleGeometry } from './PlaneHandleGeometry';
-import { axisHandleGeometry, axisDragNormal, axisSegmentDistanceSquared,
-    AxisRayGeometry } from './AxisHandleGeometry';
+import { axisHandleGeometry, axisDragNormal, AxisRayGeometry } from './AxisHandleGeometry';
+import { boundsOf, centerDistanceSquared, distanceToSegmentSquared,
+    insideProjectedPlane, rectContains, ScreenPoint } from './MoveHitGeometry';
 import { GizmoHudLayout } from './GizmoHudLayout';
 import { resolveSceneCamera } from './SceneCameraBridge';
 import {
@@ -30,7 +31,10 @@ type PositionVisual = {
     sprite?: Sprite | null; image?: ImageAsset | null; texture?: Texture2D | null;
     frame?: SpriteFrame | null; uiRoot?: Node | null;
 };
-type Entry = { field: Field; controller: any; key: string; visual?: PositionVisual | null };
+type Entry = { field: Field; controller: any; key: string;
+    visual?: PositionVisual | null;
+    picking?: HudPickingQuad | null;
+};
 /** Editor-only hover state (never serialized onto user components). */
 const selectedHover = new WeakMap<Component, string>();
 type DragState = { entry: Entry; command: GizmoMoveCommand };
@@ -221,6 +225,35 @@ function axisPlacement(component: Component, field: Field,
     const axes = { x: unit, y: unit, z: unit };
     return axisHandleGeometry(world, axes, field.axis,
         markerSize(world) / 22, field.axisSize ?? 78);
+}
+
+function isMoveHandle(field: Field): boolean {
+    return field.visual === 'axis' || field.visual === 'plane' || field.visual === 'box';
+}
+
+function boxPlacement(component: Component, field: Field,
+    local: Point): Point[] | null {
+    if (field.visual !== 'box' || !Number.isFinite(field.boxSize) ||
+        (field.boxSize || 0) <= 0) return null;
+    const half = (field.boxSize as number) * 0.5;
+    const space = spaceFor(component, field);
+    const corners: Point[] = [];
+    for (const x of [-half, half])
+        for (const y of [-half, half])
+            for (const z of [-half, half])
+                corners.push(space.toWorld({
+                    x: local.x + x, y: local.y + y, z: local.z + z,
+                }));
+    return corners;
+}
+
+function projectMovePoint(view: any, point: Point): ScreenPoint | null {
+    if (typeof view?.worldToScreen !== 'function') return null;
+    const out = new Vec3();
+    try { view.worldToScreen(new Vec3(point.x, point.y, point.z), out); }
+    catch { return null; }
+    return Number.isFinite(out.x) && Number.isFinite(out.y) ?
+        { x: out.x, y: out.y } : null;
 }
 
 function positionAxisHitProxy(controller: any, geometry: AxisRayGeometry,
@@ -466,12 +499,8 @@ function createPositionVisual(color: Color): PositionVisual | null {
                     ctx.beginPath();
                     ctx.arc(32, 32, 24, 0, Math.PI * 2);
                     ctx.stroke();
-                    ctx.strokeStyle = '#151923';
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-                    ctx.moveTo(20, 32); ctx.lineTo(44, 32);
-                    ctx.moveTo(32, 20); ctx.lineTo(32, 44);
-                    ctx.stroke();
+                    // Plain colored drag dot: no '+' glyph. The old cross
+                    // looked like a second transform tool on every handle.
                     const image = new ImageAsset(canvas);
                     const texture = new Texture2D();
                     texture.image = image;
@@ -534,7 +563,7 @@ function disposePositionVisual(visual?: PositionVisual | null): void {
     if (visual.node.isValid) visual.node.destroy();
 }
 
-function createHudPickingQuad(): HudPickingQuad | null {
+function createHudPickingQuad(purpose = 'Hud'): HudPickingQuad | null {
     const parent = cceNamespace()?.Gizmo?.gizmoRootNode;
     if (!parent?.isValid || typeof Node !== 'function' ||
         typeof MeshRenderer !== 'function' ||
@@ -543,7 +572,7 @@ function createHudPickingQuad(): HudPickingQuad | null {
     let material: Material | null = null;
     let mesh: Mesh | null = null;
     try {
-        node = new Node('CocosGizmosHudHit');
+        node = new Node('CocosGizmos' + purpose + 'Hit');
         node.layer = Layers.Enum.GIZMOS;
         node.hideFlags |= CCObject.Flags.DontSave | CCObject.Flags.HideInHierarchy;
         parent.addChild(node);
