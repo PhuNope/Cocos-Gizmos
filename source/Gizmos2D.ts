@@ -15,6 +15,7 @@ import {
     Vec3,
 } from 'cc';
 import { DrawCommandBuffer2D } from './DrawCommandBuffer2D';
+import { makePointGizmo, makePointGizmos } from './GizmoHandlePresets';
 
 const { ccclass, executeInEditMode } = _decorator;
 
@@ -409,6 +410,20 @@ class GizmosDebugDraw extends Component {
 }
 
 export class Gizmos2D {
+    /** Edit one Vec3 property using a screen-sized 2D drag handle. */
+    public static point(
+        property: string, options: GizmoPointOptions = {},
+    ): GizmoHandleDescriptor {
+        return makePointGizmo(property, options);
+    }
+
+    /** Edit every Vec3 in an array. Zero points yields no handles. */
+    public static points(
+        property: string, count: number, options: GizmoPointOptions = {},
+    ): GizmoHandleDescriptor[] {
+        return makePointGizmos(property, count, options);
+    }
+
     public static readonly DEFAULT_COLOR = Color.BLUE;
     public static readonly DEFAULT_LAYER = Layers.Enum.GIZMOS;
     private static readonly _debugNodes = new WeakMap<Node, GizmosDebugDraw>();
