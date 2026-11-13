@@ -74,6 +74,7 @@ class RenderRoot2D {}
 class Sprite {
     constructor() { this.isValid = true; this.spriteFrame = null; }
 }
+Sprite.SizeMode = { CUSTOM: 2 };
 class ImageAsset {
     constructor(canvas) { this.canvas = canvas; }
     destroy() { this.destroyed = true; }
