@@ -1,4 +1,5 @@
-import { Color, Component, Layers, Quat, RenderRoot2D, Vec3 } from 'cc';
+import { CCObject, Color, Component, director, Director, gfx, Layers,
+    Material, Mesh, MeshRenderer, Node, Quat, RenderRoot2D, utils, Vec3 } from 'cc';
 import { Gizmos2D } from './Gizmos2D';
 import { Gizmos3D } from './Gizmos3D';
 import {
@@ -6,7 +7,8 @@ import {
     intersectHandlePlane,
     PositionDragSolver,
 } from './PositionDragSolver';
-import { HudControl, HudSliderDrag, hudGrid, hudRowScreenPosition, normalizeHudControls, hudControlLayoutSignature } from './GizmoHudControls';
+import { HudControl, HudSliderDrag, hudGrid, hudRowScreenPosition, hudControlScreenRect,
+    hudSliderScreenTrack, normalizeHudControls, hudControlLayoutSignature } from './GizmoHudControls';
 import { createSceneHudProjection, createViewportHudProjection } from './GizmoHudProjection';
 import { normalizeHudItems } from './GizmoPresentation';
 import { GizmoEditSession } from './GizmoEditSession';
@@ -21,7 +23,9 @@ type Point = { x: number; y: number; z: number };
 type Field = GizmoHandleDescriptor;
 type Entry = { field: Field; controller: any; key: string };
 type DragState = { entry: Entry; solver: PositionDragSolver; session: GizmoEditSession<Point> };
-type HudEntry = { control: HudControl; controller: any; key: string; index: number };
+type HudPickingQuad = { node: Node; renderer: MeshRenderer; material: Material; mesh: Mesh };
+type HudEntry = { control: HudControl; controller: any; key: string; index: number;
+    picking?: HudPickingQuad | null };
 type HudDrag = { entry: HudEntry; solver: HudSliderDrag; session: GizmoEditSession<number> };
 
 function cceNamespace(): any {
@@ -231,6 +235,57 @@ function drawSelectedPositionMarkers(component: Component): void {
     }
 }
 
+/**
+ * HUD hit geometry must be a screen-facing quad, not a stretched BoxCollider
+ * cube. The same viewport rectangle is used for drawing, hit-test and picking.
+ */
+function createHudPickingQuad(): HudPickingQuad | null {
+    const parent = cceNamespace()?.Gizmo?.gizmoRootNode;
+    if (!parent?.isValid || typeof Node !== 'function' ||
+        typeof MeshRenderer !== 'function' ||
+        typeof utils?.createMesh !== 'function') return null;
+    let node: Node | null = null;
+    let material: Material | null = null;
+    let mesh: Mesh | null = null;
+    try {
+        node = new Node('CocosGizmosHudHit');
+        node.layer = Layers.Enum.GIZMOS;
+        node.hideFlags |= CCObject.Flags.DontSave | CCObject.Flags.HideInHierarchy;
+        parent.addChild(node);
+        const renderer = node.addComponent(MeshRenderer);
+        material = new Material();
+        material.initialize({
+            effectName: 'builtin-unlit', technique: 1,
+            states: {
+                depthStencilState: { depthTest: false, depthWrite: false },
+                rasterizerState: { cullMode: gfx.CullMode.NONE },
+            },
+        });
+        material.setProperty('mainColor', new Color(255, 255, 255, 0));
+        renderer.setMaterial(material, 0);
+        mesh = utils.createMesh({
+            positions: [-0.5, -0.5, 0, -0.5, 0.5, 0,
+                0.5, 0.5, 0, 0.5, -0.5, 0],
+            indices: [0, 3, 1, 3, 2, 1],
+        }, undefined, { calculateBounds: true });
+        renderer.mesh = mesh;
+        return { node, renderer, material, mesh };
+    } catch (error) {
+        console.warn('[cocos-gizmos/hud] HUD picking quad unavailable:', error);
+        mesh?.destroy();
+        material?.destroy();
+        if (node?.isValid) node.destroy();
+        return null;
+    }
+}
+function disposeHudPickingQuad(picking?: HudPickingQuad | null): void {
+    if (!picking) return;
+    if (picking.renderer.isValid) picking.renderer.mesh = null;
+    picking.mesh.destroy();
+    picking.material.destroy();
+    if (picking.node.isValid) picking.node.destroy();
+}
+
 function createEditorGizmo(
     base: any, allowHud: (component: Component) => boolean,
     input: GizmoInputDiagnostics,
@@ -244,6 +299,12 @@ function createEditorGizmo(
         private pendingClick: HudEntry | null = null;
         private shown = false;
         private destroyed = false;
+        private beforeDrawRegistered = false;
+        private readonly beforeDraw = (): void => {
+            if (!this.shown || this.destroyed) return;
+            // Re-project during Scene scroll, before native controller raycast.
+            this.updateMarkers();
+        };
         private layout = '';
         private readonly registeredControllers = new WeakSet<object>();
         private readonly unavailableMarkers = new WeakSet<object>();
@@ -266,6 +327,9 @@ function createEditorGizmo(
         private ensureMarkerVisible(controller: any): void {
             const cube = controller?._cubeNode;
             if (!cube || cube.isValid === false || this.unavailableMarkers.has(controller)) return;
+            // HUD quads stay invisible; the BoxCollider cube must never cover
+            // the HUD or steal mouse hits from its screen-aligned picker.
+            if (this.hudEntries.some(entry => entry.controller === controller && entry.picking)) return;
             cube.active = true;
             if (controller._cubeNodeMR?.isValid !== false && controller._cubeNodeMR) {
                 controller._cubeNodeMR.enabled = true;
@@ -274,7 +338,8 @@ function createEditorGizmo(
 
         private hasDestroyedMarkers(): boolean {
             return [...this.entries, ...this.hudEntries].some(({ controller }) =>
-                !controller?._cubeNode || controller._cubeNode.isValid === false);
+                !controller?._cubeNode || controller._cubeNode.isValid === false) ||
+                this.hudEntries.some(({ picking }) => picking && picking.node.isValid === false);
         }
 
         private registerController(controller: any): void {
@@ -396,6 +461,8 @@ function createEditorGizmo(
                     if (!controller) continue;
                     const key = 'hud:' + control.id;
                     const entry: HudEntry = { control, controller, key, index };
+                    const picking = createHudPickingQuad();
+                    entry.picking = picking;
                     const color = new Color();
                     if (typeof Color.fromHEX === 'function') Color.fromHEX(color, control.color);
                     else color.set(58, 182, 255, 255);
@@ -410,9 +477,17 @@ function createEditorGizmo(
                         throw new Error('Standalone HUD marker is unavailable');
                     }
                     applyGizmoLayer(controller._cubeNode);
-                    controller._cubeNode.active = true;
-                    if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
-                    controller.initHandle(controller._cubeNode, key);
+                    if (picking) {
+                        // Keep the controller shape active for move/up dispatch,
+                        // but let the actual mesh quad receive HUD pointer hits.
+                        if (controller.shape) controller.shape.active = true;
+                        controller._cubeNode.active = false;
+                        if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = false;
+                    } else {
+                        controller._cubeNode.active = true;
+                        if (controller._cubeNodeMR) controller._cubeNodeMR.enabled = true;
+                    }
+                    controller.initHandle(picking?.node || controller._cubeNode, key);
                     const down = (event: any) => { input.record('controllerDown'); this.beginHud(entry, event); };
                     const move = (event: any) => { input.record('controllerMove'); this.moveHud(entry, event); };
                     const up = (event: any) => {
@@ -478,6 +553,7 @@ function createEditorGizmo(
                 for (const entry of this.hudEntries) this.hideUnavailableMarker(entry.controller);
                 return;
             }
+            view.sync?.();
             const projection = (view.viewport && createViewportHudProjection(view)) ||
                 createSceneHudProjection(view, component.node.worldPosition);
             if (!projection) {
@@ -504,14 +580,32 @@ function createEditorGizmo(
                     hudGrid(projection.viewport,
                         Math.max(hudLayout?.totalRows || 0, startRow + textCount +
                             this.hudEntries.length)) : null;
-                const hitWidth = grid ? Math.max(40, grid.columnWidth - 28) : 14;
-                const world = projection.worldAt(
-                    grid ? row.x + hitWidth * 0.5 : row.x - 14, row.y);
-                entry.controller.setPosition?.(world);
-                setMarkerSize(entry.controller,
-                    grid ? projection.pixelSize * hitWidth : size,
-                    grid ? projection.pixelSize * 21 : size,
-                    grid ? projection.pixelSize * 6 : size);
+                const rect = projection.viewport && grid ?
+                    hudControlScreenRect(projection.viewport,
+                        startRow + textCount + entry.index,
+                        hudLayout?.totalRows || startRow + textCount +
+                            this.hudEntries.length) : null;
+                const hitWidth = rect ? rect.width : 14;
+                const centerX = rect ? (rect.left + rect.right) * 0.5 : row.x - 14;
+                const centerY = rect ? (rect.bottom + rect.top) * 0.5 : row.y;
+                const world = projection.worldAt(centerX, centerY);
+                if (entry.picking && entry.picking.node.isValid && rect) {
+                    entry.picking.node.active = true;
+                    entry.picking.node.setWorldPosition(world);
+                    const rotation = view.node?.worldRotation;
+                    if (rotation) entry.picking.node.setWorldRotation(rotation);
+                    entry.picking.node.setWorldScale(new Vec3(
+                        projection.pixelSize * hitWidth,
+                        projection.pixelSize * rect.height, 1));
+                    // HUD cube stays invisible. Only the accurately projected
+                    // transparent plane participates in native Scene raycast.
+                } else {
+                    entry.controller.setPosition?.(world);
+                    setMarkerSize(entry.controller,
+                        rect ? projection.pixelSize * hitWidth : size,
+                        rect ? projection.pixelSize * rect.height : size,
+                        rect ? projection.pixelSize * 6 : size);
+                }
             }
         }
 
@@ -800,6 +894,10 @@ function createEditorGizmo(
         public onShow(): void {
             if (this.destroyed) return;
             this.shown = true;
+            if (!this.beforeDrawRegistered && typeof director?.on === 'function') {
+                director.on(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
+                this.beforeDrawRegistered = true;
+            }
             this.refreshHandles();
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 if (!this.unavailableMarkers.has(controller)) {
@@ -812,6 +910,13 @@ function createEditorGizmo(
         }
 
         public onHide(): void {
+            if (this.beforeDrawRegistered) {
+                director.off(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
+                this.beforeDrawRegistered = false;
+            }
+            for (const entry of this.hudEntries) {
+                if (entry.picking?.node?.isValid) entry.picking.node.active = false;
+            }
             this.finish(true);
             this.finishHud(true);
             this.shown = false;
@@ -847,6 +952,8 @@ function createEditorGizmo(
                     this.unregisterController(controller);
                     controller.removeHandle?.(key);
                     controller.hide?.();
+                    const hud = this.hudEntries.find(item => item.controller === controller);
+                    disposeHudPickingQuad(hud?.picking);
                 } catch (error) {
                     // The Editor can destroy a controller during a Scene switch.
                     console.warn('[cocos-gizmos/handles] Discarding a stale controller:', error);
@@ -857,6 +964,10 @@ function createEditorGizmo(
         }
 
         public onDestroy(): void {
+            if (this.beforeDrawRegistered) {
+                director.off(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
+                this.beforeDrawRegistered = false;
+            }
             this.destroyed = true;
             this.finish(true);
             this.finishHud(true);
