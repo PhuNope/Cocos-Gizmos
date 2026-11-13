@@ -31,6 +31,8 @@ type PositionVisual = {
     frame?: SpriteFrame | null; uiRoot?: Node | null;
 };
 type Entry = { field: Field; controller: any; key: string; visual?: PositionVisual | null };
+/** Editor-only hover state (never serialized onto user components). */
+const selectedHover = new WeakMap<Component, string>();
 type DragState = { entry: Entry; solver: PositionDragSolver; session: GizmoEditSession<Point> };
 type HudPickingQuad = { node: Node; renderer: MeshRenderer; material: Material; mesh: Mesh };
 type HudEntry = { control: HudControl; controller: any; key: string; index: number;
@@ -221,22 +223,44 @@ function axisPlacement(component: Component, field: Field,
         markerSize(world) / 22, field.axisSize ?? 78);
 }
 
-function positionAxisHitProxy(controller: any, geometry: AxisRayGeometry): void {
+function positionAxisHitProxy(controller: any, geometry: AxisRayGeometry,
+    field?: Field): void {
     const face = (controller?._editHandlesShape?.children || []).find(
         (child: any) => child?.name === 'y');
     if (!face || face.isValid === false) return;
     const at = geometry.center;
     face.setWorldPosition?.(new Vec3(at.x, at.y, at.z));
-    face.setWorldScale?.(new Vec3(geometry.size, geometry.size, geometry.size));
-    // The native BoxController +Y face is in the XZ plane. Face it towards
-    // the Scene camera so it remains raycastable in angled 3D views.
-    const rotation = camera()?.node?.worldRotation;
+    // Make the invisible native +Y pick face a LONG strip aligned with the
+    // visible arrow, instead of the previous ~24px square that was almost
+    // impossible to click. Its color stays completely transparent.
+    const length = Math.hypot(geometry.end.x - geometry.start.x,
+        geometry.end.y - geometry.start.y, geometry.end.z - geometry.start.z);
+    const px = geometry.size / 24;
+    const width = px * Math.max(24, (field?.pickSize ?? 24) * 1.5);
+    face.setWorldScale?.(new Vec3(length, width, width));
+    const view = camera();
+    const rotation = view?.node?.worldRotation;
     if (rotation && typeof Quat.fromEuler === 'function' &&
         typeof Quat.multiply === 'function') {
         const correction = new Quat();
         Quat.fromEuler(correction, 90, 0, 0);
+        const local = new Quat();
+        // Rotate the long face strip in screen space towards the selected
+        // axis ray; its normal stays aligned to the Editor camera.
+        try {
+            const first = new Vec3();
+            const last = new Vec3();
+            view?.worldToScreen?.(new Vec3(geometry.start.x, geometry.start.y,
+                geometry.start.z), first);
+            view?.worldToScreen?.(new Vec3(geometry.end.x, geometry.end.y,
+                geometry.end.z), last);
+            const angle = Math.atan2(last.y - first.y, last.x - first.x) * 180 / Math.PI;
+            const spin = new Quat();
+            Quat.fromEuler(spin, 0, Number.isFinite(angle) ? angle : 0, 0);
+            Quat.multiply(local, correction, spin);
+        } catch { Quat.multiply(local, correction, new Quat()); }
         const orientation = new Quat();
-        Quat.multiply(orientation, rotation, correction);
+        Quat.multiply(orientation, rotation, local);
         face.setWorldRotation?.(orientation);
     }
 }
@@ -246,14 +270,18 @@ function positionAxisHitProxy(controller: any, geometry: AxisRayGeometry): void 
  * Its event callbacks still run through the existing GizmoEditSession.
  */
 function positionPlaneHitProxy(controller: any, plane: Field['plane'],
-    geometry: PlaneHandleGeometry): void {
+    geometry: PlaneHandleGeometry, field?: Field): void {
     const face = (controller?._editHandlesShape?.children || []).find(
         (child: any) => child?.name === 'y');
     if (!face || face.isValid === false) return;
     const p = geometry.center;
     face.setWorldPosition?.(new Vec3(p.x, p.y, p.z));
-    if (typeof face.setWorldScale === 'function')
-        face.setWorldScale(new Vec3(geometry.size, geometry.size, geometry.size));
+    if (typeof face.setWorldScale === 'function') {
+        const pixel = geometry.size / Math.max(12, field?.planeSize ?? 36);
+        const coverage = Math.max(geometry.size,
+            pixel * Math.max(28, (field?.pickSize ?? 24) * 1.75));
+        face.setWorldScale(new Vec3(coverage, coverage, coverage));
+    }
     if (typeof face.setWorldRotation === 'function' &&
         typeof Quat.fromEuler === 'function') {
         // Builtin +Y edit face lies in XZ. Rotate its normal onto +Z/+X
@@ -301,8 +329,20 @@ function drawSelectedPositionMarkers(component: Component): void {
             const diameter = markerSize(world);
             const radius = diameter * 0.4;
             const color = new Color(255, 190, 40, 255);
-            if (typeof field.color === 'string' && typeof Color.fromHEX === 'function') {
-                Color.fromHEX(color, field.color);
+            const key = 'position:' + field.property + ':' +
+                (field.index ?? 'single') + (field.id ? ':' + field.id : '');
+            const highlighted = selectedHover.get(component) === key;
+            const colorText = highlighted ? (field.hoverColor || '#ffff65') : field.color;
+            if (typeof colorText === 'string' && typeof Color.fromHEX === 'function')
+                Color.fromHEX(color, colorText);
+            if (field.showPositionLabel && !onCanvas) {
+                // drawPositionLabel caches a reusable Label by ID and clamps
+                // screen font size while moving or zooming the Scene camera.
+                Gizmos3D.drawPositionLabel(node,
+                    'selected-pos:' + field.property + ':' + (field.index ?? 'single'),
+                    new Vec3(world.x, world.y, world.z),
+                    { offsetPixels: field.positionLabelOffset ?? 94,
+                      digits: 2, minSize: 12, maxSize: 22 });
             }
             const ray = !onCanvas ? axisPlacement(component, field, local, world) : null;
             if (ray) {
@@ -653,6 +693,18 @@ function createEditorGizmo(
         private shown = false;
         private destroyed = false;
         private beforeDrawRegistered = false;
+        private hoveredKey: string | null = null;
+        private setHover(entry: Entry | null): void {
+            const next = entry?.key || null;
+            if (this.hoveredKey === next || !this.shown || this.destroyed) return;
+            this.hoveredKey = next;
+            const component = this.target as Component;
+            if (component) {
+                if (next) selectedHover.set(component, next);
+                else selectedHover.delete(component);
+            }
+            cceNamespace()?.Engine?.repaintInEditMode?.();
+        }
         private lastSceneCamera: any = null;
         private lastProjectionMode: any = undefined;
         // Creator's embedded Scene routes mouse events through GizmoOperation,
@@ -784,6 +836,8 @@ function createEditorGizmo(
                     field.axis === 'y' || field.axis === 'z') &&
                 (field.axisSize === undefined || Number.isFinite(field.axisSize) &&
                     field.axisSize >= 24 && field.axisSize <= 200) &&
+                (field.pickSize === undefined || Number.isFinite(field.pickSize) &&
+                    field.pickSize >= 12 && field.pickSize <= 72) &&
                 (field.planeSize === undefined || Number.isFinite(field.planeSize) &&
                     field.planeSize >= 12 && field.planeSize <= 120) &&
                 (field.planeOffset === undefined || Number.isFinite(field.planeOffset) &&
@@ -810,7 +864,8 @@ function createEditorGizmo(
                     field.space || 'local', field.axis, field.snap,
                     field.color, field.bounds, field.id,
                     field.visual || 'point', field.planeSize, field.planeOffset,
-                    field.axisSize,
+                    field.axisSize, field.pickSize, field.hoverColor,
+                    field.showPositionLabel, field.positionLabelOffset,
                 ]),
                 controls: hudControlLayoutSignature(controls),
             });
@@ -870,6 +925,15 @@ function createEditorGizmo(
                         else if (this.drag || this.hudDrag || this.pendingClick)
                             input.record('ignoredUp');
                     };
+                    controller.onControllerHoverIn = (event: any) => {
+                        if (this.shown && !this.drag) this.setHover(entry);
+                    };
+                    controller.onControllerHoverOut = () => {
+                        if (!this.drag && this.hoveredKey === entry.key)
+                            this.setHover(null);
+                    };
+                    controller.onHoverIn = controller.onControllerHoverIn;
+                    controller.onHoverOut = controller.onControllerHoverOut;
                     controller.onControllerMouseDown = down;
                     controller.onControllerMouseMove = move;
                     controller.onControllerMouseUp = up;
@@ -1023,9 +1087,10 @@ function createEditorGizmo(
                 entry.controller.setRotation?.(new Quat());
                 const size = ray?.size || tile?.size || markerSize(world);
                 setMarkerSize(entry.controller, size);
-                if (tile) positionPlaneHitProxy(entry.controller, entry.field.plane, tile);
+                if (tile) positionPlaneHitProxy(entry.controller, entry.field.plane,
+                    tile, entry.field);
                 if (ray) {
-                    positionAxisHitProxy(entry.controller, ray);
+                    positionAxisHitProxy(entry.controller, ray, entry.field);
                     // The +Y editable face is the actual native hit proxy.
                     // Hide BoxController's own cube, otherwise three chunky
                     // cubes obscure the three thin axis arrows.
@@ -1358,6 +1423,7 @@ function createEditorGizmo(
                 );
                 session.begin();
                 this.drag = { entry, solver, session };
+                this.setHover(entry);
             } catch (error) {
                 console.warn('[cocos-gizmos/handles] Unable to start position drag:', error);
             }
@@ -1416,7 +1482,8 @@ function createEditorGizmo(
                         view.worldToScreen(new Vec3(ray.end.x, ray.end.y, ray.end.z), b);
                         const distanceSquared = axisSegmentDistanceSquared(
                             pointer, a, b);
-                        if (distanceSquared <= ray.pixelWidth * ray.pixelWidth &&
+                        const width = entry.field.pickSize ?? 24;
+                        if (distanceSquared <= width * width &&
                             distanceSquared < bestDistanceSquared) {
                             nearest = entry;
                             bestDistanceSquared = distanceSquared;
@@ -1430,7 +1497,7 @@ function createEditorGizmo(
                 const dx = screen.x - pointer.x;
                 const dy = screen.y - pointer.y;
                 const distanceSquared = dx * dx + dy * dy;
-                const radius = tile ? Math.max(20, entry.field.planeSize || 36) : 18;
+                const radius = tile ? Math.max(20, entry.field.pickSize ?? 24) : 18;
                 if (Number.isFinite(distanceSquared) &&
                     distanceSquared < radius * radius &&
                     distanceSquared < bestDistanceSquared) {
@@ -1480,6 +1547,8 @@ function createEditorGizmo(
 
         public onGizmoMouseMove(event: any): void {
             input.record('gizmoMove');
+            if (!this.drag && !this.hudDrag)
+                this.setHover(this.positionEntryAt(event));
             if (this.drag) this.move(this.drag.entry, event);
             if (this.hudDrag) this.moveHud(this.hudDrag.entry, event);
         }
@@ -1533,6 +1602,8 @@ function createEditorGizmo(
         }
 
         public onNotGizmoMouseMove(event?: any): void {
+            if (!this.drag && !this.hudDrag && event)
+                this.setHover(this.positionEntryAt(event));
             if (this.drag && event) this.move(this.drag.entry, event);
             if (this.hudDrag && event) this.moveHud(this.hudDrag.entry, event);
         }
@@ -1603,6 +1674,8 @@ function createEditorGizmo(
 
         public onHide(): void {
             if (this.destroyed) return;
+            selectedHover.delete(this.target as Component);
+            this.hoveredKey = null;
             // Mark hidden *before* cancelling an in-flight edit. Session's
             // end/rollback callback calls updateMarkers(); if shown is still
             // true, it re-activates the native +Y hit proxy while deselecting.
@@ -1656,6 +1729,8 @@ function createEditorGizmo(
         public updateControllerTransform(): void { this.updateMarkers(); }
 
         private clearEntries(): void {
+            selectedHover.delete(this.target as Component);
+            this.hoveredKey = null;
             for (const { controller, key } of [...this.entries, ...this.hudEntries]) {
                 try {
                     this.unregisterController(controller);
