@@ -78,7 +78,8 @@ export class GizmoHudOverlay {
         const render2D = isUnder2DRenderRoot(node);
         this.lastPath = render2D ? '2d' : '3d';
         if (render2D) {
-            Gizmos2D.beginLayer(node, Layers.Enum.GIZMOS);
+            // Canvas cameras render UI_2D, not necessarily the Editor GIZMOS layer.
+            Gizmos2D.beginLayer(node, Layers.Enum.UI_2D);
             Gizmos2D.beginLocalPosition(node);
         }
         let drawn = 0;
