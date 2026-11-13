@@ -21,6 +21,8 @@ export class EditableWaypoint3D extends Component {
                 space: 'local', snap: 0.25,
                 axisSize: 86, pickSize: 24,
                 planeSize: 24, planeOffset: 25,
+                // Khi component đã vẽ box, chọn/kéo được cả phần bên trong.
+                boxSize: 0.7,
                 hoverColor: '#ffff65',
                 showPositionLabel: true,
                 positionLabelOffset: 94,
@@ -42,6 +44,12 @@ export class EditableWaypoint3D extends Component {
 
 **Vùng tương tác:** ba tia đỏ X, xanh lá Y, xanh dương Z; các ô nhỏ XY, XZ, YZ gần gốc. Kéo tia khóa một trục, kéo ô khóa mặt phẳng. Native BoxController dùng +Y editable face làm hit proxy, với footprint lớn hơn và dự phòng hit-test trên toàn thân tia. Vùng hiển thị nhỏ hơn vùng nhấp, nên giao diện vẫn gọn. Dùng `pickSize: 30` khi cần vùng bắt chuột lớn hơn (hợp lệ từ 12 đến 72 pixel).
 
+**Kéo box:** `boxSize: 0.7` là tùy chọn: khớp với ô wireframe
+`drawBox(..., new Vec3(0.7, 0.7, 0.7))` trong demo. Click bên trong
+box để kéo theo mặt phẳng camera; click vào thân tia để khóa trục,
+hoặc vào mặt phẳng tô màu để khóa hai trục. Điểm chọn là mesh trong suốt
+khớp với hình đang thấy, không dùng mặt +Y có ký hiệu `+` nữa.
+
 **Hover:** vùng được highlight vàng (`hoverColor`) khi mouse-in hoặc khi kéo. Di chuyển ra sẽ trở lại màu gốc. Hover không ghi lên dữ liệu Scene.
 
 **Nhãn tọa độ:** `showPositionLabel` đặt một nhãn `Pos X/Y/Z` trên vị trí đang chỉnh, offset mặc định 94 pixel màn hình. Font được giới hạn 12–22 pixel khi zoom. Nhãn dùng ID ổn định, không tạo thêm node mỗi frame.
@@ -62,7 +70,7 @@ public onGizmoHandles(): GizmoHandleList {
 }
 ```
 
-`visual:'point'` (mặc định), `visual:'plane'` và `visual:'axis'` vẫn được hỗ trợ. Các handle khác nhau có thể cùng tham chiếu một `Vec3` bằng `property` và `id` khác nhau. `space`, `snap`, `bounds`, `axis`, `plane` vẫn tương thích.
+`visual:'point'` (mặc định), `visual:'plane'`, `visual:'axis'` và `visual:'box'` vẫn được hỗ trợ. Các handle khác nhau có thể cùng tham chiếu một `Vec3` bằng `property` và `id` khác nhau. `space`, `snap`, `bounds`, `axis`, `plane` vẫn tương thích.
 
 ## Vẽ Gizmos bằng API mới
 
