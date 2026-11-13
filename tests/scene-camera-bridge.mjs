@@ -108,8 +108,15 @@ assert.ok(createSceneHudProjection(nested.camera, origin));
 assert.equal(resolveSceneCamera(null).camera, null);
 assert.equal(resolveSceneCamera({ Camera: { _camera: {} } }).convention, 'unavailable');
 assert.equal(resolveSceneCamera({ Camera: { _camera: { camera: {} } } }).camera, null);
-assert.equal(resolveSceneCamera({ Camera: {
+const editorPreferred = resolveSceneCamera({ Camera: {
     _camera: { camera: renderCamera }, camera: componentCamera,
-} }).convention, 'render-camera', 'Prefer the active wrapped Editor renderer camera');
+} });
+assert.equal(editorPreferred.convention, 'component-camera',
+    'Prefer Creator public cce.Camera.camera to its private renderer camera');
+assert.equal(editorPreferred.source, 'direct');
+assert.ok(createSceneHudProjection(editorPreferred.camera, origin));
+componentCamera.camera = { width: 800, height: 600 };
+assert.equal(resolveSceneCamera({ Camera: { camera: componentCamera } }).camera.viewport.width, 800);
+assert.equal(resolveSceneCamera({ Camera: { camera: componentCamera } }).camera.viewport.height, 600);
 
 console.log('[scene-camera-bridge] Creator 3.8 render-camera out-first and component-camera out-last projection/rays OK');
