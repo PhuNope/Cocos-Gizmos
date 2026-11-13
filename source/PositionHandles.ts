@@ -1378,6 +1378,10 @@ function createEditorGizmo(
         }
 
         public onHide(): void {
+            // Mark hidden *before* cancelling an in-flight edit. Session's
+            // end/rollback callback calls updateMarkers(); if shown is still
+            // true, it re-activates the native +Y hit proxy while deselecting.
+            this.shown = false;
             if (this.beforeDrawRegistered) {
                 director.off(Director.EVENT_BEFORE_DRAW, this.beforeDraw);
                 this.beforeDrawRegistered = false;
@@ -1392,7 +1396,6 @@ function createEditorGizmo(
             }
             this.finish(true);
             this.finishHud(true);
-            this.shown = false;
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
                 this.unregisterController(controller);
                 const hud = this.hudEntries.find(entry => entry.controller === controller);
@@ -1451,9 +1454,9 @@ function createEditorGizmo(
                 this.beforeDrawRegistered = false;
             }
             this.destroyed = true;
+            this.shown = false;
             this.finish(true);
             this.finishHud(true);
-            this.shown = false;
             this.clearEntries();
         }
     };
