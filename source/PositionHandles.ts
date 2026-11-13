@@ -339,11 +339,14 @@ function createPositionVisual(color: Color): PositionVisual | null {
                     spriteNode.layer = uiRoot.layer;
                     uiRoot.addChild(spriteNode);
                     const sprite = spriteNode.addComponent(Sprite);
+                    // SpriteFrame assignment may reset UITransform dimensions
+                    // unless SizeMode.CUSTOM is selected explicitly.
+                    sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+                    sprite.spriteFrame = frame;
                     const transform = spriteNode.getComponent(UITransform) ||
                         spriteNode.addComponent(UITransform);
                     transform.setAnchorPoint?.(0.5, 0.5);
                     transform.setContentSize?.(28, 28);
-                    sprite.spriteFrame = frame;
                     const Sorting2D = (globalThis as any).cc?.Sorting2D;
                     if (typeof Sorting2D === 'function') {
                         const sorting: any = spriteNode.addComponent(Sorting2D);
