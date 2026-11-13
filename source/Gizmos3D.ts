@@ -725,6 +725,8 @@ class GizmosDebugDraw extends Component {
 }
 
 export interface GizmosMoveHandleOptions {
+    /** Opt-in selectable object box side in node-local/world units. */
+    boxSize?: number;
     /** Node local or absolute world coordinates (default local). */
     space?: GizmoHandleSpace;
     /** Shared snap value for all axis and plane handles. */
