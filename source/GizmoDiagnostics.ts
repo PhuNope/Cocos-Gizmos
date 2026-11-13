@@ -32,6 +32,7 @@ export interface GizmoSmokeReport {
         hasNativeControlCancel: boolean;
     };
     handles: UnknownRecord;
+    hud: UnknownRecord;
     concerns: string[];
     requiresManualVerification: string[];
 }
@@ -46,6 +47,7 @@ export function buildGizmoSmokeReport(
     cce: any,
     updater: UnknownRecord | null,
     handleState: UnknownRecord | null,
+    hudState: UnknownRecord | null = null,
 ): GizmoSmokeReport {
     const selection = safely<unknown>(() => editor?.Selection?.getSelected?.('node'), null);
     const selectionCount = Array.isArray(selection) ? selection.length : null;
@@ -91,6 +93,14 @@ export function buildGizmoSmokeReport(
             pendingClicks: handleState.pendingClicks ?? 0,
             input: handleState.input ?? null,
         } : { registered: 0, active: 0, reason: 'not-loaded', input: null },
+        hud: {
+            labelsSubmitted: hudState?.hudLabels ?? 0,
+            ...(hudState?.overlay || {
+                drawn2D: 0, drawn3D: 0,
+                cameraMissing: 0, projectionFailed: 0,
+                lastPath: 'none',
+            }),
+        },
         concerns: [],
         requiresManualVerification: [
             'Click and drag a position handle in the real Scene View',
@@ -114,6 +124,12 @@ export function buildGizmoSmokeReport(
         report.concerns.push('Expected controller transaction hooks are not exposed');
     }
     if (report.scene.callbackErrors) report.concerns.push('Gizmo callback errors have occurred');
+    if (report.hud.projectionFailed > 0) {
+        report.concerns.push('HUD screen projection failed: check camera/ray compatibility');
+    }
+    if (report.hud.cameraMissing > 0) {
+        report.concerns.push('HUD camera was unavailable for one or more Scene updates');
+    }
     if ((report.handles.input?.missingPointer ?? 0) > 0) {
         report.concerns.push('Some handle events did not provide usable Scene pointer coordinates');
     }
