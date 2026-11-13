@@ -12,6 +12,8 @@ const compile = name => ts.transpileModule(
 ).outputText;
 const planes = { exports: {} };
 vm.runInNewContext(compile('PlaneHandleGeometry'), planes);
+const axes = { exports: {} };
+vm.runInNewContext(compile('AxisHandleGeometry'), axes);
 const math = { exports: {} };
 vm.runInNewContext(compile('PositionDragSolver'), math);
 const edits = { exports: {} };
@@ -49,6 +51,7 @@ vm.runInNewContext(compile('GizmoHudProjection'), {
     exports: projection.exports,
     require(name) {
         if (name === 'cc') return { Vec3 };
+        if (name === './AxisHandleGeometry') return axes.exports;
         if (name === './PlaneHandleGeometry') return planes.exports;
         if (name === './PositionDragSolver') return math.exports;
         throw new Error('Unknown projection import ' + name);
