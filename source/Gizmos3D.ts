@@ -294,6 +294,13 @@ class GizmosDebugDraw extends Component {
             this._spriteMap.set(id, sprite);
             sprite.node.setParent(this._root2D);
             sprite.node.layer = GizmosDebugDraw.overlayLayer;
+            // The screen HUD is submitted last. Prevent 3D Sprite overlays
+            // from sorting above the Scene HUD in Cocos 3.8.8's UI pass.
+            const Sorting2D = (require('cc') as any).Sorting2D;
+            if (typeof Sorting2D === 'function') {
+                const sorting: any = sprite.node.addComponent(Sorting2D);
+                if (sorting) sorting.sortingOrder = -32767;
+            }
         }
         return sprite;
     }
@@ -305,6 +312,11 @@ class GizmosDebugDraw extends Component {
             this._labelMap.set(id, label);
             label.node.setParent(this._root2D);
             label.node.layer = GizmosDebugDraw.overlayLayer;
+            const Sorting2D = (require('cc') as any).Sorting2D;
+            if (typeof Sorting2D === 'function') {
+                const sorting: any = label.node.addComponent(Sorting2D);
+                if (sorting) sorting.sortingOrder = -32767;
+            }
         }
         return label;
     }
