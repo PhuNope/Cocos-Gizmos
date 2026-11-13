@@ -14,6 +14,8 @@ import { createSceneHudProjection, createViewportHudProjection } from './GizmoHu
 import { normalizeHudItems } from './GizmoPresentation';
 import { GizmoEditSession } from './GizmoEditSession';
 import { planeHandleGeometry, PlaneHandleGeometry } from './PlaneHandleGeometry';
+import { axisHandleGeometry, axisDragNormal, axisSegmentDistanceSquared,
+    AxisRayGeometry } from './AxisHandleGeometry';
 import { GizmoHudLayout } from './GizmoHudLayout';
 import { resolveSceneCamera } from './SceneCameraBridge';
 import {
@@ -201,6 +203,44 @@ function planePlacement(component: Component, field: Field,
     field.planeSize ?? 36, field.planeOffset ?? 48);
 }
 
+/** Position of a compact X/Y/Z ray on the same local/world basis as the
+ * editable Vec3; no new serialized properties or Scene nodes are created.
+ */
+function axisPlacement(component: Component, field: Field,
+    local: Point, world: Point): AxisRayGeometry | null {
+    if (field.visual !== 'axis' || !field.axis) return null;
+    const space = spaceFor(component, field);
+    const next = { ...local, [field.axis]: local[field.axis] + 1 };
+    const point = space.toWorld(next);
+    const direction = { x: point.x - world.x, y: point.y - world.y,
+        z: point.z - world.z };
+    const unit = field.axis === 'x' ? { x: direction.x, y: direction.y, z: direction.z } :
+        direction;
+    const axes = { x: unit, y: unit, z: unit };
+    return axisHandleGeometry(world, axes, field.axis,
+        markerSize(world) / 22, field.axisSize ?? 78);
+}
+
+function positionAxisHitProxy(controller: any, geometry: AxisRayGeometry): void {
+    const face = (controller?._editHandlesShape?.children || []).find(
+        (child: any) => child?.name === 'y');
+    if (!face || face.isValid === false) return;
+    const at = geometry.center;
+    face.setWorldPosition?.(new Vec3(at.x, at.y, at.z));
+    face.setWorldScale?.(new Vec3(geometry.size, geometry.size, geometry.size));
+    // The native BoxController +Y face is in the XZ plane. Face it towards
+    // the Scene camera so it remains raycastable in angled 3D views.
+    const rotation = camera()?.node?.worldRotation;
+    if (rotation && typeof Quat.fromEuler === 'function' &&
+        typeof Quat.multiply === 'function') {
+        const correction = new Quat();
+        Quat.fromEuler(correction, 90, 0, 0);
+        const orientation = new Quat();
+        Quat.multiply(orientation, rotation, correction);
+        face.setWorldRotation?.(orientation);
+    }
+}
+
 /** Native BoxController +Y face is the only reliable Creator 3.8 hit proxy.
  * Move/scale that private face to cover the plane tile in world space.
  * Its event callbacks still run through the existing GizmoEditSession.
@@ -263,6 +303,15 @@ function drawSelectedPositionMarkers(component: Component): void {
             const color = new Color(255, 190, 40, 255);
             if (typeof field.color === 'string' && typeof Color.fromHEX === 'function') {
                 Color.fromHEX(color, field.color);
+            }
+            const ray = !onCanvas ? axisPlacement(component, field, local, world) : null;
+            if (ray) {
+                const point = (v: Point) => new Vec3(v.x, v.y, v.z);
+                Gizmos3D.beginColor(node, color);
+                Gizmos3D.drawLine(node, point(ray.start), point(ray.end));
+                Gizmos3D.drawLine(node, point(ray.end), point(ray.tipLeft));
+                Gizmos3D.drawLine(node, point(ray.end), point(ray.tipRight));
+                continue;
             }
             const plane = !onCanvas ? planePlacement(component, field, local, world) : null;
             if (plane) {
@@ -731,6 +780,10 @@ function createEditorGizmo(
                 (field.index === undefined || Number.isInteger(field.index) && field.index >= 0) &&
                 readField(component, field) !== null &&
                 (field.visual !== 'plane' || field.plane !== 'view') &&
+                (field.visual !== 'axis' || field.axis === 'x' ||
+                    field.axis === 'y' || field.axis === 'z') &&
+                (field.axisSize === undefined || Number.isFinite(field.axisSize) &&
+                    field.axisSize >= 24 && field.axisSize <= 200) &&
                 (field.planeSize === undefined || Number.isFinite(field.planeSize) &&
                     field.planeSize >= 12 && field.planeSize <= 120) &&
                 (field.planeOffset === undefined || Number.isFinite(field.planeOffset) &&
@@ -757,6 +810,7 @@ function createEditorGizmo(
                     field.space || 'local', field.axis, field.snap,
                     field.color, field.bounds, field.id,
                     field.visual || 'point', field.planeSize, field.planeOffset,
+                    field.axisSize,
                 ]),
                 controls: hudControlLayoutSignature(controls),
             });
@@ -963,12 +1017,14 @@ function createEditorGizmo(
                     Color.fromHEX(color, entry.field.color);
                 configurePositionHitProxy(entry.controller, color, true);
                 const tile = planePlacement(component, entry.field, local, world);
-                const center = tile?.center || world;
+                const ray = axisPlacement(component, entry.field, local, world);
+                const center = ray?.center || tile?.center || world;
                 entry.controller.setPosition?.(new Vec3(center.x, center.y, center.z));
                 entry.controller.setRotation?.(new Quat());
-                const size = tile?.size || markerSize(world);
+                const size = ray?.size || tile?.size || markerSize(world);
                 setMarkerSize(entry.controller, size);
                 if (tile) positionPlaneHitProxy(entry.controller, entry.field.plane, tile);
+                if (ray) positionAxisHitProxy(entry.controller, ray);
                 if (!entry.visual?.node?.isValid) {
                     const color = new Color(255, 174, 66, 255);
                     if (entry.field.color && Color.fromHEX)
@@ -978,7 +1034,7 @@ function createEditorGizmo(
                 }
                 if (entry.visual?.node?.isValid) {
                     const visible = entry.visual.node;
-                    visible.active = true;
+                    visible.active = entry.field.visual !== 'axis';
                     visible.setWorldPosition(new Vec3(center.x, center.y, center.z));
                     const rotation = camera()?.node?.worldRotation;
                     if (rotation) visible.setWorldRotation(rotation);
@@ -1008,8 +1064,10 @@ function createEditorGizmo(
                                 // Keep MeshRenderer as fallback for unusual Editor cameras.
                             }
                         }
-                        entry.visual.sprite.node.active = projected;
-                        entry.visual.renderer.enabled = !projected;
+                        entry.visual.sprite.node.active = projected &&
+                            entry.field.visual !== 'axis';
+                        entry.visual.renderer.enabled = !projected &&
+                            entry.field.visual !== 'axis';
                     }
                 }
             }
@@ -1240,7 +1298,12 @@ function createEditorGizmo(
             if (!original) return;
             const transform = spaceFor(target, entry.field);
             const forward = camera()?.node?.forward || ray.d;
-            const normal = handlePlaneNormal(entry.field.plane || 'xy', transform, original, forward);
+            const axis = entry.field.visual === 'axis' ?
+                axisPlacement(target, entry.field, original,
+                    transform.toWorld(original)) : null;
+            const normal = axis ?
+                axisDragNormal(axis.unit, forward) :
+                handlePlaneNormal(entry.field.plane || 'xy', transform, original, forward);
             if (!normal) return;
             try {
                 const solver = new PositionDragSolver(original, transform, normal, entry.field);
@@ -1334,9 +1397,24 @@ function createEditorGizmo(
                 const world = spaceFor(this.target as Component, entry.field).toWorld(local);
                 if (!validPoint(world)) continue;
                 const tile = planePlacement(this.target as Component, entry.field, local, world);
-                const center = tile?.center || world;
+                const ray = axisPlacement(this.target as Component, entry.field, local, world);
+                const center = ray?.center || tile?.center || world;
                 const screen = new Vec3();
                 try {
+                    if (ray) {
+                        const a = new Vec3();
+                        const b = new Vec3();
+                        view.worldToScreen(new Vec3(ray.start.x, ray.start.y, ray.start.z), a);
+                        view.worldToScreen(new Vec3(ray.end.x, ray.end.y, ray.end.z), b);
+                        const distanceSquared = axisSegmentDistanceSquared(
+                            pointer, a, b);
+                        if (distanceSquared <= ray.pixelWidth * ray.pixelWidth &&
+                            distanceSquared < bestDistanceSquared) {
+                            nearest = entry;
+                            bestDistanceSquared = distanceSquared;
+                        }
+                        continue;
+                    }
                     view.worldToScreen(new Vec3(center.x, center.y, center.z), screen);
                 } catch {
                     continue;
