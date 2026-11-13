@@ -151,10 +151,13 @@ async function syncSceneSelection(selected, revision = ++selectionRevision) {
 }
 async function onSelectionSelect(type, uuid) {
     if (type !== 'node') return;
+    // Creator 3.8 may dispatch one UUID or an array of node UUIDs.
+    const ids = (Array.isArray(uuid) ? uuid : [uuid])
+        .filter(id => typeof id === 'string' && id.length > 0);
     // Creator can fire select before getSelected('node') reflects the new
-    // value. The event UUID is authoritative for the first click.
+    // value. The event UUIDs are authoritative for the first click.
     const selected = selectedNodeIds();
-    if (typeof uuid === 'string' && !selected.includes(uuid)) selected.push(uuid);
+    for (const id of ids) if (!selected.includes(id)) selected.push(id);
     const revision = ++selectionRevision;
     try { await syncSceneSelection(selected, revision); }
     catch (error) { console.warn('[cocos-gizmos/selection] select sync:', error); }
@@ -162,21 +165,23 @@ async function onSelectionSelect(type, uuid) {
     await new Promise(resolve => setTimeout(resolve, 0));
     if (revision === selectionRevision) {
         const final = selectedNodeIds();
-        if (typeof uuid === 'string' && !final.includes(uuid)) final.push(uuid);
+        for (const id of ids) if (!final.includes(id)) final.push(id);
         try { await syncSceneSelection(final); }
         catch (error) { console.warn('[cocos-gizmos/selection] select reconcile:', error); }
     }
 }
 async function onSelectionUnselect(type, uuid) {
     if (type !== 'node') return;
+    const unselected = new Set((Array.isArray(uuid) ? uuid : [uuid])
+        .filter(id => typeof id === 'string'));
     // Do not leave the last selected component cached when clicking empty.
-    const selected = selectedNodeIds().filter(id => id !== uuid);
+    const selected = selectedNodeIds().filter(id => !unselected.has(id));
     const revision = ++selectionRevision;
     try { await syncSceneSelection(selected, revision); }
     catch (error) { console.warn('[cocos-gizmos/selection] unselect sync:', error); }
     await new Promise(resolve => setTimeout(resolve, 0));
     if (revision === selectionRevision) {
-        try { await syncSceneSelection(selectedNodeIds().filter(id => id !== uuid)); }
+        try { await syncSceneSelection(selectedNodeIds().filter(id => !unselected.has(id))); }
         catch (error) { console.warn('[cocos-gizmos/selection] unselect reconcile:', error); }
     }
 }
