@@ -44,6 +44,14 @@ exports.methods = {
     gizmosGetViewSettings() { return presentation ? presentation.getSettings() : { display: 'always', hud: 'selected' }; },
     gizmosSetViewSettings(value) { return presentation ? presentation.configure(value) : { display: 'always', hud: 'selected' }; },
     gizmosHudStatus() { return presentation ? presentation.getStats() : { hudLabels: 0, defaults: null }; },
+    gizmosExampleClassStatus() {
+        const { inspectGizmoExampleClasses } =
+            require('./editor-runtime/GizmoExampleClassDiagnostics.js');
+        let engine = null;
+        try { engine = require('cc'); }
+        catch { /* A detached Scene process may not expose the Cocos engine. */ }
+        return inspectGizmoExampleClasses(engine);
+    },
     gizmosSmokeReport() {
         const { buildGizmoSmokeReport } = require('./editor-runtime/GizmoDiagnostics.js');
         const editor = globalThis.Editor || globalThis.window?.Editor;
