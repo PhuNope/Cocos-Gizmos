@@ -1,11 +1,11 @@
-import { Vec3 } from 'cc';
+import { Quat, Vec3 } from 'cc';
 import { intersectHandlePlane } from './PositionDragSolver';
 
 type Point = { x: number; y: number; z: number };
 type Ray = { o: Vec3; d: Vec3 };
 
 export interface SceneHudCamera {
-    node?: { forward?: Vec3 };
+    node?: { forward?: Vec3; worldRotation?: Quat };
     viewport?: { width: number; height: number };
     /** Refresh private renderer matrices after Scene wheel/pan before ray projection. */
     sync?(): void;
