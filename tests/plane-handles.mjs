@@ -69,7 +69,9 @@ for (const option of ['pickSize: 24', 'axisSize: 66', 'planeSize: 18', 'planeOff
     'hoverColor:', 'showPositionLabel: true'])
     assert.ok(sample.includes(option),
         '3D demo demonstrates public option ' + option);
-assert.ok(!sample.includes('snap:'),
+// Check executable configuration lines, not comments such as "No snap:".
+assert.ok(!sample.split(/\r?\n/).some(line =>
+    !line.trimStart().startsWith('//') && /\bsnap\s*:/.test(line)),
     'The demo no longer forces snapping while dragging its handles');
 
 const axisSource = readFileSync(path.join(root, 'source/AxisHandleGeometry.ts'), 'utf8');
