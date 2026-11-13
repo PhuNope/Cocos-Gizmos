@@ -1229,6 +1229,10 @@ function createEditorGizmo(
             const handleName = readSceneHandleName(event);
             if (handleName && handleName !== entry.key) return;
             const view = readScenePointer(event);
+            // The native BoxController can receive a left click immediately
+            // after middle-button Scene pan, before the next BEFORE_DRAW. Its
+            // camera matrices must be current before PositionDragSolver starts.
+            if (view) camera()?.sync?.();
             const ray = view && sceneRay(view);
             if (!ray) { input.record('missingPointer'); return; }
             const target = this.target as Component;
