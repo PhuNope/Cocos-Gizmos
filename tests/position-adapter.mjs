@@ -140,15 +140,19 @@ const manager = {
     },
 };
 const cam = {
-    rays: 0,
+    rays: 0, panX: 0, panY: 0, updates: 0,
     node: { forward: new Vec3(0, 0, -1) },
     geometryRenderer: {},
+    update(force) {
+        assert.equal(force, true);
+        this.updates++;
+    },
     screenPointToRay(out, x, y) {
         if (!out?.o || !out?.d || typeof x !== 'number') {
             throw new Error('The renderer scene camera requires (out, x, y)');
         }
         this.rays++;
-        out.o = new Vec3(x, y, 100);
+        out.o = new Vec3(x + this.panX, y + this.panY, 100);
         out.d = new Vec3(0, 0, -1);
         return out;
     },
@@ -156,7 +160,7 @@ const cam = {
         if (!out || typeof point?.x !== 'number') {
             throw new Error('The renderer scene camera requires (out, worldPosition)');
         }
-        out.set(point.x, point.y, 0);
+        out.set(point.x - this.panX, point.y - this.panY, 0);
     },
 };
 const node = {
@@ -242,6 +246,43 @@ assert.equal(typeof gizmo.onNotGizmoMouseMove, 'function');
 assert.equal(typeof gizmo.onNotGizmoMouseUp, 'function');
 assert.equal(gizmo.shouldRegisterGizmoOperationEvent, true);
 const ctrl = gizmo.controllers[0];
+// User regression: middle-button pan after a 2D point drag leaves the Scene
+// operation stuck and subsequent left clicks cannot acquire the point.
+// Mouse button 1 must NEVER be treated as position or HUD drag input.
+const editsBeforePan = events.length;
+const previousRayCount = cam.rays;
+cam.panX = 75;
+cam.panY = 30;
+gizmo.onNotGizmoMouseDown({ button: 1, x: 75, y: -30 });
+gizmo.onGizmoMouseDown({ detail: { button: 1 }, x: 75, y: -30 });
+ctrl.onControllerMouseDown({
+    getButton() { return 1; }, handleName: 'y', x: 75, y: -30,
+});
+gizmo.onNotGizmoMouseMove({ buttons: 4, x: 75, y: -30 });
+gizmo.onNotGizmoMouseUp({ button: 1 });
+gizmo.onGizmoMouseUp({ button: 1 });
+assert.equal(gizmo.diagnosticState().draggingPosition, false,
+    'Pan with middle mouse never starts or leaves a position drag');
+assert.deepEqual([component.target.x, component.target.y], [150, 0],
+    'Camera pan cannot modify serialized 2D point coordinates');
+assert.equal(events.length, editsBeforePan,
+    'Pan cannot start/end an undo transaction');
+assert.equal(cam.rays, previousRayCount,
+    'Pan is not interpreted as a position raycast');
+const syncBefore = cam.updates;
+gizmo.onNotGizmoMouseDown({ button: 0, x: 75, y: -30 });
+assert.equal(gizmo.diagnosticState().draggingPosition, true,
+    'Clicking screen-space marker after pan must start a new 2D drag');
+assert.ok(cam.updates > syncBefore,
+    'The Scene camera is synchronized before the post-pan raycast');
+gizmo.onNotGizmoMouseMove({ buttons: 1, x: 100, y: -15 });
+gizmo.onNotGizmoMouseUp({ button: 0 });
+assert.deepEqual([component.target.x, component.target.y], [175, 15],
+    'Marker remains draggable at its panned screen location');
+component.target = new Vec3(150, 0, 0);
+cam.panX = 0;
+cam.panY = 0;
+gizmo.refreshHandles();
 const handleSnapshot = ctrl._handleDataMap['position:target:single'];
 assert.ok(handleSnapshot.oriColors[0] && Number.isFinite(handleSnapshot.oriColors[0].a),
     'The Creator native handle always gets a valid RGBA color snapshot');
