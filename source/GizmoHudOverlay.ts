@@ -46,8 +46,12 @@ export class GizmoHudOverlay {
             Gizmos3D.beginColor(node, color);
             const id = 'cocos-gizmos:hud:' +
                 (placement ? placement.namespace + ':' : '') + item.id;
+            // Never let the Editor drive a UI_3D label to microscopic
+            // world scale while zooming very close to the selected Node.
+            // World-scale billboarding keeps its visible size consistent.
+            const labelScale = Math.max(0.002, Math.min(4, projection.pixelSize));
             Gizmos3D.drawLabel(node, id, item.text,
-                projection.worldAt(screen.x, screen.y), item.fontSize, projection.pixelSize);
+                projection.worldAt(screen.x, screen.y), item.fontSize, labelScale);
             drawn++;
         }
         this.drawn += drawn;
