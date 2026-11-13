@@ -91,19 +91,20 @@ export default class CocosGizmos3DDemo extends Component {
             // Same API pattern as the supplied Cocos Gizmo Kit examples:
             // one Vec3 property, native XYZ dragging + XY/XZ/YZ plane squares.
             // The preset keeps all six regions in sync with moveObject.
+            // No snap: Move Object Position tracks fractional mouse movement.
             ...Gizmos3D.move('moveObject', {
-                space: 'local', snap: 0.25,
+                space: 'local',
                 axisSize: 66, pickSize: 24,
-                planeSize: 22, planeOffset: 22,
+                planeSize: 18, planeOffset: 14,
                 boxSize: 0.7, // Same size as the orange moveObject wire box.
                 hoverColor: '#ffff65',
                 showPositionLabel: true, positionLabelOffset: 82,
             }),
-            { property: 'xyPoint', plane: 'xy', space: 'local', snap: 0.25,
+            { property: 'xyPoint', plane: 'xy', space: 'local',
                 color: '#ffcc00' },
-            { property: 'xzPoint', plane: 'xz', space: 'local', snap: 0.25,
+            { property: 'xzPoint', plane: 'xz', space: 'local',
                 color: '#00ffff' },
-            { property: 'yzPoint', plane: 'yz', space: 'local', snap: 0.25,
+            { property: 'yzPoint', plane: 'yz', space: 'local',
                 color: '#ff66ff' },
             { property: 'controlPoints', index: 0, plane: 'view', space: 'local',
                 color: '#ffffff' },

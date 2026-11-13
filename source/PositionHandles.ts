@@ -206,7 +206,7 @@ function planePlacement(component: Component, field: Field,
     return planeHandleGeometry(world, {
         x: basis('x'), y: basis('y'), z: basis('z'),
     }, field.plane, pixel,
-    field.planeSize ?? 22, field.planeOffset ?? 22);
+    field.planeSize ?? 18, field.planeOffset ?? 14);
 }
 
 /** Position of a compact X/Y/Z ray on the same local/world basis as the
@@ -985,7 +985,7 @@ function createEditorGizmo(
                 (field.planeSize === undefined || Number.isFinite(field.planeSize) &&
                     field.planeSize >= 12 && field.planeSize <= 120) &&
                 (field.planeOffset === undefined || Number.isFinite(field.planeOffset) &&
-                    field.planeOffset >= 16 && field.planeOffset <= 180));
+                    field.planeOffset >= 12 && field.planeOffset <= 180));
         }
 
         private hudDescriptors(): HudControl[] {

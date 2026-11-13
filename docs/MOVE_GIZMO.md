@@ -18,9 +18,9 @@ export class EditableWaypoint3D extends Component {
     public onGizmoHandles(): GizmoHandleList {
         return [
             ...Gizmos3D.move('waypoint', {
-                space: 'local', snap: 0.25,
+                space: 'local',
                 axisSize: 66, pickSize: 24,
-                planeSize: 22, planeOffset: 22,
+                planeSize: 18, planeOffset: 14,
                 // Khi component đã vẽ box, chọn/kéo được cả phần bên trong.
                 boxSize: 0.7,
                 hoverColor: '#ffff65',
@@ -41,6 +41,8 @@ export class EditableWaypoint3D extends Component {
     }
 }
 ```
+
+**Kéo liên tục:** không cấu hình `snap` thì mọi điểm được cập nhật bằng tọa độ số thực theo chuột, không bị nhảy theo bước. Nếu cần căn lưới, có thể thêm `snap: 0.25`.
 
 **Vùng tương tác:** ba tia đỏ X, xanh lá Y, xanh dương Z; các ô nhỏ XY, XZ, YZ gần gốc. Kéo tia khóa một trục, kéo ô khóa mặt phẳng. Native BoxController dùng +Y editable face làm hit proxy, với footprint lớn hơn và dự phòng hit-test trên toàn thân tia. Vùng hiển thị nhỏ hơn vùng nhấp, nên giao diện vẫn gọn. Dùng `pickSize: 30` khi cần vùng bắt chuột lớn hơn (hợp lệ từ 12 đến 72 pixel).
 
@@ -64,7 +66,7 @@ public onGizmoHandles(): GizmoHandleList {
           plane: 'view', visual: 'axis', pickSize: 28,
           color: '#ff5555', hoverColor: '#ffff66' },
         { property: 'waypoint', id: 'move-yz', plane: 'yz',
-          visual: 'plane', planeSize: 22, planeOffset: 22,
+          visual: 'plane', planeSize: 18, planeOffset: 14,
           pickSize: 24, color: '#ff77dd' },
     ];
 }

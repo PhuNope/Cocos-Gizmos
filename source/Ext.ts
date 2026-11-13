@@ -22,7 +22,7 @@ declare global {
         space?: GizmoHandleSpace;
         /** Lock movement to one axis in the selected coordinate space. */
         axis?: GizmoHandleAxis;
-        /** Positive snap interval, expressed in the selected coordinate space. */
+        /** Optional snap interval; omit for continuous, unsnapped dragging. */
         snap?: number;
         /** Optional minimum and maximum values for each coordinate. */
         bounds?: {
@@ -38,9 +38,9 @@ declare global {
          * reference the same Vec3 property using distinct ids.
          */
         visual?: 'point' | 'plane' | 'axis' | 'box';
-        /** Visible length of an axis arrow in Scene pixels (default 78). */
+        /** Visible length of an axis arrow in Scene pixels (default 66). */
         axisSize?: number;
-        /** Radius in Scene pixels used for easier axis/plane selection (default 23). */
+        /** Radius in Scene pixels used for easier axis/plane selection (default 24). */
         pickSize?: number;
         /** Highlight color while hovered or dragged, e.g. '#ffff55'. */
         hoverColor?: string;
@@ -48,15 +48,15 @@ declare global {
          * When several handles edit the same property, the label is drawn once.
          */
         showPositionLabel?: boolean;
-        /** Label's vertical offset in screen pixels (default 92). */
+        /** Label's vertical offset in screen pixels (default 82). */
         positionLabelOffset?: number;
         /** Selectable 3D object box side length in WORLD/local units.
          * Set on a move handle when the object already draws its own box.
          */
         boxSize?: number;
-        /** Side length of the plane square in Scene pixels (default 36). */
+        /** Side length of the plane square in Scene pixels (default 18). */
         planeSize?: number;
-        /** Offset of the square along its two axes in pixels (default 48). */
+        /** Offset of the square along its two axes in pixels (default 14). */
         planeOffset?: number;
     }
 

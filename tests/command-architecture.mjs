@@ -31,8 +31,12 @@ assert.notEqual(move[0], move[1], 'Descriptors never share mutable model objects
 const compactDefaults = presets.makeMoveGizmo('compact');
 assert.equal(compactDefaults[0].axisSize, 66);
 assert.equal(compactDefaults[0].pickSize, 24);
-assert.equal(compactDefaults[3].planeSize, 22);
-assert.equal(compactDefaults[3].planeOffset, 22);
+assert.equal(compactDefaults[3].planeSize, 18);
+assert.equal(compactDefaults[3].planeOffset, 14);
+assert.ok(compactDefaults.every(handle => handle.snap === undefined),
+    'Move Gizmo defaults to continuous floating-point dragging');
+assert.equal(presets.makeMoveGizmo('close', { planeOffset: 12 })[3].planeOffset, 12);
+assert.throws(() => presets.makeMoveGizmo('invalid', { planeOffset: 11 }), /planeOffset/);
 assert.equal(compactDefaults[0].positionLabelOffset, 82);
 assert.deepEqual(plain(presets.makePointGizmo('origin')),
     { property: 'origin', visual: 'point', plane: 'xy', space: 'local',

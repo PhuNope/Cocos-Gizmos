@@ -25,8 +25,8 @@ export function unitPlaneVector(vector: PlaneVec3): PlaneVec3 | null {
     return scale(vector, 1 / length);
 }
 
-/** A 22px square centered 22px along each of its two positive local axes.
- * The compact tile stays close to the origin while avoiding axis hit regions.
+/** An 18px square centered 14px along each of its two positive local axes.
+ * Its inner corner is only 5px from each axis origin, while remaining selectable.
  * Pixel size is a world-space scalar from the Scene camera ray projection.
  */
 export function planeHandleGeometry(
@@ -34,8 +34,8 @@ export function planeHandleGeometry(
     basis: PlaneHandleBasis,
     plane: PlaneHandleKind,
     worldUnitsPerPixel: number,
-    sizePixels = 22,
-    insetPixels = 22,
+    sizePixels = 18,
+    insetPixels = 14,
 ): PlaneHandleGeometry | null {
     if (![worldUnitsPerPixel, sizePixels, insetPixels].every(
         value => Number.isFinite(value) && value > 0)) return null;

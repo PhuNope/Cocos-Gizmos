@@ -38,6 +38,16 @@ assert.equal(offset.begin(ray(205, -5)), true);
 assert.deepEqual({ ...offset.move(ray(50, 55)) }, { x: 45, y: 60, z: 0 },
     'Original grab offset remains stable during drag');
 
+const continuous = new PositionDragSolver(initial, identity,
+    { x: 0, y: 0, z: 1 }, { plane: 'xy' });
+assert.equal(continuous.begin(ray(200, 0)), true);
+assert.deepEqual({ ...continuous.move(ray(200.125, 0.375)) },
+    { x: 200.125, y: 0.375, z: 0 },
+    'Unsnapped dragging preserves fractional positions');
+assert.deepEqual({ ...continuous.move(ray(200.1875, 0.4375)) },
+    { x: 200.1875, y: 0.4375, z: 0 },
+    'Small consecutive mouse motions do not jump to grid steps');
+
 const snapped = new PositionDragSolver(initial, identity, { x: 0, y: 0, z: 1 }, {
     plane: 'xy', snap: 25,
     bounds: { min: { x: -300, y: -200 }, max: { x: 300, y: 200 } },

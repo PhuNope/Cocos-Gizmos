@@ -48,7 +48,7 @@ export default class CocosGizmos2DDemo extends Component {
         };
         return [
             Gizmos2D.point('point', {
-                snap: 5, color: '#ffcc00', bounds,
+                color: '#ffcc00', bounds,
             }),
             ...Gizmos2D.points('waypoints', this.waypoints.length, {
                 color: '#00ffff', bounds,
