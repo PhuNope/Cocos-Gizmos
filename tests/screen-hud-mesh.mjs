@@ -91,7 +91,7 @@ const document = {
     },
 };
 const camera = {
-    node: { forward: new Vec3(0, 0, -1) },
+    node: { forward: new Vec3(0, 0, -1), worldRotation: new Quat() },
     viewport: { width: 960, height: 560 },
     pixelWorld: 1,
     screenPointToRay(x, y, out) {
