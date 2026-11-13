@@ -68,9 +68,9 @@ const axisJs = ts.transpileModule(axisSource, {
     compilerOptions: { target: ts.ScriptTarget.ES2017,
         module: ts.ModuleKind.CommonJS },
 }).outputText;
-const axes = { exports: {} };
-vm.runInNewContext(axisJs, axes);
-const { axisHandleGeometry, axisSegmentDistanceSquared, axisDragNormal } = axes.exports;
+const axisModule = { exports: {} };
+vm.runInNewContext(axisJs, axisModule);
+const { axisHandleGeometry, axisSegmentDistanceSquared, axisDragNormal } = axisModule.exports;
 const rays = ['x', 'y', 'z'].map(axis =>
     axisHandleGeometry(origin, {
         x: { x: 1, y: 0, z: 0 },
