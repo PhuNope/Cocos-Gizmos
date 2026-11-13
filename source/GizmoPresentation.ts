@@ -9,6 +9,10 @@ export interface GizmoHudText {
     text: string;
     order: number;
     fontSize: number;
+    /** Minimum rendered font height in screen pixels (default 12). */
+    minSize?: number;
+    /** Maximum rendered font height in screen pixels (default 24). */
+    maxSize?: number;
     color: string;
 }
 
@@ -52,9 +56,16 @@ export function normalizeHudItems(value: unknown, maxItems = 24): GizmoHudText[]
             order: typeof item.order === 'number' && Number.isFinite(item.order) ? item.order : 0,
             fontSize: typeof item.fontSize === 'number' && Number.isFinite(item.fontSize)
                 ? Math.max(9, Math.min(60, item.fontSize)) : 14,
+            minSize: typeof item.minSize === 'number' && Number.isFinite(item.minSize)
+                ? Math.max(8, Math.min(64, item.minSize)) : 12,
+            maxSize: typeof item.maxSize === 'number' && Number.isFinite(item.maxSize)
+                ? Math.max(8, Math.min(64, item.maxSize)) : 24,
             color: typeof item.color === 'string' && COLOR_PATTERN.test(item.color)
                 ? item.color : '#ffffff',
         });
+    }
+    for (const item of result) {
+        if (item.maxSize! < item.minSize!) item.maxSize = item.minSize;
     }
     result.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
     return result;
