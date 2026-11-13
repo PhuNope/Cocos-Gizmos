@@ -52,6 +52,7 @@ const gizmos2D = class Gizmos2D {};
 const gizmos3D = class Gizmos3D {};
 const runtime = { exports: {}, console: { info() {}, error() {} },
     require(spec) {
+        if (spec === 'node:path') return require('node:path');
         if (spec === './editor-runtime/Gizmos2D.js') return { Gizmos2D: gizmos2D };
         if (spec === './editor-runtime/Gizmos3D.js') return { Gizmos3D: gizmos3D };
         if (spec === './editor-runtime/ExecuteGizmos.js') return updater;
