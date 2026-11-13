@@ -31,6 +31,7 @@ export class GizmoPresentationService {
         onError?: (component: Component, hook: string, error: unknown) => void,
     ): void {
         this.planned = true;
+        this.overlay.beginFrame();
         this.layout.beginFrame(
             components,
             (component) => this.evaluate(component, selected.has(component.node.uuid)).hud,
@@ -38,9 +39,14 @@ export class GizmoPresentationService {
         );
     }
 
+    public finishFrame(): void {
+        this.overlay.finishFrame(this.layout.totalRows);
+    }
+
     public clearFrame(): void {
         this.planned = false;
         this.layout.clear();
+        this.overlay.clearFrame();
     }
 
 
@@ -69,7 +75,8 @@ export class GizmoPresentationService {
             const count = this.overlay.render(component, plannedPlacement.items, plannedPlacement);
             // On a 2D Canvas, rendering through Gizmos2D must not create a
             // separate 3D debug root just to reset its drawing color.
-            if (count && this.overlay.lastRenderPath !== '2d') {
+            if (count && !this.overlay.isScreenHudActive &&
+                this.overlay.lastRenderPath !== '2d') {
                 Gizmos3D.beginColor(component.node, Gizmos3D.DEFAULT_COLOR);
             }
             return count;
