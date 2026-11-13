@@ -1284,7 +1284,12 @@ function createEditorGizmo(
             // gizmos even after BoxController's onControllerMouseDown has
             // already started a valid gesture. The previous fallthrough
             // finish(true) cancelled it immediately (begin -> cancel).
-            if (this.drag || this.hudDrag || this.pendingClick) return;
+            if (this.drag) return; // Native face already owns the gesture.
+            if (this.hudDrag || this.pendingClick) {
+                // Preserve the existing HUD outside-click cancellation behavior.
+                this.finishHud(true);
+                return;
+            }
             const hud = this.hudEntryAt(event);
             const point = readScenePointer(event);
             // HUD gets priority when on-screen shapes overlap position points.
