@@ -34,20 +34,20 @@ export default class CocosGizmos3DDemo extends Component {
     public testMesh: Mesh | null = null;
 
     @property({ type: Vec3 })
-    public xyPoint = new Vec3(0, 1.5, 0);
+    public xyPoint = new Vec3(0, 0.8, 0);
 
     @property({ type: Vec3 })
-    public xzPoint = new Vec3(2, 0, 2);
+    public xzPoint = new Vec3(1, 0, 0.9);
 
     @property({ type: Vec3 })
-    public yzPoint = new Vec3(0, 2, -2);
+    public yzPoint = new Vec3(0, 1, -0.9);
 
     @property({ type: [Vec3] })
     public controlPoints: Vec3[] = [
-        new Vec3(-2, 0, 0),
-        new Vec3(-1, 1, 0),
-        new Vec3(1, 1, 0),
-        new Vec3(2, 0, 0),
+        new Vec3(-1.2, 0, 0),
+        new Vec3(-0.6, 0.6, 0),
+        new Vec3(0.6, 0.6, 0),
+        new Vec3(1.2, 0, 0),
     ];
 
     public lastEvent = 'none';
@@ -97,9 +97,15 @@ export default class CocosGizmos3DDemo extends Component {
         this.wireframe = true;
         this.depthTest = true;
         this.showLabels = true;
-        this.xyPoint = new Vec3(0, 1.5, 0);
-        this.xzPoint = new Vec3(2, 0, 2);
-        this.yzPoint = new Vec3(0, 2, -2);
+        this.xyPoint = new Vec3(0, 0.8, 0);
+        this.xzPoint = new Vec3(1, 0, 0.9);
+        this.yzPoint = new Vec3(0, 1, -0.9);
+        this.controlPoints = [
+            new Vec3(-1.2, 0, 0),
+            new Vec3(-0.6, 0.6, 0),
+            new Vec3(0.6, 0.6, 0),
+            new Vec3(1.2, 0, 0),
+        ];
         this.lastEvent = 'reset button';
     }
 
