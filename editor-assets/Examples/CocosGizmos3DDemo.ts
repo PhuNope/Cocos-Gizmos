@@ -91,7 +91,7 @@ export default class CocosGizmos3DDemo extends Component {
             // Same API pattern as the supplied Cocos Gizmo Kit examples:
             // one Vec3 property, native XYZ dragging + XY/XZ/YZ plane squares.
             // The preset keeps all six regions in sync with moveObject.
-            ...Gizmos3D.moveHandles('moveObject', {
+            ...Gizmos3D.move('moveObject', {
                 space: 'local', snap: 0.25,
                 axisSize: 86, pickSize: 24,
                 planeSize: 24, planeOffset: 25,
