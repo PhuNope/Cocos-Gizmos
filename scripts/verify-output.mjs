@@ -6,7 +6,7 @@ import ts from 'typescript';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const fail = (message) => { throw new Error('[verify-output] ' + message); };
-const expected = ['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'Gizmos2D.js', 'Gizmos3D.js'].sort();
+const expected = ['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'GizmoHandlePresets.js', 'Gizmos2D.js', 'Gizmos3D.js'].sort();
 const actual = readdirSync(dist).sort();
 if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     fail('Expected runtime and type files, got: ' + actual.join(', '));
@@ -66,6 +66,10 @@ for (const dependency of ['Gizmos2D.js', 'Gizmos3D.js', 'ExecuteGizmos.js']) {
 }
 if (!read('ExecuteGizmos.js').includes("from './SceneUpdateScheduler.js'")) {
     fail('ExecuteGizmos must import the Scene update scheduler');
+}
+for (const module of ['Gizmos2D.js', 'Gizmos3D.js']) {
+    if (!read(module).includes("from './GizmoHandlePresets.js'"))
+        fail(module + ' must import the descriptor factory');
 }
 if (!read('Gizmos2D.js').includes("from './DrawCommandBuffer2D.js'")) {
     fail('Gizmos2D must import the shared 2D command buffer');
