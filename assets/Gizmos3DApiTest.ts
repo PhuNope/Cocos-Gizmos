@@ -283,6 +283,15 @@ export default class Gizmos3DApiTest extends Component {
         Gizmos3D.beginColor(n, new Color(255, 185, 70));
         Gizmos3D.drawBox(n, this.moveObject, new Vec3(0.7, 0.7, 0.7),
             Vec3.ZERO, true);
+        // Kit-style Point3D vector (from Node to the editable point).
+        Gizmos3D.beginColor(n, Color.CYAN);
+        Gizmos3D.drawArrow(n, Vec3.ZERO, this.moveObject, 0.24);
+        // Kit-style Plane3D visualization without creating MeshRenderer.
+        // The normal and square are for reference; the selectable plane
+        // tiles around moveObject are provided by moveHandles() above.
+        Gizmos3D.beginColor(n, new Color(94, 186, 255, 110));
+        Gizmos3D.drawPlanePreview(n, new Vec3(-3, 0, 2),
+            new Vec3(0, 1, 0), 2.4, false);
         Gizmos3D.beginColor(n, Color.YELLOW);
         Gizmos3D.drawLineList(n, this.controlPoints);
         Gizmos3D.endLocalPosition(n);
