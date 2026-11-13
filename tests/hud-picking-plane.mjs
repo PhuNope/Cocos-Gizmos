@@ -48,6 +48,15 @@ class Node {
         this.active = true;
         this.hideFlags = 0;
         this.components = [];
+        this.listeners = new Map();
+    }
+    on(name, callback) {
+        const list = this.listeners.get(name) || [];
+        list.push(callback);
+        this.listeners.set(name, list);
+    }
+    emit(name, event) {
+        for (const callback of this.listeners.get(name) || []) callback(event);
     }
     addChild(node) { node.parent = this; this.children.push(node); }
     addComponent(Type) {
@@ -70,6 +79,10 @@ class MeshRenderer {
     constructor() { this.isValid = true; this.enabled = true; }
     setMaterial(value) { this.material = value; }
 }
+Node.EventType = {
+    MOUSE_DOWN: 'mouse-down', MOUSE_MOVE: 'mouse-move', MOUSE_UP: 'mouse-up',
+    TOUCH_START: 'touch-start', TOUCH_MOVE: 'touch-move', TOUCH_END: 'touch-end',
+};
 class RenderRoot2D {}
 class Sprite {
     constructor() { this.isValid = true; this.spriteFrame = null; }
@@ -96,6 +109,25 @@ class Material {
 }
 let beforeDraw = null;
 const twoDDraws = [];
+const globalInput = {
+    listeners: new Map(),
+    on(type, callback, owner) {
+        const entries = this.listeners.get(type) || [];
+        entries.push({ callback, owner });
+        this.listeners.set(type, entries);
+    },
+    off(type, callback, owner) {
+        const entries = this.listeners.get(type) || [];
+        this.listeners.set(type, entries.filter(item =>
+            item.callback !== callback || item.owner !== owner));
+    },
+    emit(type, event) {
+        for (const item of [...(this.listeners.get(type) || [])]) item.callback(event);
+    },
+    count(type) { return (this.listeners.get(type) || []).length; },
+};
+const MouseTypes = { MOUSE_DOWN: 'mouse-down', MOUSE_MOVE: 'mouse-move',
+    MOUSE_UP: 'mouse-up' };
 const director = {
     on(name, callback) { assert.equal(name, 'before-draw'); beforeDraw = callback; },
     off() { beforeDraw = null; },
@@ -121,6 +153,7 @@ const cc = {
     CCObject: { Flags: { DontSave: 1, HideInHierarchy: 2 } },
     Color, Vec3, Quat, Node, Material, MeshRenderer, Mesh: class Mesh {},
     ImageAsset, Sprite, SpriteFrame, Texture2D, UITransform,
+    input: globalInput, Input: { EventType: MouseTypes },
     gfx: { CullMode: { NONE: 0 } },
     RenderRoot2D,
     Layers: { Enum: { GIZMOS: 4, UI_2D: 16, UI_3D: 32 } },
@@ -317,6 +350,10 @@ assert.ok(positionDisc, '3D selected drag point has its own visible mesh');
 const dragSprite3D = positionDisc.children[0]?.children[0]?.getComponent(Sprite);
 assert.ok(dragSprite3D?.spriteFrame,
     '3D drag point must be visible through the same Sprite UI pipeline as HUD');
+assert.ok(dragSprite3D.node.listeners.get('mouse-down')?.length,
+    'Marker Sprite must register actual Cocos Node mouse input');
+assert.equal(globalInput.count(MouseTypes.MOUSE_DOWN), 1,
+    'Selected 3D Gizmo must subscribe to a global mouse fallback');
 assert.equal(dragSprite3D.node.active, true);
 assert.equal(positionDisc.getComponent(MeshRenderer).enabled, false,
     'Mesh-only drag point is disabled when the UI sprite is available');
@@ -325,18 +362,30 @@ assert.equal(positionDisc.worldPosition.y, 100);
 assert.ok(positionDisc.worldScale.x > 0);
 assert.equal(dragController._cubeNode.active, true,
     'Native drag hit cube is re-activated separately from the point mesh');
-dragGizmo.onNotGizmoMouseDown({ x: 100, y: 100 });
+// Test real input event routing instead of calling Gizmo operation
+// callbacks directly (those may never run for visual UI Sprite nodes).
+globalInput.emit(MouseTypes.MOUSE_DOWN, {
+    getButton() { return 0; }, getLocation() { return { x: 100, y: 100 }; },
+});
 assert.equal(dragGizmo.diagnosticState().draggingPosition, true,
-    'Independent drag point hit-test begins a Scene position edit');
-dragGizmo.onNotGizmoMouseMove({ x: 121, y: 114 });
-dragGizmo.onNotGizmoMouseUp({ x: 121, y: 114 });
+    'Global Cocos input begins drag when native BoxController misses a click');
+globalInput.emit(MouseTypes.MOUSE_MOVE, {
+    getLocation() { return { x: 121, y: 114 }; },
+});
+globalInput.emit(MouseTypes.MOUSE_UP, {
+    getLocation() { return { x: 121, y: 114 }; },
+});
 assert.equal(dragComponent.handlePosition.x, 121);
 assert.equal(dragComponent.handlePosition.y, 114);
 assert.equal(dragGizmo.diagnosticState().draggingPosition, false);
 dragAdapter.refresh([dragComponent], new Set(), 2100);
+assert.equal(globalInput.count(MouseTypes.MOUSE_DOWN), 0,
+    'Deselecting must remove global Scene input listeners');
 assert.equal(positionDisc.active, false,
     'Deselecting hides only the visible disc without destroying its mesh');
 dragAdapter.refresh([dragComponent], new Set([dragNode.uuid]), 2110);
+assert.equal(globalInput.count(MouseTypes.MOUSE_DOWN), 1,
+    'Reselect must register exactly one mouse listener');
 assert.equal(positionDisc.active, true,
     'Selected -> empty -> same node immediately restores visible drag disc');
 dragAdapter.dispose();
@@ -363,9 +412,19 @@ assert.ok(dragSprite2D?.spriteFrame,
     '2D drag point must use a UI Sprite, just like the working Scene HUD');
 assert.equal(dragSprite2D.node.active, true);
 assert.ok(twoDDraws.length >= 2, 'Canvas 2D fallback still draws Graphics markers');
-drag2D.gizmo.onNotGizmoMouseDown({ x: 50, y: 60 });
-drag2D.gizmo.onNotGizmoMouseMove({ x: 75, y: 70 });
-drag2D.gizmo.onNotGizmoMouseUp({ x: 75, y: 70 });
+assert.ok(dragSprite2D.node.listeners.get('mouse-down')?.length,
+    'Canvas drag Sprite also receives native UI mouse input');
+dragSprite2D.node.emit('mouse-down', {
+    getButton() { return 0; }, getUILocation() { return { x: 50, y: 60 }; },
+});
+assert.equal(drag2D.gizmo.diagnosticState().draggingPosition, true,
+    'Direct Sprite MOUSE_DOWN starts a 2D position edit');
+globalInput.emit(MouseTypes.MOUSE_MOVE, {
+    getLocation() { return { x: 75, y: 70 }; },
+});
+globalInput.emit(MouseTypes.MOUSE_UP, {
+    getLocation() { return { x: 75, y: 70 }; },
+});
 assert.equal(drag2D.handlePosition.x, 75);
 assert.equal(drag2D.handlePosition.y, 70);
 dragAdapter2D.dispose();
