@@ -258,6 +258,7 @@ function createPositionVisual(color: Color): PositionVisual | null {
         node.layer = Layers.Enum.GIZMOS;
         node.hideFlags |= CCObject.Flags.DontSave | CCObject.Flags.HideInHierarchy;
         parent.addChild(node);
+        node.active = false; // Only show after the selected component is ready.
         const renderer = node.addComponent(MeshRenderer);
         material = new Material();
         material.initialize({
@@ -416,6 +417,8 @@ function createEditorGizmo(
             if (!controller || this.unavailableMarkers.has(controller)) return;
             this.unregisterController(controller);
             const hud = this.hudEntries.find(entry => entry.controller === controller);
+            const position = this.entries.find(entry => entry.controller === controller);
+            if (position?.visual?.node?.isValid) position.visual.node.active = false;
             suspendNativeController(controller, hud?.picking);
             this.unavailableMarkers.add(controller);
         }
@@ -964,6 +967,40 @@ function createEditorGizmo(
             drag.session.finish(cancelled);
         }
 
+        /** The Editor can hide its native cube even when a component stays
+         * selected. Match the independent position disc in Scene pixels to
+         * start native PositionDragSolver gestures without BoxController hits.
+         * The selection/move gizmos use the same screenPointToRay coordinates.
+         */
+        private positionEntryAt(event: any): Entry | null {
+            if (!this.shown || this.destroyed || !this.entries.length) return null;
+            const pointer = readScenePointer(event);
+            const view = camera();
+            if (!pointer || typeof view?.worldToScreen !== 'function') return null;
+            let nearest: Entry | null = null;
+            let bestDistanceSquared = 18 * 18;
+            for (const entry of this.entries) {
+                const local = readField(this.target as Component, entry.field);
+                if (!local) continue;
+                const world = spaceFor(this.target as Component, entry.field).toWorld(local);
+                if (!validPoint(world)) continue;
+                const screen = new Vec3();
+                try {
+                    view.worldToScreen(new Vec3(world.x, world.y, world.z), screen);
+                } catch {
+                    continue;
+                }
+                const dx = screen.x - pointer.x;
+                const dy = screen.y - pointer.y;
+                const distanceSquared = dx * dx + dy * dy;
+                if (Number.isFinite(distanceSquared) && distanceSquared < bestDistanceSquared) {
+                    nearest = entry;
+                    bestDistanceSquared = distanceSquared;
+                }
+            }
+            return nearest;
+        }
+
         /** Fallback hit-test when Creator consumes a HUD pointer event before
          * its native transparent mesh can receive a Controller callback. */
         private hudEntryAt(event: any): HudEntry | null {
@@ -988,8 +1025,11 @@ function createEditorGizmo(
         public onGizmoMouseDown(event: any): void {
             input.record('gizmoDown');
             const name = readSceneHandleName(event);
-            const entry = this.entries.find((item) => item.key === name);
-            if (entry) this.begin(entry, event);
+            const entry = this.entries.find((item) => item.key === name) ||
+                (!name ? this.positionEntryAt(event) : null);
+            if (entry) this.begin(entry, name ? event : {
+                ...event, ...readScenePointer(event), handleName: entry.key,
+            });
             const hud = this.hudEntries.find((item) => item.key === name) ||
                 (!name ? this.hudEntryAt(event) : null);
             if (hud) this.beginHud(hud, name ? event : {
@@ -1020,6 +1060,14 @@ function createEditorGizmo(
             input.record('outsideDown');
             const hud = this.hudEntryAt(event);
             const point = readScenePointer(event);
+            // HUD gets priority when on-screen shapes overlap position points.
+            if (!hud && point && !this.drag && !this.pendingClick && !this.hudDrag) {
+                const position = this.positionEntryAt(event);
+                if (position) {
+                    this.begin(position, { ...event, ...point, handleName: position.key });
+                    if (this.drag) return;
+                }
+            }
             if (hud && point && !this.drag && !this.pendingClick && !this.hudDrag) {
                 // Controller event routing can be intercepted by another
                 // Gizmo. Use the identical screen rectangle as the HUD mesh.
@@ -1031,6 +1079,7 @@ function createEditorGizmo(
         }
 
         public onNotGizmoMouseMove(event?: any): void {
+            if (this.drag && event) this.move(this.drag.entry, event);
             if (this.hudDrag && event) this.moveHud(this.hudDrag.entry, event);
         }
 
