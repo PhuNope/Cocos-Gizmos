@@ -243,6 +243,7 @@ function createEditorGizmo(
         private hudDrag: HudDrag | null = null;
         private pendingClick: HudEntry | null = null;
         private shown = false;
+        private destroyed = false;
         private layout = '';
         private readonly registeredControllers = new WeakSet<object>();
         private readonly unavailableMarkers = new WeakSet<object>();
@@ -297,6 +298,7 @@ function createEditorGizmo(
         }
 
         public init(): void {
+            this.destroyed = false;
             this.shouldRegisterGizmoOperationEvent = true;
             this.rebuild();
             this._isInitialized = true;
@@ -780,8 +782,10 @@ function createEditorGizmo(
         }
 
         public isHandleVisible(): boolean { return this.shown; }
+        public isHandleDisposed(): boolean { return this.destroyed; }
 
         public onShow(): void {
+            if (this.destroyed) return;
             this.shown = true;
             this.refreshHandles();
             for (const { controller } of [...this.entries, ...this.hudEntries]) {
@@ -840,6 +844,7 @@ function createEditorGizmo(
         }
 
         public onDestroy(): void {
+            this.destroyed = true;
             this.finish(true);
             this.finishHud(true);
             this.shown = false;
@@ -890,16 +895,22 @@ export function createPositionHandleAdapter(
     }
 
     function show(component: Component): any {
+        // Explicitly re-activate on every selection entry, including
+        // A -> no selection -> A. Merely calling gizmo.show() on the stale
+        // component reference does not re-register native Scene operation
+        // picking after an empty selection in Creator 3.8.8.
         let gizmo = (component as any).gizmo;
-        if (!(gizmo instanceof gizmoConstructor)) {
-            try {
-                manager.showComponentGizmo?.(component);
-                gizmo = (component as any).gizmo;
-            } catch {
-                // Use the component pool API when selection has no existing Gizmo.
-            }
+        try {
+            manager.showComponentGizmo?.(component);
+            const mounted = (component as any).gizmo;
+            if (mounted instanceof gizmoConstructor) gizmo = mounted;
+        } catch {
+            // Use createGizmo when Editor keeps a stale component link.
         }
-        if (!(gizmo instanceof gizmoConstructor) && typeof manager.createGizmo === 'function') {
+        if (!(gizmo instanceof gizmoConstructor) || gizmo.isHandleDisposed?.()) {
+            gizmo = null;
+        }
+        if (!gizmo && typeof manager.createGizmo === 'function') {
             for (const key of selectedKeys(component)) {
                 try {
                     gizmo = manager.createGizmo(key, component) || (component as any).gizmo;
@@ -909,7 +920,7 @@ export function createPositionHandleAdapter(
                 }
             }
         }
-        if (!(gizmo instanceof gizmoConstructor)) return null;
+        if (!(gizmo instanceof gizmoConstructor) || gizmo.isHandleDisposed?.()) return null;
         gizmo.show?.();
         // Some Editor Gizmo implementations do not dispatch onShow when
         // reusing a previously hidden component Gizmo. Restore it explicitly.
@@ -964,6 +975,7 @@ export function createPositionHandleAdapter(
                     // Creator can replace component.gizmo while the adapter still
                     // holds the previous instance after an A -> B -> A selection.
                     if (previous !== (component as any).gizmo ||
+                        previous.isHandleDisposed?.() ||
                         previous.isHandleVisible?.() === false) {
                         const restored = show(component);
                         if (restored) active.set(component, restored);
