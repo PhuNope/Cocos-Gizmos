@@ -45,6 +45,7 @@ const manifest = {
       'get-settings': { methods: ['getSettings'] },
       'set-settings': { methods: ['setSettings'] },
       'get-diagnostics': { methods: ['getDiagnostics'] },
+      'get-example-assets': { methods: ['getExampleAssets'] },
     },
   },
 };
