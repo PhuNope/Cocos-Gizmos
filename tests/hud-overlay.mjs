@@ -17,6 +17,8 @@ vm.runInNewContext(compile('GizmoHudControls'), controls);
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
 }
+const bridge = { exports: {} };
+vm.runInNewContext(compile('SceneCameraBridge'), bridge);
 const projection = { exports: {} };
 vm.runInNewContext(compile('GizmoHudProjection'), {
     exports: projection.exports,
@@ -35,10 +37,14 @@ const labels = [];
 const camera = {
     rays: 0,
     node: { forward: new Vec3(0, 0, -1) },
-    worldToScreen(point, out) { Object.assign(out, { x: point.x + 100, y: point.y + 100, z: 1 }); },
-    screenPointToRay(x, y) {
+    geometryRenderer: {},
+    // Creator's internal scene camera uses *out-first* signatures.
+    worldToScreen(out, point) { Object.assign(out, { x: point.x + 100, y: point.y + 100, z: 1 }); },
+    screenPointToRay(out, x, y) {
         this.rays++;
-        return { o: new Vec3(x, y, 10), d: new Vec3(0, 0, -1) };
+        out.o = new Vec3(x, y, 10);
+        out.d = new Vec3(0, 0, -1);
+        return out;
     },
 };
 const sink = {
@@ -57,6 +63,7 @@ const sandbox = {
         if (id === './GizmoPresentation') return {};
         if (id === './GizmoHudControls') return controls.exports;
         if (id === './GizmoHudProjection') return projection.exports;
+        if (id === './SceneCameraBridge') return bridge.exports;
         throw new Error('unexpected module ' + id);
     },
 };
