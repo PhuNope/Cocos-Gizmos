@@ -1,5 +1,6 @@
 import { Component, director, Director, Node } from 'cc';
 import { SceneUpdateScheduler } from './SceneUpdateScheduler';
+import { Gizmos2D } from './Gizmos2D';
 
 // Scene process owns start/stop. A stale sessionStorage flag must not block the updater.
 type UpdateStats = {
@@ -152,6 +153,7 @@ export function start(): UpdateStats {
         stableEngineFrames = 0;
         selectionCache.clear();
         registry.clear();
+        Gizmos2D.clearPendingFrame();
         try { positionHandles?.clear?.(); }
         catch (error) { warnOnce('Position handles pre-scene cleanup failed', error); }
         try { presentation?.clearFrame?.(); }
@@ -221,6 +223,7 @@ export function start(): UpdateStats {
         stats.scene = root && (root.name || root.uuid || '(unnamed scene)');
         if (root !== activeScene) {
             activeScene = root;
+            Gizmos2D.clearPendingFrame();
             selectionCache.clear();
             try { positionHandles?.clear?.(); }
             catch (error) { warnOnce('Position handles cleanup failed', error); }
@@ -290,6 +293,13 @@ export function start(): UpdateStats {
                 catch (error) { warnOnce('onGizmoHud (' + comp.constructor?.name + ')', error); }
             }
         }
+        // Unsaved Scene tabs sometimes restore a GizmosDebugDraw Component
+        // without resuming its lateUpdate. The drag point uses live Editor
+        // picking, but the selected Graphics line would stay at old positions.
+        // Submit 2D geometry at the end of this actual Editor update instead
+        // of waiting for a potentially absent Component.lateUpdate.
+        try { Gizmos2D.flushEditorFrame(); }
+        catch (error) { warnOnce('Scene 2D Graphics flush failed', error); }
         try { presentation?.finishFrame?.(); }
         catch (error) { warnOnce('Screen HUD flush failed', error); }
     }
@@ -319,6 +329,7 @@ export function start(): UpdateStats {
             director.off(Director.EVENT_AFTER_SCENE_LAUNCH, afterSceneLaunch);
             registry.clear();
             selectionCache.clear();
+            Gizmos2D.clearPendingFrame();
             presentation?.clearFrame?.();
         },
     };
