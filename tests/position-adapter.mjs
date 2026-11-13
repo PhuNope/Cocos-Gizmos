@@ -66,7 +66,7 @@ class Base {
             _editHandlesShape: { children: [{ name: 'x', active: true }, { name: 'y', active: true }] },
             _wireFrameBoxNode: { active: true },
             _wireFrameBoxMeshRenderer: { enabled: true },
-            setColor() {}, setEditHandlesColor() {}, setHandleColor() {}, setOpacity() {},
+            setColor() {}, setEditHandlesColor() {}, setHandleColor() {}, setOpacity(alpha) { this.opacity = alpha; },
             initEditHandles() { throw new Error('topNode: unsafe initEditHandles'); },
             showEditHandles() { throw new Error('topNode: unsafe showEditHandles'); },
             initHandle() {},
@@ -181,7 +181,9 @@ assert.equal(gizmo.controllers.length, 1);
 assert.equal(gizmo.controllers[0]._editHandlesShape.active, false,
     'Editable BoxController face handles are never initialized or displayed');
 assert.equal(gizmo.controllers[0]._cubeNode.active, true, 'The rendered point remains visible');
-assert.equal(gizmo.controllers[0]._cubeNodeMR.enabled, true, 'Point mesh rendering is enabled');
+assert.equal(gizmo.controllers[0]._cubeNodeMR.enabled, true, 'Picking mesh stays enabled');
+assert.equal(gizmo.controllers[0].opacity, 0,
+    'Native BoxController cube is transparent; the separately drawn sphere is the only visible dot');
 assert.equal(gizmo.controllers[0]._cubeNode.layer, 4, 'Point marker uses the Gizmos render layer');
 assert.equal(gizmo.controllers[0]._cubeNode.layer, 4,
     'Standalone cube is the only picking marker');
