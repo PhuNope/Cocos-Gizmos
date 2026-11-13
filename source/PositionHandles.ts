@@ -893,7 +893,8 @@ function createEditorGizmo(
             const hud = this.hudEntries.find(entry => entry.controller === controller);
             const position = this.entries.find(entry => entry.controller === controller);
             if (position?.visual?.node?.isValid) position.visual.node.active = false;
-            suspendNativeController(controller, hud?.picking);
+            suspendNativeController(controller, hud?.picking || position?.picking);
+            if (controller.shape) controller.shape.active = false;
             this.unavailableMarkers.add(controller);
         }
 
@@ -901,9 +902,11 @@ function createEditorGizmo(
             if (!this.shown || !controller || !this.unavailableMarkers.has(controller)) return;
             this.unavailableMarkers.delete(controller);
             const hud = this.hudEntries.find(entry => entry.controller === controller);
-            if (hud?.picking?.node?.isValid) hud.picking.node.active = true;
+            const move = this.entries.find(entry => entry.controller === controller);
+            const picking = hud?.picking || move?.picking;
+            if (picking?.node?.isValid) picking.node.active = true;
             else this.ensureMarkerVisible(controller);
-            if (hud && controller.shape) controller.shape.active = true;
+            if (picking && controller.shape) controller.shape.active = true;
             this.registerController(controller);
         }
 
@@ -913,7 +916,8 @@ function createEditorGizmo(
             if (!cube || cube.isValid === false || this.unavailableMarkers.has(controller)) return;
             // HUD quads stay invisible; the BoxCollider cube must never cover
             // the HUD or steal mouse hits from its screen-aligned picker.
-            if (this.hudEntries.some(entry => entry.controller === controller && entry.picking)) return;
+            if (this.hudEntries.some(entry => entry.controller === controller && entry.picking) ||
+                this.entries.some(entry => entry.controller === controller && entry.picking)) return;
             cube.active = true;
             if (controller._cubeNodeMR?.isValid !== false && controller._cubeNodeMR) {
                 controller._cubeNodeMR.enabled = true;
@@ -923,7 +927,8 @@ function createEditorGizmo(
         private hasDestroyedMarkers(): boolean {
             return [...this.entries, ...this.hudEntries].some(({ controller }) =>
                 !controller?._cubeNode || controller._cubeNode.isValid === false) ||
-                this.hudEntries.some(({ picking }) => picking && picking.node.isValid === false);
+                [...this.entries, ...this.hudEntries].some(
+                    ({ picking }) => picking && picking.node.isValid === false);
         }
 
         private registerController(controller: any): void {
@@ -1207,6 +1212,10 @@ function createEditorGizmo(
             camera()?.sync?.();
             const component = this.target as Component;
             if (!component?.node?.isValid) return;
+            const view = camera();
+            const moveProjection = view?.viewport &&
+                this.entries.some(entry => entry.picking) ?
+                createViewportHudProjection(view) : null;
             for (const entry of this.entries) {
                 const local = readField(component, entry.field);
                 if (!local) {
@@ -1224,17 +1233,28 @@ function createEditorGizmo(
                 const color = new Color(255, 174, 66, 255);
                 if (entry.field.color && Color.fromHEX)
                     Color.fromHEX(color, entry.field.color);
-                configurePositionHitProxy(entry.controller, color, true);
+                if (!entry.picking)
+                    configurePositionHitProxy(entry.controller, color, true);
                 const tile = planePlacement(component, entry.field, local, world);
                 const ray = axisPlacement(component, entry.field, local, world);
                 const center = ray?.center || tile?.center || world;
                 entry.controller.setPosition?.(new Vec3(center.x, center.y, center.z));
                 entry.controller.setRotation?.(new Quat());
                 const size = ray?.size || tile?.size || markerSize(world);
-                setMarkerSize(entry.controller, size);
-                if (tile) positionPlaneHitProxy(entry.controller, entry.field.plane,
-                    tile, entry.field);
-                if (ray) {
+                if (!entry.picking) setMarkerSize(entry.controller, size);
+                if (entry.picking) {
+                    updateMovePickingQuad(entry,
+                        projectedMoveGeometry(component, entry.field, local, world, view),
+                        view, moveProjection);
+                    if (entry.controller._editHandlesShape)
+                        entry.controller._editHandlesShape.active = false;
+                    if (entry.controller._cubeNode)
+                        entry.controller._cubeNode.active = false;
+                    if (entry.controller._cubeNodeMR)
+                        entry.controller._cubeNodeMR.enabled = false;
+                } else if (tile) positionPlaneHitProxy(entry.controller,
+                    entry.field.plane, tile, entry.field);
+                if (ray && !entry.picking) {
                     positionAxisHitProxy(entry.controller, ray, entry.field);
                     // The +Y editable face is the actual native hit proxy.
                     // Hide BoxController's own cube, otherwise three chunky
@@ -1243,7 +1263,7 @@ function createEditorGizmo(
                     if (entry.controller._cubeNodeMR)
                         entry.controller._cubeNodeMR.enabled = false;
                 }
-                if (!entry.visual?.node?.isValid) {
+                if (!isMoveHandle(entry.field) && !entry.visual?.node?.isValid) {
                     const color = new Color(255, 174, 66, 255);
                     if (entry.field.color && Color.fromHEX)
                         Color.fromHEX(color, entry.field.color);
@@ -1252,7 +1272,7 @@ function createEditorGizmo(
                 }
                 if (entry.visual?.node?.isValid) {
                     const visible = entry.visual.node;
-                    visible.active = entry.field.visual !== 'axis';
+                    visible.active = !isMoveHandle(entry.field);
                     visible.setWorldPosition(new Vec3(center.x, center.y, center.z));
                     const rotation = camera()?.node?.worldRotation;
                     if (rotation) visible.setWorldRotation(rotation);
@@ -1283,9 +1303,9 @@ function createEditorGizmo(
                             }
                         }
                         entry.visual.sprite.node.active = projected &&
-                            entry.field.visual !== 'axis';
+                            !isMoveHandle(entry.field);
                         entry.visual.renderer.enabled = !projected &&
-                            entry.field.visual !== 'axis';
+                            !isMoveHandle(entry.field);
                     }
                 }
             }
