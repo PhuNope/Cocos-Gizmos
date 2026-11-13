@@ -51,7 +51,7 @@ export default class Gizmos3DApiTest extends Component {
     @property({ type: Vec3 })
     public yzPoint = new Vec3(0, 2, -2);
 
-    /** One object with a center handle and three selectable plane tiles. */
+    /** One object moved using three small XYZ axis arrows. */
     @property({ type: Vec3, displayName: 'Move Object Position' })
     public moveObject = new Vec3(4, 2, 1);
 
@@ -87,21 +87,17 @@ export default class Gizmos3DApiTest extends Component {
 
     public onGizmoHandles(): GizmoHandleList {
         return [
-            // One object, four native handles: the center follows the Inspector
-            // Move Plane selector while the translucent tiles directly select
-            // XY, XZ and YZ without changing the Inspector.
-            { property: 'moveObject', id: 'center',
-                plane: this.getSelectedMovePlane(),
-                space: 'local', snap: 0.25, color: '#ffb94a' },
-            { property: 'moveObject', id: 'move-xy', visual: 'plane',
-                plane: 'xy', planeSize: 40, planeOffset: 52,
-                space: 'local', snap: 0.25, color: '#ffd24b' },
-            { property: 'moveObject', id: 'move-xz', visual: 'plane',
-                plane: 'xz', planeSize: 40, planeOffset: 52,
-                space: 'local', snap: 0.25, color: '#45d8ee' },
-            { property: 'moveObject', id: 'move-yz', visual: 'plane',
-                plane: 'yz', planeSize: 40, planeOffset: 52,
-                space: 'local', snap: 0.25, color: '#f56fd3' },
+            // The three arrows all edit the SAME Vec3. Select a ray to
+            // lock movement to X, Y or Z; no large point/plane tiles remain.
+            { property: 'moveObject', id: 'axis-x', visual: 'axis',
+                plane: 'view', axis: 'x', axisSize: 78,
+                space: 'local', snap: 0.25, color: '#ff595e' },
+            { property: 'moveObject', id: 'axis-y', visual: 'axis',
+                plane: 'view', axis: 'y', axisSize: 78,
+                space: 'local', snap: 0.25, color: '#43df66' },
+            { property: 'moveObject', id: 'axis-z', visual: 'axis',
+                plane: 'view', axis: 'z', axisSize: 78,
+                space: 'local', snap: 0.25, color: '#4b8fff' },
             { property: 'xyPoint', plane: 'xy', space: 'local', snap: 0.25,
                 color: '#ffcc00' },
             { property: 'xzPoint', plane: 'xz', space: 'local', snap: 0.25,
@@ -119,9 +115,8 @@ export default class Gizmos3DApiTest extends Component {
         return [
             { id: 'title', text: 'Gizmos3D API Test', order: 0, color: '#ffff88' },
             { id: 'size', text: 'Size: ' + this.size.toFixed(2), order: 1 },
-            { id: 'move-plane', text: 'Center: ' +
-                this.getSelectedMovePlane().toUpperCase() +
-                '  |  Drag XY / XZ / YZ colored plane squares', order: 1 },
+            { id: 'move-plane', text: 'Drag X (red), Y (green), Z (blue) rays',
+                order: 1 },
             { id: 'depth', text: 'Depth test: ' + this.depthTest, order: 2 },
             { id: 'event', text: 'Last event: ' + this.lastEvent, order: 3, fontSize: 12 },
         ];
@@ -284,18 +279,11 @@ export default class Gizmos3DApiTest extends Component {
         Gizmos3D.drawLine(n, Vec3.ZERO, this.yzPoint);
         Gizmos3D.drawSphere(n, this.xyPoint, 0.2, false, 12, 8);
 
-        // Selected draggable object. The plugin draws native XY/XZ/YZ plane
-        // tiles around this box; all four handles update moveObject.
+        // Selected draggable object: PositionHandles draws the three
+        // compact interactive axis rays, not the old plane tiles.
         Gizmos3D.beginColor(n, new Color(255, 185, 70));
         Gizmos3D.drawBox(n, this.moveObject, new Vec3(0.7, 0.7, 0.7),
             Vec3.ZERO, true);
-        const center = this.moveObject;
-        Gizmos3D.beginColor(n, Color.RED);
-        Gizmos3D.drawLine(n, center, new Vec3(center.x + 1.1, center.y, center.z));
-        Gizmos3D.beginColor(n, Color.GREEN);
-        Gizmos3D.drawLine(n, center, new Vec3(center.x, center.y + 1.1, center.z));
-        Gizmos3D.beginColor(n, Color.BLUE);
-        Gizmos3D.drawLine(n, center, new Vec3(center.x, center.y, center.z + 1.1));
         Gizmos3D.beginColor(n, Color.YELLOW);
         Gizmos3D.drawLineList(n, this.controlPoints);
         Gizmos3D.endLocalPosition(n);
