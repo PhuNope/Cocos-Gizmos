@@ -728,7 +728,7 @@ assert.ok(rotateEvents.includes('rotationEuler:end'));
 // Reset Euler and ensure an edge-on X ring (view forward -Z) is draggable.
 rotateComponent.rotationEuler=new Vec3(0,0,0);
 rotateGizmo.refreshHandles();
-click(rotX,100,170);
+click(rotX,100,145);
 assert.equal(rotateGizmo.diagnosticState().draggingPosition,true,
     'Edge-on X ring starts via screen-space fallback');
 move(rotX,100,190);
