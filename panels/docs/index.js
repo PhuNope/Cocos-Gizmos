@@ -154,7 +154,7 @@ const examples = Object.freeze([
             '    }',
             '  }',
             '}',
-        ].join('\\n'),
+        ].join('\n'),
     },
     {
         id: 'points', group: 'handles', heading: 'Gizmos2D.point() và points()',
