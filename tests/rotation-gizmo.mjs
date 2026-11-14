@@ -119,7 +119,8 @@ assert.ok(phases.includes('end'),'Committed rotation closes Undo transaction');
 const cancelled = new commands.GizmoRotateCommand(current,center,{x:0,y:0,z:1},
     ROTATE_IDENTITY,{axis:'z',twoD:true},
     {read:()=>current,write:value=>{current={...value};}},
-    {rollback:()=>phases.push('rollback')});
+    {begin:()=>phases.push('begin'), rollback:()=>phases.push('rollback'),
+        update:()=>phases.push('update'), end:()=>phases.push('end')});
 assert.equal(cancelled.begin(cast(1,0)),true);
 cancelled.update(cast(-1,0));
 cancelled.cancel();
