@@ -366,7 +366,7 @@ Gizmos3D.drawSphere(node, c, 0.3);
 assert.equal(calls.spheres.at(-1).depth, false,
     'Switching depth test uses the no-depth triangle pool');
 assert.equal(trianglePools[0]._vertexCount, 16 * 8 * 6);
-trianglePools[0]._vertexCount = trianglePools[0]._maxVertices - 6 * 52;
+trianglePools[0]._vertexCount = trianglePools[0]._maxVertices - 3 * 52;
 Gizmos3D.drawSphere(node, c, 0.3);
 const adaptive = calls.spheres.at(-1);
 assert.ok(adaptive.sx <= 16 && adaptive.sy <= 8 &&
