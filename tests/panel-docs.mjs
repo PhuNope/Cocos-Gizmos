@@ -11,7 +11,7 @@ const resetIndex = menu.findIndex(m => m.label === 'Reset Gizmos');
 assert.equal(menu[resetIndex + 1].label, 'Open Document');
 assert.equal(packageManifest.panels.docs.title, 'Gizmos Open Document');
 assert.match(doc.template, /width: 220/);
-assert.match(doc.template, /size: 'large'/);
+assert.match(doc.template, /size: &#39;large&#39;/);
 assert.equal(menu[resetIndex + 1].message, 'open-doc');
 assert.deepEqual(packageManifest.contributions.messages['open-doc'].methods, ['openDoc']);
 assert.match(doc.template, /Gizmos3D\.move/);
