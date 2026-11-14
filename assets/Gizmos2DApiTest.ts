@@ -30,6 +30,10 @@ export default class Gizmos2DApiTest extends Component {
     @property({ type: Vec3 })
     public moveObject = new Vec3(110, -10, 0);
 
+    /** Editable 2D Z rotation in degrees, around this Node's origin. */
+    @property({ type: Vec3, displayName: 'Rotate Z (Euler Degrees)' })
+    public rotationEuler = new Vec3(0, 0, 25);
+
     @property({ type: [Vec3] })
     public waypoints: Vec3[] = [
         new Vec3(-75, -90, 0),
@@ -54,6 +58,11 @@ export default class Gizmos2DApiTest extends Component {
                 planeSize: 18, planeOffset: 14,
                 showPositionLabel: true, bounds,
             }),
+            // A circular rotation handle, similar to the Cocos/Unity Z dial.
+            // Omit snap for smooth rotation; add snap: 15 if desired.
+            ...Gizmos2D.rotate('rotationEuler', {
+                space: 'local', ringSize: 70, pickSize: 14,
+            }),
             Gizmos2D.point('point', {
                 color: '#ffcc00', bounds,
             }),
@@ -70,7 +79,9 @@ export default class Gizmos2DApiTest extends Component {
             { id: 'point', text: 'Point: ' + this.point.x + ', ' + this.point.y, order: 2 },
             { id: 'move', text: 'Move XY: ' + this.moveObject.x.toFixed(1) +
                 ', ' + this.moveObject.y.toFixed(1), order: 3 },
-            { id: 'event', text: 'Last event: ' + this.lastEvent, order: 4, fontSize: 12 },
+            { id: 'rotation', text: 'Rotate Z: ' +
+                this.rotationEuler.z.toFixed(1) + ' deg', order: 4 },
+            { id: 'event', text: 'Last event: ' + this.lastEvent, order: 5, fontSize: 12 },
         ];
     }
 
@@ -118,6 +129,12 @@ export default class Gizmos2DApiTest extends Component {
 
         Gizmos2D.beginLayer(n, Layers.Enum.GIZMOS);
         Gizmos2D.beginLocalPosition(n);
+
+        // Rotated direction pointer in the center of the interactive ring.
+        const angle = this.rotationEuler.z * Math.PI / 180;
+        Gizmos2D.beginColor(n, new Color(255, 210, 125, 255));
+        Gizmos2D.drawLine(n, v(0, 0),
+            v(Math.cos(angle) * 55, Math.sin(angle) * 55));
 
         // Outline shapes
         Gizmos2D.beginColor(n, Color.CYAN);

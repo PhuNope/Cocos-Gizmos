@@ -64,6 +64,10 @@ for (const { src, oldName, name, uuid } of samples) {
     assert.match(mounted, /onGizmoHudControls\(\)/);
     assert.match(mounted, /onGizmoHandles\(\)/);
     assert.match(mounted, /onGizmoChanged\(/);
+    if (name === 'CocosGizmos2DDemo' || name === 'CocosGizmos3DDemo') {
+        assert.match(mounted, /\.rotate\('rotationEuler'/,
+            'Installed example must expose the interactive rotation ring');
+    }
     assert.doesNotMatch(mounted, new RegExp("@ccclass\\('" + oldName + "'\\)"),
         'Mounted Component needs a distinct class name if project already copied examples');
 

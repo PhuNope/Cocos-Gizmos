@@ -16,6 +16,15 @@ const move2dOptions: GizmosMove2DHandleOptions = {
 };
 const move2dHandles: GizmoHandleList = Gizmos2D.move('target', move2dOptions);
 void move2dHandles;
+const rotation3D: GizmosRotateHandleOptions = {
+    space: 'local', snap: 15, ringSize: 80, pickSize: 14,
+};
+const rotation2D: GizmosRotate2DHandleOptions = {
+    space: 'world', ringSize: 70,
+};
+const rotate3DHandles: GizmoHandleList = Gizmos3D.rotate('rotationEuler', rotation3D);
+const rotate2DHandles: GizmoHandleList = Gizmos2D.rotate('rotationEuler', rotation2D);
+void [rotate3DHandles, rotate2DHandles];
 const handle: GizmoHandleDescriptor = {
     property: 'target',
     plane: 'xy',

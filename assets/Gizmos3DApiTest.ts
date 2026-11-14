@@ -55,6 +55,10 @@ export default class Gizmos3DApiTest extends Component {
     @property({ type: Vec3, displayName: 'Move Object Position' })
     public moveObject = new Vec3(2.6, 1.1, 0.8);
 
+    /** One editable Euler orientation, drawn as a box at the Node's origin. */
+    @property({ type: Vec3, displayName: 'Rotate Object (Euler Degrees)' })
+    public rotationEuler = new Vec3(15, 20, 30);
+
     @property({ type: Enum(MovePlane3D), displayName: 'Move Plane' })
     public movePlane: MovePlane3D = MovePlane3D.XY;
 
@@ -98,6 +102,11 @@ export default class Gizmos3DApiTest extends Component {
                 boxSize: 0.7, // Same size as the orange moveObject wire box.
                 hoverColor: '#ffff65',
                 showPositionLabel: true, positionLabelOffset: 82,
+            }),
+            // 3D: three rotation rings, X(red), Y(green), Z(blue).
+            // Drag a ring to rotate; add snap: 15 for stepped rotation.
+            ...Gizmos3D.rotate('rotationEuler', {
+                space: 'local', ringSize: 72, pickSize: 14,
             }),
             { property: 'xyPoint', plane: 'xy', space: 'local',
                 color: '#ffcc00' },
@@ -288,6 +297,11 @@ export default class Gizmos3DApiTest extends Component {
 
         // Selected draggable object: PositionHandles draws the three
         // compact axis rays and three small translucent plane squares.
+        Gizmos3D.beginColor(n, new Color(245, 195, 98));
+        // The rotation ring is centered on this Node; this virtual box
+        // demonstrates the Euler angles without changing the Node transform.
+        Gizmos3D.drawBox(n, Vec3.ZERO, new Vec3(0.9, 0.9, 0.9),
+            this.rotationEuler, true);
         Gizmos3D.beginColor(n, new Color(255, 185, 70));
         Gizmos3D.drawBox(n, this.moveObject, new Vec3(0.7, 0.7, 0.7),
             Vec3.ZERO, true);
