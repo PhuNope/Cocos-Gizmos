@@ -25,6 +25,8 @@ function isUnder2DRenderRoot(node: any): boolean {
 type ScreenRow = { index: number; text: string; color: string; fontSize: number;
     minSize?: number; maxSize?: number; isControl: boolean;
     kind?: 'button' | 'slider' | 'toggle' | 'checkbox';
+    size?: 'small' | 'normal' | 'large';
+    width?: number;
     value?: number | boolean; min?: number; max?: number };
 
 /** Draw CSS-independent, antialiased HUD widgets in the existing texture. */
@@ -259,7 +261,12 @@ class ScreenHudMesh {
                         row.index, viewport, totalRows);
                     const x = screen.x;
                     const y = height - screen.y;
-                    const font = hudTextPixels(row.fontSize, row.minSize, row.maxSize);
+                    const font = row.isControl ?
+                        hudTextPixels(row.fontSize, 10, 18) :
+                        hudTextPixels(row.fontSize, row.minSize, row.maxSize);
+                    // All visual sizes fit inside the shared 22px picking row.
+                    const visualScale = row.size === 'small' ? 0.78 :
+                        row.size === 'large' ? 1.12 : 1;
                     if (row.isControl) {
                         const hit = hudControlScreenRect(viewport, row.index, totalRows);
                         hudRoundedRect(ctx, hit.left * scale,
@@ -277,34 +284,38 @@ class ScreenHudMesh {
                             (row.max as number) > (row.min as number) ?
                             Math.max(0, Math.min(1, (value - (row.min as number)) /
                                 ((row.max as number) - (row.min as number)))) : 0;
-                        const track = hudSliderScreenTrack(viewport, row.index, totalRows);
+                        const track = hudSliderScreenTrack(
+                            viewport, row.index, totalRows, row.width);
                         const trackX = track.left;
                         const trackWidth = track.width;
                         ctx.fillText(row.text, x * scale, y * scale,
                             grid.columnWidth * 0.32 * scale);
                         hudRoundedRect(ctx, trackX * scale, (y - 3) * scale,
-                            trackWidth * scale, 6 * scale, 3 * scale, '#54677e');
+                            trackWidth * scale, 6 * visualScale * scale,
+                            3 * visualScale * scale, '#54677e');
                         if (progress > 0)
                             hudRoundedRect(ctx, trackX * scale, (y - 3) * scale,
-                                trackWidth * progress * scale, 6 * scale, 3 * scale,
+                                trackWidth * progress * scale,
+                                6 * visualScale * scale, 3 * visualScale * scale,
                                 '#7bbaff');
                         hudDisc(ctx, (trackX + trackWidth * progress) * scale,
-                            y * scale, 5 * scale, '#eef8ff');
+                            y * scale, 5 * visualScale * scale, '#eef8ff');
                         ctx.fillStyle = '#c4e4ff';
                         ctx.fillText(String(Math.round(value * 1000) / 1000),
                             (trackX + trackWidth + 9) * scale, y * scale,
                             grid.columnWidth * 0.20 * scale);
                     } else if (row.kind === 'toggle') {
                         const enabled = row.value === true;
-                        const pillX = x + grid.columnWidth - 77;
+                        const pillX = x + grid.columnWidth - 77 * visualScale;
                         ctx.fillStyle = '#e7f1ff';
                         ctx.fillText(row.text, x * scale, y * scale,
                             Math.max(35, grid.columnWidth - 95) * scale);
                         hudRoundedRect(ctx, pillX * scale, (y - 8) * scale,
-                            37 * scale, 16 * scale, 8 * scale,
+                            37 * visualScale * scale, 16 * visualScale * scale,
+                            8 * visualScale * scale,
                             enabled ? '#3ad2a4' : '#55667e');
-                        hudDisc(ctx, (pillX + (enabled ? 28 : 9)) * scale,
-                            y * scale, 6 * scale, '#f6fbff');
+                        hudDisc(ctx, (pillX + (enabled ? 28 : 9) * visualScale) * scale,
+                            y * scale, 6 * visualScale * scale, '#f6fbff');
                         ctx.fillStyle = enabled ? '#98efcf' : '#b3c0d4';
                         ctx.font = 10 * scale + 'px sans-serif';
                         ctx.fillText(enabled ? 'On' : 'Off',
@@ -312,18 +323,24 @@ class ScreenHudMesh {
                     } else if (row.kind === 'checkbox') {
                         const enabled = row.value === true;
                         const left = (x + 2) * scale, top = (y - 7) * scale;
-                        hudRoundedRect(ctx, left, top, 15 * scale, 15 * scale,
-                            3 * scale, enabled ? '#69c9f1' : '#54667b');
+                        hudRoundedRect(ctx, left, top,
+                            15 * visualScale * scale, 15 * visualScale * scale,
+                            3 * visualScale * scale, enabled ? '#69c9f1' : '#54667b');
                         if (enabled)
                             hudCheckboxTick(ctx, left + 2 * scale,
-                                top + 3 * scale, scale);
+                                top + 3 * scale, scale * visualScale);
                         ctx.fillStyle = '#e7f1ff';
-                        ctx.fillText(row.text, (x + 26) * scale, y * scale,
-                            Math.max(35, columnTextWidth - 26) * scale);
+                        const textStart = 9 + 17 * visualScale;
+                        ctx.fillText(row.text, (x + textStart) * scale, y * scale,
+                            Math.max(35, columnTextWidth - textStart) * scale);
                     } else if (row.kind === 'button') {
-                        const width = Math.max(70, Math.min(grid.columnWidth - 40, 150));
-                        hudRoundedRect(ctx, x * scale, (y - 9) * scale,
-                            width * scale, 18 * scale, 6 * scale, '#397eb8');
+                        const defaultWidth = Math.min(grid.columnWidth - 40, 150);
+                        const width = Math.max(60, Math.min(grid.columnWidth - 30,
+                            row.width ?? defaultWidth));
+                        hudRoundedRect(ctx, x * scale,
+                            (y - 9 * visualScale) * scale,
+                            width * scale, 18 * visualScale * scale,
+                            6 * visualScale * scale, '#397eb8');
                         ctx.font = '600 ' + Math.max(12, font - 1) * scale + 'px sans-serif';
                         ctx.fillStyle = '#f5faff';
                         ctx.fillText(row.text, (x + 12) * scale, y * scale,
@@ -571,6 +588,9 @@ export class GizmoHudOverlay {
                     maxSize: item.maxSize,
                     isControl: item.id.startsWith('control:'),
                     kind: control?.type,
+                    size: control?.size,
+                    width: control?.type === 'button' ||
+                        control?.type === 'slider' ? control.width : undefined,
                     value: typeof current === 'number' || typeof current === 'boolean' ?
                         current : undefined,
                     min: control?.type === 'slider' ? control.min : undefined,
