@@ -14,6 +14,8 @@ import { createSceneHudProjection, createViewportHudProjection } from './GizmoHu
 import { normalizeHudItems } from './GizmoPresentation';
 import { GizmoEditSession } from './GizmoEditSession';
 import { planeHandleGeometry, PlaneHandleGeometry } from './PlaneHandleGeometry';
+import { moveWorldPerPixel } from './MoveScreenScale';
+import { moveStrokeBands, MoveStrokePoint } from './MoveStrokeGeometry';
 import { axisHandleGeometry, axisDragNormal, AxisRayGeometry } from './AxisHandleGeometry';
 import { boundsOf, centerDistanceSquared, distanceToSegmentSquared,
     insideProjectedPlane, rectContains, ScreenPoint } from './MoveHitGeometry';
@@ -131,30 +133,27 @@ function writeField(target: Component, field: Field, value: Point): boolean {
     return true;
 }
 
+/** Consistent camera-pixel size in both ortho 2D and perspective 3D.
+ * Never fall back to a large hardcoded world size after a successful
+ * projection: that caused giant arrows when the Scene was zoomed in.
+ */
 function markerSize(world: Point): number {
     const view = camera();
-    if (typeof view?.worldToScreen !== 'function') return 1.5;
-    const screen = new Vec3();
-    try {
-        view.worldToScreen(new Vec3(world.x, world.y, world.z), screen);
-        const a = sceneRay({ x: screen.x, y: screen.y });
-        const b = sceneRay({ x: screen.x + 1, y: screen.y });
-        if (!a || !b) return 1.5;
-        const normal = a.d;
-        const hitA = intersectHandlePlane(a, world, normal);
-        const hitB = intersectHandlePlane(b, world, normal);
-        if (!hitA || !hitB) return 0.3;
-        const pixel = Math.hypot(hitA.x - hitB.x, hitA.y - hitB.y, hitA.z - hitB.z);
-        // Use a ~22px picking marker rather than a tiny 10px cube. The
-        // projection is evaluated again after every drag so the visible point
-        // keeps the same size across Scene zoom levels.
-        if (Number.isFinite(pixel) && pixel > 1e-10) {
-            return Math.max(1e-8, pixel * 22);
-        }
-    } catch {
-        // Keep the default marker size if the camera is being replaced.
-    }
-    return 1.5;
+    if (typeof view?.worldToScreen !== 'function') return 0.22;
+    // The camera bridge's wrapper is recreated per request; synchronizing
+    // avoids reading a stale inverse/projection matrix after Scene zoom.
+    view.sync?.();
+    const project = (p: Point): { x: number; y: number } | null => {
+        try {
+            const screen = new Vec3();
+            view.worldToScreen(new Vec3(p.x, p.y, p.z), screen);
+            return Number.isFinite(screen.x) && Number.isFinite(screen.y) ?
+                { x: screen.x, y: screen.y } : null;
+        } catch { return null; }
+    };
+    const pixel = moveWorldPerPixel(world, project,
+        view.node?.right, view.node?.up);
+    return pixel === null ? 0.22 : Math.max(1e-10, pixel * 22);
 }
 
 /**
@@ -333,6 +332,34 @@ function positionPlaneHitProxy(controller: any, plane: Field['plane'],
  * after a 2D selection switch. The actual drag still uses initHandle and the
  * Editor's controller event pipeline; this is the visible representation.
  */
+/** Consistent ~2px Move strokes for both Graphics2D and GeometryRenderer3D.
+ * Two alpha-composited quads give each stroke a translucent pixel fringe.
+ * Render against the camera plane; hit geometry remains unchanged.
+ */
+function drawMoveStroke(
+    node: Node, a: MoveStrokePoint, b: MoveStrokePoint,
+    color: Color, onCanvas: boolean, pixel: number,
+    canvasPoint: (point: Point) => Vec3,
+): void {
+    const view = camera();
+    const forward = view?.node?.forward || { x: 0, y: 0, z: -1 };
+    const bands = moveStrokeBands(a, b, forward, pixel);
+    if (!bands) return;
+    const draw = (quad: MoveStrokePoint[], paint: Color) => {
+        if (onCanvas) {
+            Gizmos2D.beginColor(node, paint);
+            Gizmos2D.drawSolidPolygon(node, quad.map(canvasPoint));
+        } else {
+            Gizmos3D.beginColor(node, paint);
+            const points = quad.map(p => new Vec3(p.x, p.y, p.z));
+            Gizmos3D.drawQuad(node, points[0], points[1], points[2], points[3], false);
+        }
+    };
+    draw(bands.feather, new Color(color.r, color.g, color.b,
+        Math.max(1, Math.round(color.a * 0.24))));
+    draw(bands.core, color);
+}
+
 function drawSelectedPositionMarkers(component: Component): void {
     if (!component?.node?.isValid || typeof component.onGizmoHandles !== 'function') return;
     const fields: Field[] = component.onGizmoHandles() || [];
@@ -401,43 +428,33 @@ function drawSelectedPositionMarkers(component: Component): void {
                 node.inverseTransformPoint(point, new Vec3(v.x, v.y, v.z));
                 return point;
             };
+            const pixel = diameter / 22;
             const ray = axisPlacement(component, field, local, world);
             if (ray) {
-                if (onCanvas) {
-                    const start = canvasPoint(ray.start);
-                    const end = canvasPoint(ray.end);
-                    const left = canvasPoint(ray.tipLeft);
-                    const right = canvasPoint(ray.tipRight);
-                    Gizmos2D.beginColor(node, color);
-                    Gizmos2D.drawLine(node, start, end);
-                    Gizmos2D.drawLine(node, end, left);
-                    Gizmos2D.drawLine(node, end, right);
-                } else {
-                    const point = (v: Point) => new Vec3(v.x, v.y, v.z);
-                    Gizmos3D.beginColor(node, color);
-                    Gizmos3D.drawLine(node, point(ray.start), point(ray.end));
-                    Gizmos3D.drawLine(node, point(ray.end), point(ray.tipLeft));
-                    Gizmos3D.drawLine(node, point(ray.end), point(ray.tipRight));
-                }
+                // A soft-edged 2px ribbon replaces zoom-dependent Graphics
+                // lineWidth=5 and jagged native 3D one-pixel debug lines.
+                for (const [a, b] of [
+                    [ray.start, ray.end],
+                    [ray.end, ray.tipLeft],
+                    [ray.end, ray.tipRight],
+                ]) drawMoveStroke(node, a, b, color, onCanvas, pixel, canvasPoint);
                 continue;
             }
             const plane = planePlacement(component, field, local, world);
             if (plane) {
+                const corners = plane.corners;
                 if (onCanvas) {
-                    const corners = plane.corners.map(canvasPoint);
-                    Gizmos2D.beginColor(node, new Color(color.r, color.g, color.b, 85));
-                    Gizmos2D.drawSolidPolygon(node, corners);
-                    Gizmos2D.beginColor(node, color);
-                    Gizmos2D.drawLineList(node, corners, true);
+                    Gizmos2D.beginColor(node, new Color(color.r, color.g, color.b, 60));
+                    Gizmos2D.drawSolidPolygon(node, corners.map(canvasPoint));
                 } else {
-                    const corners = plane.corners.map(p => new Vec3(p.x, p.y, p.z));
-                    Gizmos3D.beginColor(node, new Color(color.r, color.g, color.b, 85));
-                    Gizmos3D.drawQuad(node, corners[0], corners[1],
-                        corners[2], corners[3], false);
-                    Gizmos3D.beginColor(node, color);
-                    for (let i = 0; i < 4; i++)
-                        Gizmos3D.drawLine(node, corners[i], corners[(i + 1) % 4]);
+                    const points = corners.map(p => new Vec3(p.x, p.y, p.z));
+                    Gizmos3D.beginColor(node, new Color(color.r, color.g, color.b, 60));
+                    Gizmos3D.drawQuad(node, points[0], points[1],
+                        points[2], points[3], false);
                 }
+                for (let i = 0; i < 4; i++)
+                    drawMoveStroke(node, corners[i], corners[(i + 1) % 4],
+                        color, onCanvas, pixel, canvasPoint);
                 continue;
             }
             if (onCanvas) {
@@ -891,6 +908,15 @@ function createEditorGizmo(
             // on every rotation/zoom of the new camera.
             this.refreshSceneCamera();
             this.updateMarkers();
+            // The Scene scheduler can miss an update during a drag or a
+            // wheel zoom. Render and flush before the same GPU draw, rather
+            // than leaving red/green 2D arrows one or two frames behind.
+            const component = this.target as Component;
+            if (this.drag?.entry && component?.node?.isValid &&
+                isCanvas2D(component.node)) {
+                drawSelectedPositionMarkers(component);
+                Gizmos2D.flushEditorFrame();
+            }
         };
         private refreshSceneCamera(): void {
             const sceneCamera = cceNamespace()?.Camera;
@@ -1641,10 +1667,18 @@ function createEditorGizmo(
                             this.onControlUpdate?.(property, index);
                             this.onComponentChanged?.(target.node);
                             this.updateMarkers();
+                            if (isCanvas2D(target.node)) {
+                                drawSelectedPositionMarkers(target);
+                                Gizmos2D.flushEditorFrame();
+                            }
                             cceNamespace()?.Engine?.repaintInEditMode?.();
                         },
                         rollback: () => {
                             this.onComponentChanged?.(target.node);
+                            if (isCanvas2D(target.node)) {
+                                drawSelectedPositionMarkers(target);
+                                Gizmos2D.flushEditorFrame();
+                            }
                             cceNamespace()?.Engine?.repaintInEditMode?.();
                         },
                         end: (_value, cancelled, changed) => {
@@ -1654,6 +1688,10 @@ function createEditorGizmo(
                             } finally {
                                 this.closeControl(property, index, cancelled || !changed);
                                 this.updateMarkers();
+                                if (isCanvas2D(target.node)) {
+                                    drawSelectedPositionMarkers(target);
+                                    Gizmos2D.flushEditorFrame();
+                                }
                             }
                         },
                     },

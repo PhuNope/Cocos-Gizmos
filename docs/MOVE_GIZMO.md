@@ -1,5 +1,14 @@
 # Move Gizmo
 
+## Hiển thị mượt khi zoom và drag
+
+Move 2D/3D dùng kích thước tính từ phép chiếu camera theo pixel, không
+còn dựa vào giao ray có thể mất ổn định ở mức zoom lớn. Arrow và viền
+plane được vẽ dưới dạng dải 2px với viền alpha mềm (~1px), không phụ thuộc
+vào độ dày đường Graphics mặc định hoặc MSAA của Scene.
+Trong 2D, dữ liệu hình được flush ngay khi drag thay đổi để giảm
+độ trễ một vài frame khi chuột kéo nhanh.
+
 ## Gizmos2D.move() — Move Object Position trong Canvas 2D
 
 ```ts

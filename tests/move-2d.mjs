@@ -48,6 +48,7 @@ assert.match(source2D, /public static move\(/);
 assert.match(source2D, /return makeMoveGizmo2D\(property, options\)/);
 assert.match(renderer, /if \(onCanvas\) \{\s*const start = canvasPoint\(ray.start\)/);
 assert.match(renderer, /Gizmos2D\.drawSolidPolygon\(node, corners\)/);
-assert.match(renderer, /Gizmos2D\.drawLineList\(node, corners, true\)/);
+assert.match(renderer, /drawMoveStroke\(node, corners\[i\]/);
+assert.match(renderer, /Gizmos2D\.flushEditorFrame\(\)/);
 assert.match(sample, /Gizmos2D\.move\('moveObject'/);
 console.log('[move-2d] X/Y/XY descriptors, fractional drag and Canvas render path OK');
