@@ -583,8 +583,36 @@ const release = controller => controller.onControllerMouseUp({ button: 0 });
 click(arrowControl, 147, 100);
 assert.equal(moveGizmo.diagnosticState().draggingPosition, true,
     'Arrow shaft acquires a native dragging session');
+const repaintCountAtDrag = immediateSceneRepaints;
+const oldWheelProjection = rendererCamera.worldToScreen;
+let dragWheelZoom = 1;
+rendererCamera.worldToScreen = (out, point) =>
+    out.set(point.x * dragWheelZoom, point.y * dragWheelZoom, point.z);
+try {
+    beforeDraw();
+    dragWheelZoom = 2;
+    beforeDraw();
+    dragWheelZoom = 0.5;
+    beforeDraw();
+    assert.equal(immediateSceneRepaints, repaintCountAtDrag,
+        'Drag + scroll never requests a redundant full-scene redraw');
+    assert.equal(moveGizmo.diagnosticState().draggingPosition, true);
+} finally {
+    rendererCamera.worldToScreen = oldWheelProjection;
+}
 move(arrowControl, 162, 113);
 release(arrowControl);
+const repaintAfterMouseUp = immediateSceneRepaints;
+const oldAfterMouseUp = rendererCamera.worldToScreen;
+rendererCamera.worldToScreen = (out, point) =>
+    out.set(point.x * 1.75, point.y * 1.75, point.z);
+try {
+    beforeDraw();
+    assert.equal(immediateSceneRepaints, repaintAfterMouseUp + 1,
+        'Wheel hover redraw resumes immediately after drag release');
+} finally {
+    rendererCamera.worldToScreen = oldAfterMouseUp;
+}
 assert.deepEqual([moveComponent.moveObject.x, moveComponent.moveObject.y,
     moveComponent.moveObject.z], [115, 100, 0],
     'Dragging arrow affects its axis only');

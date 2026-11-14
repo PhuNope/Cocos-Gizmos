@@ -363,11 +363,16 @@ function drawMoveStroke(
 // stream. Repaint through it, rather than submitting only Move shapes during
 // mousemove (which erased unrelated 2D debug drawings for up to 750ms).
 const lastCanvasPaint = new WeakMap<Component, number>();
+// BEFORE_DRAW fires per native Gizmo, so detect captures across all selected
+// components before scheduling an expensive synchronous Scene redraw.
+const activePositionDrags = new Set<object>();
+const CANVAS_DRAG_REPAINT_MS = 32; // Max ~31 manual full-scene ticks/sec
 // Shared between native per-Component Gizmo controllers. On a wheel frame,
 // only the first Move controller should schedule a full redraw; repeated
 // BEFORE_DRAW callbacks for other selected controllers observe the same key.
 let lastMoveViewKey: string | null = null;
 function repaintMoveAfterCameraChange(): void {
+    if (activePositionDrags.size) return; // drag + wheel must never repaint here
     const view = camera();
     if (typeof view?.worldToScreen !== 'function') return;
     const rawNode: any = view.node;
@@ -403,9 +408,12 @@ function repaintMoveAfterCameraChange(): void {
 
 function repaintCanvasMove(component: Component): void {
     if (!component?.node?.isValid || !isCanvas2D(component.node)) return;
-    // Synchronous manual scheduler tick flushes all selected/ordinary
-    // callback geometry in the same input event; reentrant calls are guarded
-    // by SceneUpdateScheduler.
+    // Pointer moves can arrive far faster than the GPU draws. Limit fallback
+    // repaint frequency; normal engine frames keep drawing independently.
+    const now = Date.now();
+    if (now - (lastCanvasPaint.get(component) || 0) < CANVAS_DRAG_REPAINT_MS)
+        return;
+    lastCanvasPaint.set(component, now); // Reserve before reentrant callbacks.
     repaintWholeScene();
 }
 
@@ -946,7 +954,8 @@ function createEditorGizmo(
             }
             // Repaint the highlighted handle immediately; Cocos may consume
             // the hover event without dispatching an engine update first.
-            if (this.entries.some(item => isMoveHandle(item.field)))
+            if (!this.drag && !activePositionDrags.size &&
+                this.entries.some(item => isMoveHandle(item.field)))
                 repaintWholeScene();
             cceNamespace()?.Engine?.repaintInEditMode?.();
         }
@@ -962,6 +971,10 @@ function createEditorGizmo(
             // belongs to the previous Scene camera; re-mount it once, not
             // on every rotation/zoom of the new camera.
             this.refreshSceneCamera();
+            // During a captured drag, native picking quads are never used.
+            // Avoid re-projecting them or scheduling full-scene redraws for
+            // each wheel tick while a drag already owns input events.
+            if (activePositionDrags.size) return;
             this.updateMarkers();
             // Wheel, pan or orbit can update the native picking quads in
             // BEFORE_DRAW without a matching BEFORE_UPDATE draw callback.
@@ -975,7 +988,7 @@ function createEditorGizmo(
             const component = this.target as Component;
             if (this.drag?.entry && component?.node?.isValid &&
                 isCanvas2D(component.node) &&
-                Date.now() - (lastCanvasPaint.get(component) || 0) > 32)
+                Date.now() - (lastCanvasPaint.get(component) || 0) > CANVAS_DRAG_REPAINT_MS)
                 repaintCanvasMove(component);
         };
         private refreshSceneCamera(): void {
@@ -1750,6 +1763,7 @@ function createEditorGizmo(
                 );
                 if (!command.begin(ray)) return;
                 this.drag = { entry, command };
+                activePositionDrags.add(this);
                 this.setHover(entry);
             } catch (error) {
                 console.warn('[cocos-gizmos/handles] Unable to start position drag:', error);
@@ -1773,8 +1787,12 @@ function createEditorGizmo(
             const drag = this.drag;
             if (!drag) return;
             this.drag = null;
-            if (cancelled) drag.command.cancel();
-            else drag.command.end();
+            try {
+                if (cancelled) drag.command.cancel();
+                else drag.command.end();
+            } finally {
+                activePositionDrags.delete(this);
+            }
         }
 
         /** The Editor can hide its native cube even when a component stays

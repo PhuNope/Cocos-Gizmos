@@ -13,6 +13,11 @@ vẽ lại arrow và plane 2D/3D ngay trong frame, không phải chờ lượt c
 nhật Scene 250ms tiếp theo. Chỉ phát vẽ lại khi fingerprint camera
 thay đổi để tránh giật và tốn CPU khi camera đứng yên.
 
+Khi **đang drag và lăn chuột**, bỏ nhánh redraw toàn bộ Scene trong
+BEFORE_DRAW và cập nhật native pick quads không cần thiết. 2D giới hạn
+redraw chủ động vào khoảng 31 lần/giây, các engine frame vẫn vẽ bình
+thường. Khi thả chuột, zoom-hover redraw bật lại lập tức.
+
 ## Gizmos2D.move() — Move Object Position trong Canvas 2D
 
 ```ts
