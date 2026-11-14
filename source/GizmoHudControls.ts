@@ -158,8 +158,10 @@ export function formatHudControl(control: HudControl, value: unknown): string {
 }
 
 /**
- * A slider drag uses screen-space movement, so zooming the camera does not
- * affect the amount edited. The component property is committed by the adapter.
+ * A slider uses screen-space movement so camera zoom does not affect editing.
+ * With trackLeft set, click/drag are absolute positions on the HUD track.
+ * Without it (legacy cameras or clicks outside track), motion is relative.
+ * The adapter commits both modes through the same Undo/Redo session.
  */
 export class HudSliderDrag {
     public readonly initial: number;
@@ -169,8 +171,11 @@ export class HudSliderDrag {
         initial: number,
         private readonly startX: number,
         private readonly trackPixels = HUD_SLIDER_TRACK_PIXELS,
+        private readonly trackLeft?: number,
     ) {
-        if (!Number.isFinite(initial) || !Number.isFinite(startX)) {
+        if (!Number.isFinite(initial) || !Number.isFinite(startX) ||
+            !Number.isFinite(trackPixels) || trackPixels <= 0 ||
+            (trackLeft !== undefined && !Number.isFinite(trackLeft))) {
             throw new Error('Invalid HUD slider starting state');
         }
         this.initial = initial;
@@ -179,7 +184,9 @@ export class HudSliderDrag {
     public move(x: number): number | null {
         if (!Number.isFinite(x)) return null;
         const { min, max, step } = this.control;
-        const raw = this.initial + ((x - this.startX) / this.trackPixels) * (max - min);
+        const raw = this.trackLeft === undefined ?
+            this.initial + ((x - this.startX) / this.trackPixels) * (max - min) :
+            min + ((x - this.trackLeft) / this.trackPixels) * (max - min);
         const snapped = step ? min + Math.round((raw - min) / step) * step : raw;
         if (!Number.isFinite(snapped)) return null;
         const result = Math.max(min, Math.min(max, snapped));

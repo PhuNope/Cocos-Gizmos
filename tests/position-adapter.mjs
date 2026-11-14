@@ -731,6 +731,54 @@ slider.onMouseMove({ handleName: 'hud:radius', x: 50, y: 10 });
 hudGizmo.onNotGizmoMouseDown();
 assert.equal(component.radius, 80, 'Clicking outside cancels unfinished slider drag');
 
+// Native Controller with a real viewport: clicking on the drawn track must
+// change the value at mouse-down, even with no mouse movement.
+cam.width = 900;
+cam.height = 500;
+hudGizmo.refreshHandles();
+const track = hud.exports.hudSliderScreenTrack(
+    { width: cam.width, height: cam.height }, 2, 4);
+const clickAt = ratio => ({ handleName: 'hud:radius',
+    x: track.left + track.width * ratio, y: 60 });
+component.radius = 20;
+const eventStart = hudEvents.length;
+slider.onMouseDown(clickAt(0.8));
+assert.equal(component.radius, 80, 'Track click sets the value immediately');
+assert.deepEqual(hudEvents.slice(eventStart),
+    ['radius:begin:20', 'radius:update:80'],
+    'Click calls begin/update before mousemove');
+slider.onMouseUp();
+assert.deepEqual(hudEvents.slice(eventStart),
+    ['radius:begin:20', 'radius:update:80', 'radius:end:80'],
+    'Mouse-up commits the click as one edit session');
+
+component.radius = 25;
+slider.onMouseDown(clickAt(0.2));
+assert.equal(component.radius, 20, 'Click applies step snapping');
+slider.onMouseMove(clickAt(0.75));
+assert.equal(component.radius, 75, 'Dragging after click tracks absolute X');
+hudGizmo.onKeyDown({ key: 'Escape' });
+assert.equal(component.radius, 25, 'Escape restores pre-click value');
+
+slider.onMouseDown(clickAt(0));
+assert.equal(component.radius, 0, 'Leftmost click selects minimum');
+slider.onMouseUp();
+slider.onMouseDown(clickAt(1));
+assert.equal(component.radius, 100, 'Rightmost click selects maximum');
+slider.onMouseUp();
+
+component.radius = 20;
+const labelX = track.left - 40;
+slider.onMouseDown({ handleName: 'hud:radius', x: labelX, y: 60 });
+assert.equal(component.radius, 20, 'Label click does not jump');
+slider.onMouseMove({ handleName: 'hud:radius',
+    x: labelX + track.width * 0.5, y: 60 });
+assert.equal(component.radius, 70, 'Label press preserves relative drag');
+slider.onMouseUp();
+delete cam.width;
+delete cam.height;
+hudGizmo.refreshHandles();
+
 
 toggle.onMouseDown({ handleName: 'hud:visibility', x: 10, y: 10 });
 const registeredBeforeClear = hudAdapter.status().registered;

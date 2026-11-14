@@ -1583,8 +1583,13 @@ function createEditorGizmo(
                     hudSliderScreenTrack(view.viewport,
                         (placement?.startRow || 0) + (placement?.textCount || 0) +
                             entry.index, total || entry.index + 1) : null;
+                // Use the same pixel track as the textured HUD. Clicks
+                // inside the visible track jump to that value immediately.
+                // A press on the label keeps the old relative drag behavior.
+                const onTrack = !!track && at.x >= track.left &&
+                    at.x <= track.left + track.width;
                 const solver = new HudSliderDrag(entry.control, current, at.x,
-                    track?.width);
+                    track?.width, onTrack ? track!.left : undefined);
                 const property = entry.control.property;
                 const session = new GizmoEditSession<number>(
                     () => (component as any)[property],
@@ -1621,6 +1626,17 @@ function createEditorGizmo(
                 );
                 session.begin();
                 this.hudDrag = { entry, solver, session };
+                if (onTrack) {
+                    // One edit session for click + any subsequent drag.
+                    // Mouse-up commits; Escape restores the original value.
+                    try {
+                        const value = solver.move(at.x);
+                        if (value !== null) session.apply(value);
+                    } catch (error) {
+                        this.finishHud(true);
+                        throw error;
+                    }
+                }
             } catch (error) {
                 console.warn('[cocos-gizmos/hud] Cannot begin slider drag:', error);
             }
