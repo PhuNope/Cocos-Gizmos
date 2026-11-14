@@ -91,6 +91,14 @@ callbacks may still work, but interactive handles cannot be assumed to work.
   only the second component's property should change. Turn off the first
   component's HUD and confirm that the second group shifts upward without
   leaving invisible picking markers.
+- **Rotation gizmos (2D + 3D):** Select a `CocosGizmos2DDemo` or
+  `CocosGizmos3DDemo` Node, look for a blue Z ring (2D) or red X, green
+  Y and blue Z rings (3D) centered on the Node. Try clicking an empty
+  center (should not grab), dragging Z through 360 degrees, X/Y while
+  the camera looks edge-on, and hovering then zooming. Confirm the
+  `rotationEuler` property updates, a single Undo restores the value,
+  Escape cancels in-progress rotation, and deselection/reselection restores
+  the rings. Repeat after Scene switches or rotating/scaling a Parent.
 - **Undo / Redo:** Perform one continuous nontrivial drag, release the pointer,
   press Ctrl+Z once, then Ctrl+Shift+Z. Compare the Scene position and
   Inspector value with the original and final values. Test Button, Toggle,

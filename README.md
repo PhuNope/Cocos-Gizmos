@@ -172,6 +172,36 @@ game does not call them automatically. Calls made explicitly from gameplay
 code still require a runtime guard. The type-only package does not provide
 `@registerGizmos`; avoid using that decorator.
 
+## Rotation Gizmos (2D and 3D)
+
+`Gizmos2D.rotate()` creates one blue Z rotation ring; `Gizmos3D.rotate()`
+creates colored XYZ rings (X red, Y green, Z blue) around the selected
+Component's node. They edit a serialized **Vec3 of Euler degrees** and
+reuse Move's Undo/Redo and `onGizmoChanged()` callbacks.
+
+```ts
+@property({ type: Vec3 })
+rotationEuler = new Vec3(0, 0, 30);
+
+onGizmoHandles(): GizmoHandleList {
+    return [...Gizmos3D.rotate('rotationEuler', {
+        space: 'local', ringSize: 72, pickSize: 14,
+        // snap: 15, // optionally snap angles to 15 degrees
+    })];
+}
+```
+
+For 2D, use `Gizmos2D.rotate('rotationEuler')` to rotate about Z.
+In 3D, `space: 'local'` follows node orientation and Euler rotation;
+`space: 'world'` keeps rings aligned to the world axes. The underlying
+Component field is **not automatically assigned to `node.eulerAngles`**.
+Use the value to rotate your own target/geometry in `onGizmoChanged()`
+or `onDrawGizmosSelected()`. Each drag is one undoable edit, Escape cancels.
+The ring radius is measured in Scene pixels and stays stable across zoom.
+Edge-on 3D X/Y rings support a screen-space drag fallback.
+
+See [Rotation Gizmo guide](docs/ROTATE_GIZMO.md) for details.
+
 ## Install the extension
 
 1. Download `Cocos-Gizmos-v3.0.0.zip` from the [v3.0.0 GitHub Release](https://github.com/PhuNope/Cocos-Gizmos/releases/tag/v3.0.0), or use a [v3 development ZIP from GitHub Actions](https://github.com/PhuNope/Cocos-Gizmos/actions?query=branch%3Av3).
