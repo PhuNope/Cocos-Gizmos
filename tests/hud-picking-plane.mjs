@@ -671,5 +671,80 @@ assert.equal(arrowControl.hitTarget.isValid, false,
     'Switching scenes destroys old native Move picking nodes');
 console.log('[move-picking-native] full arrow, polygon plane, object box, lifecycle and no plus glyph OK');
 
+// Rotation gizmo native integration: its transparent picking mesh is an
+// annulus, not a square, and the same named handle owns the Undo/Redo gesture.
+const rotateNode = new Node('Rotate3DNode');
+rotateNode.uuid='rotate-selected';
+rotateNode.activeInHierarchy=true;
+rotateNode.worldMatrix={};
+rotateNode.worldPosition=new Vec3(100,100,0);
+const rotateEvents=[];
+const rotateComponent={
+    __classname__:'RotationProbe',constructor:{name:'RotationProbe'},
+    isValid:true,enabled:true,node:rotateNode,
+    rotationEuler:new Vec3(0,0,0),
+    onGizmoChanged(name,phase){rotateEvents.push(name+':'+phase);},
+    onGizmoHandles(){return [
+        ...['x','y','z'].map(axis=>({
+            property:'rotationEuler',visual:'rotation',
+            axis,id:'rotation-'+axis,plane:'view',
+            space:'world',ringSize:70,pickSize:14,
+            color: axis==='x'?'#ff595e':axis==='y'?'#43df66':'#4b8fff',
+        })),
+    ]},
+};
+const rotationAdapter=createPositionHandleAdapter(()=>true);
+rotationAdapter.refresh([rotateComponent],new Set([rotateNode.uuid]),5800);
+const rotateGizmo=rotateComponent.gizmo;
+assert.equal(rotateGizmo.controllers.length,3,
+    '3D Rotate creates exactly three native X/Y/Z controllers');
+const [rotX,rotY,rotZ]=rotateGizmo.controllers;
+for(const ctrl of rotateGizmo.controllers){
+    assert.equal(ctrl.hitTarget.name,'CocosGizmosRotationHit');
+    assert.ok(ctrl.hitTarget.getComponent(MeshRenderer)?.mesh);
+    const verts=ctrl.hitTarget.getComponent(MeshRenderer).mesh.geometry.positions;
+    assert.ok(verts.length>100,'Rotation pick surface is a segmented annulus');
+    assert.equal(ctrl._cubeNode.active,false,'No native point box over rotation');
+}
+assert.ok(Math.abs(rotZ.hitTarget.worldScale.x-70)<1e-6,
+    'Rotation ring radius maintains constant Scene pixel size');
+rotateGizmo.onNotGizmoMouseDown({button:0,x:100,y:100});
+assert.equal(rotateGizmo.diagnosticState().draggingPosition,false,
+    'Empty center of a rotation gizmo never starts a gesture');
+click(rotZ,170,100);
+assert.equal(rotateGizmo.diagnosticState().draggingPosition,true,
+    'Native Z annulus starts a rotation drag');
+move(rotZ,100,170);
+assert.ok(Math.abs(rotateComponent.rotationEuler.z-90)<1e-4,
+    'Z ring drag updates Euler degrees by the signed angle');
+release(rotZ);
+assert.equal(rotateGizmo.diagnosticState().draggingPosition,false);
+assert.ok(rotateEvents.includes('rotationEuler:begin'));
+assert.ok(rotateEvents.includes('rotationEuler:update'));
+assert.ok(rotateEvents.includes('rotationEuler:end'));
+
+// Reset Euler and ensure an edge-on X ring (view forward -Z) is draggable.
+rotateComponent.rotationEuler=new Vec3(0,0,0);
+rotateGizmo.refreshHandles();
+click(rotX,100,170);
+assert.equal(rotateGizmo.diagnosticState().draggingPosition,true,
+    'Edge-on X ring starts via screen-space fallback');
+move(rotX,100,190);
+assert.ok(Math.abs(rotateComponent.rotationEuler.x)>5,
+    'Edge-on X ring responds to vertical pointer movement');
+rotateGizmo.onKeyDown({key:'Escape'});
+assert.deepEqual([
+    rotateComponent.rotationEuler.x,rotateComponent.rotationEuler.y,
+    rotateComponent.rotationEuler.z],[0,0,0],
+    'Escape restores original Euler angles');
+rotationAdapter.refresh([rotateComponent],new Set(),6000);
+assert.equal(rotZ.hitTarget.active,false,'Deselection hides rotation ring picking');
+rotationAdapter.refresh([rotateComponent],new Set([rotateNode.uuid]),6100);
+assert.equal(rotZ.hitTarget.active,true,'Reselection restores annulus');
+rotationAdapter.dispose();
+assert.equal(rotX.hitTarget.isValid,false,
+    'Scene cleanup destroys rotation picking meshes');
+console.log('[rotate-picking-native] three annuli, 90° drag, edge-on X, cancel, reselect OK');
+
 console.log('[position-visual] 2D/3D marker Sprite + native +Y BoxController drag proxy OK');
 console.log('[hud-picking-plane] exact native HUD quad geometry, zoom and click OK');
