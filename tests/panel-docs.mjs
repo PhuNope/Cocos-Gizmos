@@ -6,6 +6,9 @@ const doc = require('../panels/docs/index.js');
 const extension = require('../main.js');
 
 assert.equal(packageManifest.panels.docs.main, './panels/docs/index.js');
+assert.equal(packageManifest.panels.docs.type, 'simple');
+assert.equal(packageManifest.panels.docs.size.width, 1600);
+assert.equal(packageManifest.panels.docs.size.height, 920);
 const menu = packageManifest.contributions.menu;
 const resetIndex = menu.findIndex(m => m.label === 'Reset Gizmos');
 assert.equal(menu[resetIndex + 1].label, 'Open Document');

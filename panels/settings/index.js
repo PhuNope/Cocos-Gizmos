@@ -1,5 +1,7 @@
 'use strict';
 
+const { fillAvailableScreen } = require('../full-size');
+
 exports.template = `
 <section class="gizmos-settings">
     <h2>Gizmos</h2>
@@ -38,7 +40,18 @@ exports.template = `
 `;
 
 exports.style = `
-.gizmos-settings { padding: 16px; color: var(--color-normal-fill, inherit); font: 13px sans-serif; }
+:host { display: block; width: 100%; height: 100%; overflow-y: auto; }
+.gizmos-settings { box-sizing: border-box; width: 100%; min-height: 100%;
+  padding: clamp(18px, 2.2vw, 34px); color: var(--color-normal-fill, inherit);
+  font: 13px/1.55 sans-serif; display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start; column-gap: 24px; }
+.gizmos-settings > h2, .gizmos-settings > p,
+.gizmos-settings > .field, .gizmos-settings > #gizmo-feedback { grid-column: 1 / -1; }
+.gizmos-settings .diagnostics { min-width: 0; }
+@media (max-width: 860px) {
+  .gizmos-settings { grid-template-columns: minmax(0, 1fr); }
+}
 .gizmos-settings h2 { margin: 0 0 12px; font-size: 18px; }
 .gizmos-settings p { color: var(--color-normal-contrast-emphasis, #888); }
 .gizmos-settings .field { margin: 16px 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -61,6 +74,7 @@ exports.$ = {
 };
 
 exports.ready = async function ready() {
+    fillAvailableScreen();
     const editor = globalThis.Editor;
     const display = this.$.display;
     const hud = this.$.hud;

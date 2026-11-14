@@ -10,6 +10,9 @@ const panel = require('../panels/settings/index.js');
 const manifest = require('../package.json');
 
 assert.equal(manifest.panels.settings.main, './panels/settings/index.js');
+assert.equal(manifest.panels.settings.type, 'simple');
+assert.equal(manifest.panels.settings.size.width, 1600);
+assert.equal(manifest.panels.settings.size.height, 920);
 assert.equal(manifest.contributions.messages['get-settings'].methods[0], 'getSettings');
 assert.equal(manifest.contributions.messages['set-settings'].methods[0], 'setSettings');
 assert.equal(manifest.contributions.messages['get-diagnostics'].methods[0], 'getDiagnostics');

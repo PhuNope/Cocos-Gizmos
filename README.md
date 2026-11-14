@@ -82,9 +82,22 @@ Sizes change visuals within each row, not the row hitboxes. A custom
 anchor, freely resizable row height, or grid-column width would need
 a separate coordinated layout and picking API.
 
+## Full-size Editor panels
+
+**Gizmos → Open Document** and **Gizmos → Gizmos Settings** now open
+as standalone resizable Editor windows, not narrow docked tabs. Both panels
+request the available monitor work area, with a 1600×920 initial-size
+fallback where Cocos Creator does not expose a window-maximize API.
+They remain separate from the Scene and do not resize the Editor's main
+workspace. Small displays can still resize either window (minimum 660×480).
+The Settings layout uses two diagnostic columns on wide displays and
+stacks them on narrow ones. If an existing docked tab is still open from
+an earlier extension install, close it and reload the extension to apply
+the new panel type.
+
 ## API reference inside Cocos Creator
 
-Open **Gizmos → Open Document** (next to **Reset Gizmos**) to browse the dockable
+Open **Gizmos → Open Document** (next to **Reset Gizmos**) to browse the standalone
 API guide for Gizmos2D, Gizmos3D, Move/Point handles and HUD callbacks. It includes
 searchable TypeScript examples and self-contained SVG diagrams.
 The **Callbacks** tab explains Gizmo lifecycle hooks, begin/update/end/cancel

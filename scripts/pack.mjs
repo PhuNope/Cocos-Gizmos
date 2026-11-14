@@ -31,8 +31,16 @@ const manifest = {
   types: './dist/Gizmos.d.ts',
   main: './main.js',
   panels: {
-    settings: { title: 'Gizmos Settings', type: 'dockable', main: './panels/settings/index.js' },
-    docs: { title: 'Gizmos Open Document', type: 'dockable', main: './panels/docs/index.js' },
+    // Cocos Creator's 'simple' panels open in their own window instead of
+    // a tiny dock in the Editor layout. The panel can be resized by the user.
+    settings: { title: 'Gizmos Settings', type: 'simple',
+      flags: { resizable: true, save: false },
+      size: { width: 1600, height: 920, 'min-width': 660, 'min-height': 480 },
+      main: './panels/settings/index.js' },
+    docs: { title: 'Gizmos Open Document', type: 'simple',
+      flags: { resizable: true, save: false },
+      size: { width: 1600, height: 920, 'min-width': 660, 'min-height': 480 },
+      main: './panels/docs/index.js' },
   },
   // The Scene Script is Editor-only: unlike asset-db mounts, it is never
   // included in the Cocos game script graph.
@@ -154,6 +162,7 @@ const entries = [
   ['scene.js', readFileSync(path.join(ROOT, 'scene.js'))],
   ['panels/settings/index.js', readFileSync(path.join(ROOT, 'panels/settings/index.js'))],
   ['panels/docs/index.js', readFileSync(path.join(ROOT, 'panels/docs/index.js'))],
+  ['panels/full-size.js', readFileSync(path.join(ROOT, 'panels/full-size.js'))],
   ...['Define.js', 'GizmoDiagnostics.js', 'GizmoExampleClassDiagnostics.js', 'SceneGizmoInput.js', 'GizmoEditSession.js', 'GizmoPresentation.js', 'GizmoHudControls.js', 'GizmoHudLayout.js', 'GizmoHudProjection.js', 'SceneCameraBridge.js', 'GizmoHudOverlay.js', 'GizmoPresentationService.js', 'GizmoMoveCommand.js', 'GizmoHandlePresets.js', 'PositionDragSolver.js', 'PlaneHandleGeometry.js', 'AxisHandleGeometry.js', 'MoveHitGeometry.js', 'MoveScreenScale.js', 'MoveStrokeGeometry.js', 'PositionHandles.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos2D.js', 'Gizmos3D.js']
     .map(name => ['editor-runtime/' + name, readFileSync(path.join(ROOT, 'editor-runtime', name))]),
   ['builder.js', readFileSync(path.join(ROOT, 'builder.js'))],

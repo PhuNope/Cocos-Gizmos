@@ -1,5 +1,7 @@
 'use strict';
 
+const { fillAvailableScreen } = require('../full-size');
+
 // Self-contained Editor-only reference: no external images, network calls or game assets.
 // SVG illustrations are explanatory diagrams, not Scene screenshots.
 const drawings = {
@@ -511,6 +513,7 @@ exports.$ = {
     status: '#cg-doc-status',
 };
 exports.ready = function ready() {
+    fillAvailableScreen();
     const host = this;
     const ui = host.$;
     host._cgDocGroup = 'all';

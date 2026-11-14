@@ -217,15 +217,42 @@ async function resetGizmos() {
     }
 }
 
+/** Prefer the Editor's native maximize for standalone windows. Some Creator
+ * builds do not expose findWindow(), so panel.ready() also uses the standard
+ * window sizing API as a guarded fallback.
+ */
+function openFullSizePanel(id) {
+    const panel = globalThis.Editor?.Panel;
+    const opened = panel?.open?.(id);
+    const maximize = () => {
+        try {
+            const win = panel?.findWindow?.(id);
+            if (win && typeof win.then === 'function') {
+                // Some Editor builds return a promise for their window lookup.
+                void win.then(candidate => candidate?.maximize?.()).catch(() => {});
+            } else {
+                win?.maximize?.();
+            }
+        } catch {
+            // The standalone panel defaults to 1600x920, and its ready hook
+            // can fill the work area if Editor.Panel.findWindow is unsupported.
+        }
+    };
+    if (opened && typeof opened.then === 'function')
+        return opened.then(value => { maximize(); return value; });
+    maximize();
+    return opened;
+}
+
 exports.methods = {
     resetGizmos,
     onSelectionSelect,
     onSelectionUnselect,
     openSettings() {
-        return globalThis.Editor?.Panel?.open?.('cocos-gizmos.settings');
+        return openFullSizePanel('cocos-gizmos.settings');
     },
     openDoc() {
-        return globalThis.Editor?.Panel?.open?.('cocos-gizmos.docs');
+        return openFullSizePanel('cocos-gizmos.docs');
     },
     async getDiagnostics() {
         return globalThis.Editor.Message.request('scene', 'execute-scene-script', {

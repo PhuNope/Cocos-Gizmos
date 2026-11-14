@@ -74,6 +74,19 @@ assert.ok([...entries.keys()].every(name => !name.startsWith('docs/')),
 assert.ok(installed.contributions.menu.some(item =>
     item.path === 'Gizmos' && item.label === 'Open Document' && item.message === 'open-doc'),
     'Installed extension must expose Gizmos > Open Document beside Reset Gizmos');
+for (const panelName of ['docs', 'settings']) {
+    const definition = installed.panels[panelName];
+    assert.equal(definition.type, 'simple',
+        'Both installed panels must use separate, full-size windows');
+    assert.equal(definition.size.width, 1600);
+    assert.equal(definition.size.height, 920);
+    assert.equal(definition.flags.resizable, true);
+    assert.equal(definition.flags.save, false);
+}
+assert.match(entries.get('panels/full-size.js') || '', /fillAvailableScreen/,
+    'Installed panels include their standalone-window maximization fallback');
+assert.match(entries.get('panels/docs/index.js') || '', /fillAvailableScreen/);
+assert.match(entries.get('panels/settings/index.js') || '', /fillAvailableScreen/);
 assert.equal(installed.panels.docs.main, './panels/docs/index.js');
 assert.equal(installed.panels.docs.title, 'Gizmos Open Document');
 assert.deepEqual(installed.contributions.messages['open-doc'].methods, ['openDoc']);
