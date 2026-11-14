@@ -1,5 +1,5 @@
 import {
-    ROTATE_IDENTITY, RotateAxis, RotateQuat, RotateRay, RotateSpace, RotateVec3,
+    RotateAxis, RotateQuat, RotateRay, RotateSpace, RotateVec3,
     rotateAxisQuat, rotateAxisVector, rotateCross, rotateDot, rotateEulerQuat,
     rotateQuatEuler, rotateQuatInverse, rotateQuatMul, rotateQuatUnit,
     rotateSub, rotateUnit,
@@ -26,7 +26,7 @@ export class RotationDragSolver {
         private readonly initial: RotateVec3,
         private readonly center: RotateVec3,
         normal: RotateVec3,
-        frame: RotateQuat = ROTATE_IDENTITY,
+        frame: RotateQuat,
         private readonly options: RotationDragOptions,
     ) {
         const unit = rotateUnit(normal);

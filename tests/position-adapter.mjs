@@ -20,6 +20,16 @@ const scale = { exports: {} };
 vm.runInNewContext(compile('MoveScreenScale'), scale);
 const strokes = { exports: {} };
 vm.runInNewContext(compile('MoveStrokeGeometry'), strokes);
+const rotationGeometry = { exports: {} };
+vm.runInNewContext(compile('RotationHandleGeometry'), rotationGeometry);
+const rotationSolver = { exports: {} };
+vm.runInNewContext(compile('RotationDragSolver'), {
+    exports: rotationSolver.exports,
+    require(id) {
+        if(id === './RotationHandleGeometry') return rotationGeometry.exports;
+        throw new Error('Unexpected rotation solver import ' + id);
+    },
+});
 const math = { exports: {} };
 vm.runInNewContext(compile('PositionDragSolver'), math);
 const edits = { exports: {} };
@@ -31,6 +41,17 @@ vm.runInNewContext(compile('GizmoMoveCommand'), {
         if (spec === './GizmoEditSession') return edits.exports;
         if (spec === './PositionDragSolver') return math.exports;
         throw Error('Unexpected command dependency ' + spec);
+    },
+});
+const rotationCommands = { exports: {} };
+vm.runInNewContext(compile('GizmoRotateCommand'), {
+    exports: rotationCommands.exports,
+    require(id) {
+        if(id === './GizmoEditSession') return edits.exports;
+        if(id === './GizmoMoveCommand') return commands.exports;
+        if(id === './RotationHandleGeometry') return rotationGeometry.exports;
+        if(id === './RotationDragSolver') return rotationSolver.exports;
+        throw new Error('Unexpected rotation command import ' + id);
     },
 });
 const hud = { exports: {} };
@@ -229,6 +250,8 @@ const sandbox = {
         if (name === './PlaneHandleGeometry') return planes.exports;
         if (name === './PositionDragSolver') return math.exports;
         if (name === './GizmoMoveCommand') return commands.exports;
+        if (name === './RotationHandleGeometry') return rotationGeometry.exports;
+        if (name === './GizmoRotateCommand') return rotationCommands.exports;
         if (name === './GizmoEditSession') return edits.exports;
         if (name === './GizmoHudControls') return hud.exports;
         if (name === './GizmoPresentation') return presentation.exports;

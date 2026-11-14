@@ -193,9 +193,19 @@ const axes = evaluate('AxisHandleGeometry');
 const hit = evaluate('MoveHitGeometry');
 const scale = evaluate('MoveScreenScale');
 const strokes = evaluate('MoveStrokeGeometry');
+const rotationGeometry = evaluate('RotationHandleGeometry');
+const rotationSolver = evaluate('RotationDragSolver', {
+    './RotationHandleGeometry': rotationGeometry,
+});
 const edit = evaluate('GizmoEditSession');
 const commands = evaluate('GizmoMoveCommand', {
     './GizmoEditSession': edit, './PositionDragSolver': solver,
+});
+const rotationCommands = evaluate('GizmoRotateCommand', {
+    './GizmoEditSession': edit,
+    './RotationHandleGeometry': rotationGeometry,
+    './RotationDragSolver': rotationSolver,
+    './GizmoMoveCommand': commands,
 });
 const controls = evaluate('GizmoHudControls');
 const presentation = { normalizeHudItems(value) { return value; } };
@@ -290,6 +300,8 @@ const sandbox = {
             './MoveScreenScale': scale, './MoveStrokeGeometry': strokes,
             './ExecuteGizmos': { tickOnce() { immediateSceneRepaints++; } },
             './GizmoMoveCommand': commands,
+            './RotationHandleGeometry': rotationGeometry,
+            './GizmoRotateCommand': rotationCommands,
             './GizmoEditSession': edit,
             './GizmoHudControls': controls, './GizmoHudProjection': projection,
             './GizmoPresentation': presentation, './GizmoHudLayout': layoutModule,
