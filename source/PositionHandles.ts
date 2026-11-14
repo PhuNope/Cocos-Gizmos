@@ -1858,6 +1858,17 @@ function createEditorGizmo(
             const target = this.target as Component;
             const original = readField(target, entry.field);
             if (!original) return;
+            if (entry.field.visual === 'rotation' && view) {
+                // A native ring MeshRenderer may raycast against the rear
+                // half of an edge-on ring directly behind the projected
+                // pivot. Keep the center selection area empty even when
+                // GizmoOperation bypasses our screen hit-test.
+                const pivot = projectMovePoint(camera(),
+                    handleWorldOrigin(target,entry.field,original));
+                const deadRadius = Math.min(20,(entry.field.ringSize ?? 72)*0.25);
+                if(pivot && (view.x-pivot.x)**2 +
+                    (view.y-pivot.y)**2 < deadRadius**2) return;
+            }
             const transform = spaceFor(target, entry.field);
             const forward = camera()?.node?.forward || ray.d;
             const ring = rotationPlacement(target, entry.field,original,
@@ -1991,6 +2002,16 @@ function createEditorGizmo(
                 const projected = projectedMoveGeometry(
                     component, entry.field, local, world, view);
                 if (projected?.type === 'rotation' && projected.ring) {
+                    // Projected X/Y rings can collapse to a diameter when
+                    // seen edge-on. Do not treat the center intersection
+                    // as a draggable rotation handle: it should remain
+                    // available for object selection and other gizmos.
+                    const screenCenter = projectMovePoint(view,world);
+                    const deadRadius = Math.min(20,(entry.field.ringSize ?? 72)*0.25);
+                    if(screenCenter &&
+                        (pointer.x-screenCenter.x)**2 +
+                        (pointer.y-screenCenter.y)**2 < deadRadius**2)
+                        continue;
                     const distance = rotationRingDistanceSquared(pointer,projected.ring);
                     const pickSize = entry.field.pickSize ?? 14;
                     if(distance <= pickSize*pickSize && distance < rotationDistance) {
