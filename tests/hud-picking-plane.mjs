@@ -716,7 +716,9 @@ assert.equal(rotateGizmo.diagnosticState().draggingPosition,true,
     'Native Z annulus starts a rotation drag');
 move(rotZ,100,170);
 assert.ok(Math.abs(rotateComponent.rotationEuler.z-90)<1e-4,
-    'Z ring drag updates Euler degrees by the signed angle');
+    'Z ring drag updates Euler degrees by the signed angle, actual: ' +
+    JSON.stringify(rotateComponent.rotationEuler) + '; events: ' + JSON.stringify(rotateEvents) +
+    '; drag: ' + String(rotateGizmo.diagnosticState().draggingPosition));
 release(rotZ);
 assert.equal(rotateGizmo.diagnosticState().draggingPosition,false);
 assert.ok(rotateEvents.includes('rotationEuler:begin'));
