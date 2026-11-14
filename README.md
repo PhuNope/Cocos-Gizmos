@@ -47,6 +47,14 @@ snap unless `snap` is supplied. See the mounted 2D demo in Assets and the
 **Gizmos → OpenDoc → Move / Points** section for a visual example.
 The handle descriptors also work in `@registerGizmos` drawers.
 
+## Scene HUD control design
+
+HUD buttons now appear as rounded, clickable buttons; toggles render true
+on/off switches; checkboxes show a highlighted square and checkmark.
+Sliders have rounded tracks and thumb indicators. Text-only fallbacks use
+Unicode checkboxes instead of `[x]` or `[ ]`. Native picking rectangles
+are unchanged and no Canvas Sprite/Mask conflict is introduced.
+
 ## API reference inside Cocos Creator
 
 Open **Gizmos → OpenDoc** (next to **Reset Gizmos**) to browse the dockable

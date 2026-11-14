@@ -144,9 +144,9 @@ export function hudSliderScreenTrack(
 }
 
 export function formatHudControl(control: HudControl, value: unknown): string {
-    if (control.type === 'button') return '[' + control.text + ']';
-    if (control.type === 'toggle') return control.text + ': ' + (value === true ? '[ON]' : '[OFF]');
-    if (control.type === 'checkbox') return '[' + (value === true ? 'x' : ' ') + '] ' + control.text;
+    if (control.type === 'button') return control.text;
+    if (control.type === 'toggle') return control.text + ': ' + (value === true ? 'On' : 'Off');
+    if (control.type === 'checkbox') return (value === true ? '☑ ' : '☐ ') + control.text;
     if (control.type !== 'slider') return control.text;
     const current = typeof value === 'number' && Number.isFinite(value) ?
         Math.max(control.min, Math.min(control.max, value)) : control.min;

@@ -42,13 +42,13 @@ const recolored = controls.map(control => ({ ...control }));
 recolored[2].color = '#ffffff';
 assert.notEqual(hudControlLayoutSignature(recolored), layout,
     'Changing control marker color must update its controller');
-assert.equal(formatHudControl(controls[0]), '[Reset]');
+assert.equal(formatHudControl(controls[0]), 'Reset');
 assert.match(formatHudControl(controls[1], 50), /Radius: \[/);
-assert.equal(formatHudControl(controls[2], true), 'Visible: [ON]');
-assert.equal(formatHudControl(controls[2], false), 'Visible: [OFF]');
-assert.equal(formatHudControl(controls[3], true), '[x] Grid');
-assert.equal(formatHudControl(controls[3], false), '[ ] Grid');
-assert.equal(formatHudControl(controls[3], undefined), '[ ] Grid');
+assert.equal(formatHudControl(controls[2], true), 'Visible: On');
+assert.equal(formatHudControl(controls[2], false), 'Visible: Off');
+assert.equal(formatHudControl(controls[3], true), '☑ Grid');
+assert.equal(formatHudControl(controls[3], false), '☐ Grid');
+assert.equal(formatHudControl(controls[3], undefined), '☐ Grid');
 
 const drag = new HudSliderDrag(controls[1], 25, 100);
 assert.equal(drag.move(160), 75);

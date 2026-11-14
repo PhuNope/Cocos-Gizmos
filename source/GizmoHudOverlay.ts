@@ -27,6 +27,61 @@ type ScreenRow = { index: number; text: string; color: string; fontSize: number;
     kind?: 'button' | 'slider' | 'toggle' | 'checkbox';
     value?: number | boolean; min?: number; max?: number };
 
+/** Draw CSS-independent, antialiased HUD widgets in the existing texture. */
+function hudRoundedRect(ctx: any, x: number, y: number, w: number,
+    h: number, radius: number, fill: string): void {
+    ctx.fillStyle = fill;
+    if (typeof ctx.beginPath !== 'function' ||
+        typeof ctx.quadraticCurveTo !== 'function' ||
+        typeof ctx.moveTo !== 'function' || typeof ctx.lineTo !== 'function' ||
+        typeof ctx.fill !== 'function') {
+        ctx.fillRect(x, y, w, h);
+        return;
+    }
+    const r = Math.max(0, Math.min(radius, w / 2, h / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.fill();
+}
+
+function hudDisc(ctx: any, x: number, y: number, r: number, color: string): void {
+    ctx.fillStyle = color;
+    if (typeof ctx.beginPath === 'function' &&
+        typeof ctx.arc === 'function' && typeof ctx.fill === 'function') {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+    } else ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+}
+
+function hudCheckboxTick(ctx: any, x: number, y: number, scale: number): void {
+    if (typeof ctx.beginPath === 'function' &&
+        typeof ctx.moveTo === 'function' &&
+        typeof ctx.lineTo === 'function' &&
+        typeof ctx.stroke === 'function') {
+        ctx.beginPath();
+        ctx.moveTo(x, y + 5 * scale);
+        ctx.lineTo(x + 4 * scale, y + 9 * scale);
+        ctx.lineTo(x + 11 * scale, y);
+        ctx.strokeStyle = '#102333';
+        ctx.lineWidth = 2 * scale;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+    } else {
+        ctx.font = 'bold ' + 12 * scale + 'px sans-serif';
+        ctx.fillStyle = '#102333';
+        ctx.fillText('✓', x, y + 5 * scale);
+    }
+}
+
 function projectHudPlane(camera: SceneHudCamera, left: number, bottom: number,
     width: number, height: number): number[] | null {
     const viewport = camera.viewport;
@@ -193,9 +248,9 @@ class ScreenHudMesh {
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return false;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'rgba(15,18,25,0.88)';
+                ctx.fillStyle = '#151e2d';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'rgba(105,150,190,0.7)';
+                ctx.fillStyle = '#78b8f0';
                 ctx.fillRect(0, 0, canvas.width, scale);
                 ctx.textBaseline = 'middle';
                 const columnTextWidth = Math.max(70, grid.columnWidth - 30);
@@ -206,17 +261,16 @@ class ScreenHudMesh {
                     const y = height - screen.y;
                     const font = hudTextPixels(row.fontSize, row.minSize, row.maxSize);
                     if (row.isControl) {
-                        ctx.fillStyle = 'rgba(48,73,97,0.65)';
                         const hit = hudControlScreenRect(viewport, row.index, totalRows);
-                        ctx.fillRect(hit.left * scale,
-                            (height - hit.top) * scale,
-                            hit.width * scale, hit.height * scale);
+                        hudRoundedRect(ctx, hit.left * scale,
+                            (height - hit.top + 1) * scale,
+                            hit.width * scale, Math.max(1, hit.height - 2) * scale,
+                            5 * scale, '#273950');
                     }
                     ctx.font = font * scale + 'px sans-serif';
                     ctx.fillStyle = /^#[a-fA-F0-9]{6,8}$/.test(row.color) ?
                         row.color : '#ffffff';
                     if (row.kind === 'slider') {
-                        const label = row.text.split(':')[0];
                         const value = typeof row.value === 'number' ? row.value : row.min || 0;
                         const progress = Number.isFinite(value) &&
                             Number.isFinite(row.min) && Number.isFinite(row.max) &&
@@ -226,19 +280,54 @@ class ScreenHudMesh {
                         const track = hudSliderScreenTrack(viewport, row.index, totalRows);
                         const trackX = track.left;
                         const trackWidth = track.width;
-                        ctx.fillText(label, x * scale, y * scale, grid.columnWidth * 0.32 * scale);
-                        ctx.fillStyle = '#566577';
-                        ctx.fillRect(trackX * scale, (y - 2) * scale,
-                            trackWidth * scale, 4 * scale);
-                        ctx.fillStyle = '#70b7fa';
-                        ctx.fillRect(trackX * scale, (y - 2) * scale,
-                            trackWidth * progress * scale, 4 * scale);
-                        ctx.fillStyle = '#daeafa';
-                        ctx.fillRect((trackX + trackWidth * progress - 4) * scale,
-                            (y - 8) * scale, 8 * scale, 16 * scale);
+                        ctx.fillText(row.text, x * scale, y * scale,
+                            grid.columnWidth * 0.32 * scale);
+                        hudRoundedRect(ctx, trackX * scale, (y - 3) * scale,
+                            trackWidth * scale, 6 * scale, 3 * scale, '#54677e');
+                        if (progress > 0)
+                            hudRoundedRect(ctx, trackX * scale, (y - 3) * scale,
+                                trackWidth * progress * scale, 6 * scale, 3 * scale,
+                                '#7bbaff');
+                        hudDisc(ctx, (trackX + trackWidth * progress) * scale,
+                            y * scale, 5 * scale, '#eef8ff');
+                        ctx.fillStyle = '#c4e4ff';
                         ctx.fillText(String(Math.round(value * 1000) / 1000),
-                            (trackX + trackWidth + 8) * scale, y * scale,
-                            grid.columnWidth * 0.22 * scale);
+                            (trackX + trackWidth + 9) * scale, y * scale,
+                            grid.columnWidth * 0.20 * scale);
+                    } else if (row.kind === 'toggle') {
+                        const enabled = row.value === true;
+                        const pillX = x + grid.columnWidth - 77;
+                        ctx.fillStyle = '#e7f1ff';
+                        ctx.fillText(row.text, x * scale, y * scale,
+                            Math.max(35, grid.columnWidth - 95) * scale);
+                        hudRoundedRect(ctx, pillX * scale, (y - 8) * scale,
+                            37 * scale, 16 * scale, 8 * scale,
+                            enabled ? '#3ad2a4' : '#55667e');
+                        hudDisc(ctx, (pillX + (enabled ? 28 : 9)) * scale,
+                            y * scale, 6 * scale, '#f6fbff');
+                        ctx.fillStyle = enabled ? '#98efcf' : '#b3c0d4';
+                        ctx.font = 10 * scale + 'px sans-serif';
+                        ctx.fillText(enabled ? 'On' : 'Off',
+                            (pillX + 42) * scale, y * scale, 30 * scale);
+                    } else if (row.kind === 'checkbox') {
+                        const enabled = row.value === true;
+                        const left = (x + 2) * scale, top = (y - 7) * scale;
+                        hudRoundedRect(ctx, left, top, 15 * scale, 15 * scale,
+                            3 * scale, enabled ? '#69c9f1' : '#54667b');
+                        if (enabled)
+                            hudCheckboxTick(ctx, left + 2 * scale,
+                                top + 3 * scale, scale);
+                        ctx.fillStyle = '#e7f1ff';
+                        ctx.fillText(row.text, (x + 26) * scale, y * scale,
+                            Math.max(35, columnTextWidth - 26) * scale);
+                    } else if (row.kind === 'button') {
+                        const width = Math.max(70, Math.min(grid.columnWidth - 40, 150));
+                        hudRoundedRect(ctx, x * scale, (y - 9) * scale,
+                            width * scale, 18 * scale, 6 * scale, '#397eb8');
+                        ctx.font = '600 ' + Math.max(12, font - 1) * scale + 'px sans-serif';
+                        ctx.fillStyle = '#f5faff';
+                        ctx.fillText(row.text, (x + 12) * scale, y * scale,
+                            Math.max(30, width - 18) * scale);
                     } else {
                         ctx.fillText(row.text, x * scale, y * scale,
                             columnTextWidth * scale);
@@ -475,7 +564,9 @@ export class GizmoHudOverlay {
                     (component as any)[control.property] : undefined;
                 this.screenRows.push({
                     index: (placement?.startRow || 0) + i,
-                    text: item.text, color: item.color,
+                    // The textured HUD draws the real widget. Keep formatted
+                    // Unicode labels only for the non-Canvas fallback path.
+                    text: control ? control.text : item.text, color: item.color,
                     fontSize: item.fontSize, minSize: item.minSize,
                     maxSize: item.maxSize,
                     isControl: item.id.startsWith('control:'),

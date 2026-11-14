@@ -85,6 +85,13 @@ const document = {
                 return {
                     clearRect() {}, fillRect(...args) { drawCalls.push(['rect', ...args]); },
                     fillText(...args) { drawCalls.push(['text', ...args]); },
+                    beginPath() { drawCalls.push(['begin-path']); },
+                    moveTo(...args) { drawCalls.push(['move-to', ...args]); },
+                    lineTo(...args) { drawCalls.push(['line-to', ...args]); },
+                    quadraticCurveTo(...args) { drawCalls.push(['curve', ...args]); },
+                    arc(...args) { drawCalls.push(['circle', ...args]); },
+                    fill() { drawCalls.push(['fill']); },
+                    stroke() { drawCalls.push(['stroke']); },
                 };
             },
         };
@@ -213,6 +220,36 @@ overlay.render(component, [{ id: 'text:title', text: 'Gizmos2D Test',
         property: 'radius', min: 0, max: 100, color: '#ffffff' }] });
 overlay.finishFrame(2);
 assert.equal(drawCalls.length, texBefore, 'Identical HUD frames reuse the same texture');
+// Button, toggle and checkbox must render genuine shaped controls instead of
+// the prior raw "[Reset]", "[ON]" and "[x]" text inside a rectangle.
+component.visible = true;
+component.grid = false;
+const drawStart = drawCalls.length;
+overlay.beginFrame();
+overlay.render(component, [
+    { id: 'control:visible', text: 'Visible: [ON]', color: '#ffffff', fontSize: 14 },
+    { id: 'control:grid', text: '[ ] Grid', color: '#ffffff', fontSize: 14 },
+    { id: 'control:reset', text: '[Reset]', color: '#ffffff', fontSize: 14 },
+], {
+    namespace: 'pretty', startRow: 0, textCount: 0,
+    controls: [
+        { type: 'toggle', id: 'visible', text: 'Visible', property: 'visible' },
+        { type: 'checkbox', id: 'grid', text: 'Grid', property: 'grid' },
+        { type: 'button', id: 'reset', text: 'Reset' },
+    ],
+});
+overlay.finishFrame(3);
+const drawnWidgets = drawCalls.slice(drawStart);
+for (const label of ['Visible', 'Grid', 'Reset'])
+    assert.ok(drawnWidgets.some(call => call[0] === 'text' && call[1] === label),
+        'The screen HUD draws native-looking control label: ' + label);
+assert.ok(drawnWidgets.some(call => call[0] === 'circle'),
+    'Toggle has a rounded switch thumb');
+assert.ok(drawnWidgets.some(call => call[0] === 'curve'),
+    'Controls have rounded backgrounds');
+assert.ok(drawnWidgets.every(call => call[0] !== 'text' ||
+    !/\[[ x]\]|\[Reset\]|\[ON\]/.test(call[1])),
+    'ASCII checkbox/button/toggle strings must not be shown');
 overlay.beginFrame();
 overlay.finishFrame(0);
 assert.equal(rootGizmo.children[0].active, false,
