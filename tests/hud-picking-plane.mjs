@@ -191,6 +191,8 @@ const solver = evaluate('PositionDragSolver');
 const planes = evaluate('PlaneHandleGeometry');
 const axes = evaluate('AxisHandleGeometry');
 const hit = evaluate('MoveHitGeometry');
+const scale = evaluate('MoveScreenScale');
+const strokes = evaluate('MoveStrokeGeometry');
 const edit = evaluate('GizmoEditSession');
 const commands = evaluate('GizmoMoveCommand', {
     './GizmoEditSession': edit, './PositionDragSolver': solver,
@@ -272,8 +274,9 @@ const sandbox = {
             cc, './Gizmos2D': { Gizmos2D: {
                 DEFAULT_COLOR: {}, DEFAULT_LAYER: 4,
                 beginLayer() {}, beginLocalPosition() {}, endLocalPosition() {},
-                beginColor() {},
+                beginColor() {}, flushEditorFrame() {},
                 drawSolidEllipse(...args) { twoDDraws.push(args); },
+                drawSolidPolygon(...args) { twoDDraws.push(args); },
             } },
             './Gizmos3D': { Gizmos3D: {
                 DEFAULT_COLOR: {}, setDepTest() {}, beginColor() {},
@@ -283,6 +286,7 @@ const sandbox = {
             './PositionDragSolver': solver,
             './PlaneHandleGeometry': planes, './AxisHandleGeometry': axes,
             './MoveHitGeometry': hit,
+            './MoveScreenScale': scale, './MoveStrokeGeometry': strokes,
             './GizmoMoveCommand': commands,
             './GizmoEditSession': edit,
             './GizmoHudControls': controls, './GizmoHudProjection': projection,
