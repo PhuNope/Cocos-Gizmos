@@ -27,7 +27,10 @@ export function moveStrokeBands(
         !Number.isFinite(solidPixels) || solidPixels <= 0 ||
         !Number.isFinite(featherPixels) || featherPixels < 0) return null;
     const axis = sub(b, a);
-    const side = cross(axis, cameraForward);
+    // GeometryRenderer 3.8 draws solid quads as front-facing triangles.
+    // cross(axis,forward) reversed the winding from the Scene camera:
+    // all Move3D arrows were backface-culled and thus invisible.
+    const side = cross(cameraForward, axis);
     const length = Math.hypot(side.x, side.y, side.z);
     if (!Number.isFinite(length) || length < 1e-12) return null;
     const unit = { x: side.x / length, y: side.y / length, z: side.z / length };

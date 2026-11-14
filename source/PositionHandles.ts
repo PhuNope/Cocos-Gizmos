@@ -343,7 +343,16 @@ function drawMoveStroke(
     const view = camera();
     const forward = view?.node?.forward || { x: 0, y: 0, z: -1 };
     const bands = moveStrokeBands(a, b, forward, pixel);
-    if (!bands) return;
+    if (!bands) {
+        // Looking straight down one axis makes a camera-facing ribbon
+        // degenerate. Keep the 3D arrow segment with a native line.
+        if (!onCanvas) {
+            Gizmos3D.beginColor(node, color);
+            Gizmos3D.drawLine(node, new Vec3(a.x, a.y, a.z),
+                new Vec3(b.x, b.y, b.z));
+        }
+        return;
+    }
     const draw = (quad: MoveStrokePoint[], paint: Color) => {
         if (onCanvas) {
             Gizmos2D.beginColor(node, paint);
@@ -371,6 +380,8 @@ const CANVAS_DRAG_REPAINT_MS = 32; // Max ~31 manual full-scene ticks/sec
 // only the first Move controller should schedule a full redraw; repeated
 // BEFORE_DRAW callbacks for other selected controllers observe the same key.
 let lastMoveViewKey: string | null = null;
+let lastMoveViewRedraw = -Infinity;
+const MOVE_VIEW_REDRAW_INTERVAL_MS = 30;
 function repaintMoveAfterCameraChange(): void {
     if (activePositionDrags.size) return; // drag + wheel must never repaint here
     const view = camera();
@@ -400,8 +411,13 @@ function repaintMoveAfterCameraChange(): void {
         return;
     }
     if (key === lastMoveViewKey) return;
-    // Set the key BEFORE repainting, so reentrant draw notifications and
-    // multiple selected components cannot cause a redraw feedback loop.
+    // Wheel and orbit may dispatch multiple BEFORE_DRAW notifications
+    // before GeometryRenderer.render() resets its shared triangle cache.
+    // Coalesce 3D redraws to avoid overflowing that cache.
+    const now = Date.now();
+    if (now - lastMoveViewRedraw < MOVE_VIEW_REDRAW_INTERVAL_MS) return;
+    lastMoveViewRedraw = now;
+    // Fingerprint is set before drawing to prevent reentrant updates.
     lastMoveViewKey = key;
     repaintWholeScene();
 }
@@ -424,6 +440,7 @@ function drawSelectedPositionMarkers(component: Component): void {
     const node = component.node;
     const onCanvas = isCanvas2D(node);
     camera()?.sync?.();
+    const previousDepthTest = onCanvas ? true : Gizmos3D.getDepTest(node);
     const nodeScale = node.worldScale || new Vec3(1, 1, 1);
     const sx = Number.isFinite(nodeScale.x) && Math.abs(nodeScale.x) > 1e-8 ?
         Math.abs(nodeScale.x) : 1;
@@ -535,7 +552,9 @@ function drawSelectedPositionMarkers(component: Component): void {
             Gizmos2D.beginColor(node, Gizmos2D.DEFAULT_COLOR);
             lastCanvasPaint.set(component, Date.now());
         } else {
-            Gizmos3D.setDepTest(node, true);
+            // Restore the user's original setting; a drawer may choose
+            // depthTest=false for all its onDrawGizmos() primitives.
+            Gizmos3D.setDepTest(node, previousDepthTest);
             Gizmos3D.beginColor(node, Gizmos3D.DEFAULT_COLOR);
         }
     }
