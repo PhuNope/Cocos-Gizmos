@@ -2,7 +2,7 @@
 
 All notable changes to Cocos-Gizmos are documented here.
 
-## Unreleased — v3 development branch
+## [3.0.1] - 2026-11-15
 
 ### Added
 - `Gizmos2D.rotate()` provides a Z rotation ring for Euler Vec3 degrees with smooth drag, optional angular snap and Undo/Redo.
