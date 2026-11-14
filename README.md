@@ -174,7 +174,7 @@ code still require a runtime guard. The type-only package does not provide
 
 ## Install the extension
 
-1. Download the latest **v3** ZIP from the [GitHub Actions artifacts](https://github.com/PhuNope/Cocos-Gizmos/actions?query=branch%3Av3). It contains `Cocos-Gizmos-v3.0.0.zip`; a 3.0.0 GitHub Release has not been published.
+1. Download `Cocos-Gizmos-v3.0.0.zip` from the [v3.0.0 GitHub Release](https://github.com/PhuNope/Cocos-Gizmos/releases/tag/v3.0.0), or use a [v3 development ZIP from GitHub Actions](https://github.com/PhuNope/Cocos-Gizmos/actions?query=branch%3Av3).
 2. In Cocos Creator, open **Extensions → Extension Manager**, choose **Project** (or **Global**), click **Import Extension (+)** and select the ZIP.
 3. Enable `cocos-gizmos`. The Scene Script handles Editor drawing, and the read-only `cocos-gizmos` asset package supplies global TypeScript declarations.
 

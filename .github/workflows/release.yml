@@ -38,17 +38,29 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # A version tag is the only trigger for publishing a release.
-      - name: Validate release tag
+      # The initial v3.0.0 release is explicitly requested by a one-time
+      # branch commit with subject "release: v3.0.0". All future v3 pushes
+      # remain artifact-only; normal version tags still trigger Releases.
+      - name: Validate explicit release request
         id: release
-        if: ${{ github.ref_type == 'tag' }}
+        if: ${{ github.ref_type == 'tag' || (github.event_name == 'push' && github.ref == 'refs/heads/v3' && startsWith(github.event.head_commit.message, 'release: v3.0.0')) }}
         shell: bash
         run: |
           set -euo pipefail
           tag="v$(node -p 'require("./package.json").version')"
-          [[ "$GITHUB_REF_NAME" == "$tag" ]] || {
-            echo "Tag $GITHUB_REF_NAME does not match package version $tag"; exit 1;
-          }
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            [[ "$GITHUB_REF_NAME" == "$tag" ]] || {
+              echo "::error::Tag $GITHUB_REF_NAME does not match package version $tag"; exit 1;
+            }
+          else
+            [[ "$GITHUB_REF" == "refs/heads/v3" && "$tag" == "v3.0.0" ]] || {
+              echo "::error::Unexpected branch release request"; exit 1;
+            }
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+              echo "::error::$tag already exists; refusing to republish the initial release"
+              exit 1
+            fi
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "publish=true" >> "$GITHUB_OUTPUT"
 
