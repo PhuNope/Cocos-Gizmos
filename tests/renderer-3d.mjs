@@ -395,4 +395,28 @@ Gizmos3D.setDepTest(node, false);
 Gizmos3D.drawSphere(node, c, 0.3, false, 999, 999);
 assert.equal(calls.spheres.length, sphereCount + 1,
     'A too-dense sphere near a full buffer is not submitted');
+// A Component can remain selected while Cocos replaces the Scene camera
+// (switching Scene tabs or 2D/3D view). Its cached GeometryRenderer must
+// rebind instead of submitting every arrow to an invisible old camera.
+const alternateLines = [];
+const nextRenderer = {
+    ...geometryRenderer,
+    addLine(...args) { alternateLines.push(args); },
+};
+const nextCamera = {
+    ...sceneCamera,
+    geometryRenderer: nextRenderer,
+};
+sandbox.cce.Camera._camera.camera = nextCamera;
+Gizmos3D.setDepTest(node, false);
+assert.equal(Gizmos3D.getDepTest(node), false);
+const previousCameraLineCount = calls.lines.length;
+Gizmos3D.drawLine(node, new Vec3(0, 0), new Vec3(1, 0));
+assert.equal(alternateLines.length, 1,
+    'Move handles draw into the active camera after scene/view switch');
+assert.equal(calls.lines.length, previousCameraLineCount,
+    'No new geometry is submitted to the disposed camera');
+sandbox.cce.Camera._camera.camera = sceneCamera;
+Gizmos3D.setDepTest(node, true);
+assert.equal(Gizmos3D.getDepTest(node), true);
 console.log('[renderer-3d] depth toggles, triangle budgeting, sphere fallback and Move quad recovery OK');
