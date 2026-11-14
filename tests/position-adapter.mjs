@@ -651,8 +651,8 @@ assert.equal(hudAdapter.status().input.controllerDown, 0,
 
 const raysBefore = cam.rays;
 hudGizmo.refreshHandles();
-assert.equal(cam.rays - raysBefore, 5,
-    'Four HUD controls share three rays; the position marker uses two');
+assert.equal(cam.rays - raysBefore, 3,
+    'Four HUD controls share three rays; position scale uses projection derivatives, not rays');
 const controllersBeforeText = hudGizmo.controllers.length;
 const controlsBeforeText = component.onGizmoHudControls;
 component.onGizmoHudControls = () => controlsBeforeText().map(control => ({
