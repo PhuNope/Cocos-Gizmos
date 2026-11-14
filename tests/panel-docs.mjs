@@ -18,13 +18,15 @@ assert.match(doc.template, /size: &#39;large&#39;/);
 assert.equal(menu[resetIndex + 1].message, 'open-doc');
 assert.deepEqual(packageManifest.contributions.messages['open-doc'].methods, ['openDoc']);
 assert.match(doc.template, /Gizmos3D\.move/);
+assert.match(doc.template, /Gizmos3D\.rotate/);
+assert.match(doc.template, /Gizmos2D\.rotate/);
 assert.match(doc.template, /Gizmos2D\.move/);
 assert.match(doc.template, /Gizmos2D\.point/);
 assert.match(doc.template, /onGizmoHudControls/);
 assert.match(doc.template, /<svg[^>]+role="img"/);
 assert.match(doc.style, /cg-api-card/);
-assert.equal((doc.template.match(/class="cg-api-card"/g) || []).length, 14,
-    'Open Document ships fourteen API cards, including 2D Move, decorator and callback examples');
+assert.equal((doc.template.match(/class="cg-api-card"/g) || []).length, 16,
+    'Open Document ships sixteen API cards, including Move, Rotate, decorator and callbacks');
 for (const callback of ['onGizmoChanged', 'onGizmoHudChanged', 'onGizmoHudAction',
     'onRestore', 'GizmoHandlePhase']) {
     assert.ok(doc.template.includes(callback), 'Open Document documents ' + callback);
