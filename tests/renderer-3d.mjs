@@ -100,8 +100,13 @@ class Sprite {
     set spriteFrame(value) { this._frame = value; this.frameWrites++; }
 }
 class RenderRoot2D {}
-const calls = { lines: [], dashed: [], triangles: [], quads: [] };
+const calls = { lines: [], dashed: [], triangles: [], quads: [], spheres: [], crosses: [] };
+const trianglePools = [
+    { _maxVertices: 30000, _vertexCount: 0 },
+    { _maxVertices: 30000, _vertexCount: 0 },
+];
 const geometryRenderer = {
+    _buffers: { triangles: trianglePools },
     addLine(a, b, color, depth) {
         calls.lines.push({ a: { ...a }, b: { ...b }, color, depth });
     },
@@ -109,7 +114,20 @@ const geometryRenderer = {
         calls.dashed.push({ a: { ...a }, b: { ...b }, color, depth });
     },
     addTriangle(...args) { calls.triangles.push(args); },
-    addQuad(...args) { calls.quads.push(args); },
+    addQuad(...args) {
+        calls.quads.push(args);
+        if (!args[5]) trianglePools[args[6] ? 1 : 0]._vertexCount += 6;
+    },
+    addSphere(c, radius, color, sx, sy, wireframe, depth) {
+        calls.spheres.push({ c, radius, color, sx, sy, wireframe, depth });
+        if (!wireframe) {
+            const pool = trianglePools[depth ? 1 : 0];
+            assert.ok(pool._vertexCount + sx * sy * 6 <= pool._maxVertices,
+                'Gizmos may never ask GeometryRenderer to exceed its triangle capacity');
+            pool._vertexCount += sx * sy * 6;
+        }
+    },
+    addCross(...args) { calls.crosses.push(args); },
 };
 
 const cc = {
@@ -333,4 +351,48 @@ const positionWrites = positionLabel.stringWrites;
 Gizmos3D.drawPositionLabel(node, 'object-position', pos);
 assert.equal(positionLabel.stringWrites, positionWrites,
     'Position label is reused without rewriting identical text');
-console.log('[renderer-3d] Move Gizmo presets, new arrow/plane APIs, position labels and existing renderer OK');
+// Cocos 3.8.8 has separate 10,000-triangle queues for depth on/off. Users
+// toggle depthTest in their drawer callbacks, so neither queue may overrun.
+const c = new Vec3(1, 2, 3);
+Gizmos3D.setDepTest(node, true);
+assert.equal(Gizmos3D.getDepTest(node), true);
+Gizmos3D.drawSphere(node, c, 0.3);
+assert.deepEqual([calls.spheres.at(-1).sx, calls.spheres.at(-1).sy], [16, 8],
+    'Small Editor marker spheres avoid the old 32x16 tessellation');
+assert.equal(calls.spheres.at(-1).depth, true);
+Gizmos3D.setDepTest(node, false);
+assert.equal(Gizmos3D.getDepTest(node), false);
+Gizmos3D.drawSphere(node, c, 0.3);
+assert.equal(calls.spheres.at(-1).depth, false,
+    'Switching depth test uses the no-depth triangle pool');
+assert.equal(trianglePools[0]._vertexCount, 16 * 8 * 6);
+trianglePools[0]._vertexCount = trianglePools[0]._maxVertices - 6 * 52;
+Gizmos3D.drawSphere(node, c, 0.3);
+const adaptive = calls.spheres.at(-1);
+assert.ok(adaptive.sx <= 16 && adaptive.sy <= 8 &&
+    adaptive.sx * adaptive.sy * 2 <= 52,
+    'A nearly-full no-depth pool lowers sphere detail');
+trianglePools[0]._vertexCount = trianglePools[0]._maxVertices - 6;
+const crossesBefore = calls.crosses.length;
+const sphereCount = calls.spheres.length;
+Gizmos3D.drawSphere(node, c, 0.3);
+assert.equal(calls.crosses.length, crossesBefore + 1,
+    'At capacity a sphere becomes one cheap cross');
+assert.equal(calls.spheres.length, sphereCount,
+    'Never issue a sphere to a full triangle pool');
+const q = [new Vec3(0, 0), new Vec3(1, 0), new Vec3(1, 1), new Vec3(0, 1)];
+const fallbackLines = calls.lines.length;
+Gizmos3D.drawQuad(node, ...q, false);
+assert.equal(calls.lines.length, fallbackLines + 4,
+    'Exhausted quad draws an outline rather than vanishing');
+Gizmos3D.setDepTest(node, true);
+assert.equal(Gizmos3D.getDepTest(node), true);
+const beforeDepthTrue = trianglePools[1]._vertexCount;
+Gizmos3D.drawSphere(node, c, 0.3);
+assert.ok(trianglePools[1]._vertexCount > beforeDepthTrue,
+    'Re-enabling depth test still renders into its independent pool');
+Gizmos3D.setDepTest(node, false);
+Gizmos3D.drawSphere(node, c, 0.3, false, 999, 999);
+assert.equal(calls.spheres.length, sphereCount + 1,
+    'A too-dense sphere near a full buffer is not submitted');
+console.log('[renderer-3d] depth toggles, triangle budgeting, sphere fallback and Move quad recovery OK');

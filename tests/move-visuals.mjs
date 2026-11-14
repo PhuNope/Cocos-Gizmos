@@ -62,6 +62,26 @@ assert.equal(moveCameraProjectionSignature(probe, () => null), null,
     'Unavailable camera must not request redraw');
 assert.equal(moveCameraProjectionSignature(probe, () => ({ x: NaN, y: 0 })), null,
     'Broken renderer camera must not request redraw');
+// Solid Move stroke triangles must face the Scene camera. Previously the
+// wrong ribbon winding was culled on both depth-on and depth-off passes.
+const forward = { x: 0, y: 0, z: -1 };
+for (const end of [
+    { x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 },
+    { x: 1, y: 1, z: 0 },
+]) {
+    const ribbon = moveStrokeBands({ x: 0, y: 0, z: 0 }, end, forward, 0.01);
+    assert.ok(ribbon, 'Visible X/Y/XY arrows produce finite ribbons');
+    const [a, b, c] = ribbon.core;
+    const u = { x: b.x-a.x, y: b.y-a.y, z: b.z-a.z };
+    const v = { x: c.x-b.x, y: c.y-b.y, z: c.z-b.z };
+    const normal = { x: u.y*v.z-u.z*v.y, y: u.z*v.x-u.x*v.z,
+        z: u.x*v.y-u.y*v.x };
+    const dot = normal.x*forward.x + normal.y*forward.y + normal.z*forward.z;
+    assert.ok(dot < 0, 'Quad winding must face the Scene camera, not its backface');
+}
+assert.equal(moveStrokeBands({ x: 0, y: 0, z: 0 },
+    { x: 0, y: 0, z: -1 }, forward, 0.01), null,
+    'Axis pointing into camera is degenerate; 3D uses native line fallback');
 assert.equal(moveWorldPerPixel(center, () => null), null);
 assert.equal(moveWorldPerPixel(center,p=>({x:NaN,y:p.y})), null);
 const adapter = readFileSync(path.join(root,'source/PositionHandles.ts'),'utf8');
@@ -76,6 +96,9 @@ assert.match(adapter,/activePositionDrags\.add\(this\)/);
 assert.match(adapter,/activePositionDrags\.delete\(this\)/);
 assert.match(adapter,/CANVAS_DRAG_REPAINT_MS = 32/);
 assert.match(adapter,/function repaintMoveAfterCameraChange\(\)/);
+assert.match(adapter,/const MOVE_VIEW_REDRAW_INTERVAL_MS = 30/);
+assert.match(adapter,/const previousDepthTest = onCanvas \? true : Gizmos3D\.getDepTest\(node\)/);
+assert.match(adapter,/Gizmos3D\.setDepTest\(node, previousDepthTest\)/);
 assert.match(adapter,/if \(this\.entries\.some\(entry => isMoveHandle\(entry\.field\)\)\)/);
 assert.match(adapter,/lastMoveViewKey = key;\s*repaintWholeScene\(\)/);
 assert.match(adapter,/repaintWholeScene\(\)/);

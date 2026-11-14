@@ -280,7 +280,7 @@ const sandbox = {
                 drawSolidPolygon(...args) { twoDDraws.push(args); },
             } },
             './Gizmos3D': { Gizmos3D: {
-                DEFAULT_COLOR: {}, setDepTest() {}, beginColor() {},
+                DEFAULT_COLOR: {}, setDepTest() {}, getDepTest() { return true; }, beginColor() {},
                 drawSphere() {}, drawLine() {}, drawQuad() {},
                 drawPositionLabel() {},
             } },

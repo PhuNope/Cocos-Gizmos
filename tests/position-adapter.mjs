@@ -215,7 +215,7 @@ const sandbox = {
             beginColor() {}, drawSolidEllipse(...args) { visibleDots.canvas.push(args); },
         } };
         if (name === './Gizmos3D') return { Gizmos3D: {
-            DEFAULT_COLOR: {}, setDepTest() {}, beginColor() {},
+            DEFAULT_COLOR: {}, setDepTest() {}, getDepTest() { return true; }, beginColor() {},
             drawSphere(...args) { visibleDots.scene3d.push(args); },
             drawQuad(...args) { visibleDots.scene3d.push(args); },
             drawLine() {},

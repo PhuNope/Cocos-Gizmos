@@ -13,6 +13,17 @@ vẽ lại arrow và plane 2D/3D ngay trong frame, không phải chờ lượt c
 nhật Scene 250ms tiếp theo. Chỉ phát vẽ lại khi fingerprint camera
 thay đổi để tránh giật và tốn CPU khi camera đứng yên.
 
+### Cocos 3.8.8: giới hạn tam giác và depth-test
+
+GeometryRenderer chỉ có 10.000 tam giác cho mỗi bộ đệm depth-test. Sphere
+mặc định dùng 16×8 segments, giảm chi tiết theo dung lượng còn lại hoặc
+fallback thành cross; quad Move fallback thành đường viền khi thiếu chỗ.
+Đã sửa winding của dải arrow 3D (tránh back-face culling), có fallback
+line khi camera nhìn trùng trục, và khôi phục trạng thái depth-test gốc
+sau khi plugin vẽ handle. Các lần repaint do wheel được coalesce
+khoảng 30 ms để không tích lũy hình học quá nhiều trước GPU render.
+
+
 Khi **đang drag và lăn chuột**, bỏ nhánh redraw toàn bộ Scene trong
 BEFORE_DRAW và cập nhật native pick quads không cần thiết. 2D giới hạn
 redraw chủ động vào khoảng 31 lần/giây, các engine frame vẫn vẽ bình
