@@ -2014,8 +2014,22 @@ function createEditorGizmo(
                         continue;
                     const distance = rotationRingDistanceSquared(pointer,projected.ring);
                     const pickSize = entry.field.pickSize ?? 14;
-                    if(distance <= pickSize*pickSize && distance < rotationDistance) {
-                        rotation = entry; rotationDistance = distance;
+                    // At cardinal points a face-on Z circle intersects an
+                    // edge-on X/Y diameter. Prefer the face-on ring only
+                    // for near-equal stroke distances; otherwise the closest
+                    // screen stroke should win as usual.
+                    const ring = rotationPlacement(component,entry.field,
+                        local,world,markerSize(world)/22);
+                    const forward = view?.node?.forward;
+                    const facing = ring && forward ?
+                        Math.abs(ring.normal.x*forward.x +
+                            ring.normal.y*forward.y +
+                            ring.normal.z*forward.z) /
+                        Math.max(1e-8,Math.hypot(forward.x,forward.y,forward.z)) :
+                        0;
+                    const score = distance + 36*(1-Math.min(1,facing));
+                    if(distance <= pickSize*pickSize && score < rotationDistance) {
+                        rotation = entry; rotationDistance = score;
                     }
                     continue;
                 }
