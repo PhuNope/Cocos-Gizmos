@@ -81,6 +81,18 @@ assert.equal(invalid.begin({o:{x:1,y:0,z:0},d:{x:1,y:0,z:0}}),false,
     'Parallel camera ray cannot start a rotation');
 assert.throws(()=>new solver.RotationDragSolver(initial,center,{x:0,y:0,z:1},
     ROTATE_IDENTITY,{axis:'z',snap:0}));
+// 3D X/Y rings become edge-on from front view. A ray parallel to the
+// rotation plane should still rotate using the projected-screen tangent.
+const edge = new solver.RotationDragSolver(initial,center,{x:1,y:0,z:0},
+    ROTATE_IDENTITY,{axis:'x',space:'world'},
+    {tangent:{x:0,y:1},radiusPixels:72});
+const edgeRay={o:{x:0,y:1,z:10},d:{x:0,y:0,z:-1}};
+assert.equal(edge.begin(edgeRay,{x:200,y:100}),true);
+const edgeEuler=edge.move(edgeRay,{x:200,y:100+Math.PI*36});
+assert.ok(edgeEuler && [edgeEuler.x,edgeEuler.y,edgeEuler.z].every(Number.isFinite));
+near(edgeEuler.x,90,'Edge-on X ring responds to a screen drag');
+assert.equal(edge.cancel().x,0);
+assert.equal(edge.move(edgeRay),null,'Edge-on pointer coordinates are required');
 
 const original = {x:30,y:40,z:12};
 const frame = rotateEulerQuat({x:0,y:35,z:0});

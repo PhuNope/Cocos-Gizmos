@@ -5,6 +5,12 @@ import {
     rotateSub, rotateUnit,
 } from './RotationHandleGeometry';
 
+export interface RotationScreenFallback {
+    /** Unit vector in the direction of a projected ring diameter. */
+    tangent: {x:number;y:number};
+    /** Scene View ring radius in screen pixels. */
+    radiusPixels: number;
+}
 export interface RotationDragOptions {
     axis: RotateAxis;
     space?: RotateSpace;
@@ -19,6 +25,8 @@ export interface RotationDragOptions {
 export class RotationDragSolver {
     private previous: RotateVec3 | null = null;
     private totalDegrees = 0;
+    private screenStart: {x:number;y:number} | null = null;
+    private readonly useScreen: boolean;
     private readonly normal: RotateVec3;
     private readonly initialQuat: RotateQuat;
     private readonly frame: RotateQuat;
@@ -28,6 +36,7 @@ export class RotationDragSolver {
         normal: RotateVec3,
         frame: RotateQuat,
         private readonly options: RotationDragOptions,
+        private readonly screenFallback?: RotationScreenFallback | null,
     ) {
         const unit = rotateUnit(normal);
         if (!unit || ![initial.x,initial.y,initial.z].every(Number.isFinite))
@@ -38,6 +47,15 @@ export class RotationDragSolver {
         this.normal = unit;
         this.frame = rotateQuatUnit(frame);
         this.initialQuat = rotateEulerQuat(initial);
+        // An X/Y rotation plane becomes edge-on as the Scene camera faces Z.
+        // Ray/plane intersections are undefined then; use a stable screen
+        // projection of the ring as an Editor-style gesture fallback.
+        if (screenFallback && (!Number.isFinite(screenFallback.radiusPixels) ||
+            screenFallback.radiusPixels <= 0 ||
+            !Number.isFinite(screenFallback.tangent.x) ||
+            !Number.isFinite(screenFallback.tangent.y)))
+            throw new Error('Invalid rotation screen fallback');
+        this.useScreen = !!screenFallback;
     }
     private onPlane(ray: RotateRay): RotateVec3 | null {
         const denom = rotateDot(this.normal,ray.d);
@@ -48,21 +66,40 @@ export class RotationDragSolver {
             z:ray.o.z+t*ray.d.z};
         return rotateUnit(rotateSub(hit,this.center));
     }
-    public begin(ray: RotateRay): boolean {
-        this.previous=this.onPlane(ray);
+    public begin(ray: RotateRay, pointer?: {x:number;y:number}): boolean {
         this.totalDegrees=0;
-        return !!this.previous;
+        this.screenStart=null;
+        this.previous=null;
+        const facing = Math.abs(rotateDot(this.normal,ray.d)) /
+            Math.max(1e-8,Math.hypot(ray.d.x,ray.d.y,ray.d.z));
+        if (facing >= 0.08)
+            this.previous=this.onPlane(ray);
+        if(this.previous) return true;
+        if(this.useScreen && pointer &&
+            Number.isFinite(pointer.x) && Number.isFinite(pointer.y)) {
+            this.screenStart={x:pointer.x,y:pointer.y};
+            return true;
+        }
+        return false;
     }
-    public move(ray: RotateRay): RotateVec3 | null {
-        if (!this.previous) return null;
-        const next=this.onPlane(ray);
-        if (!next) return null;
-        const sine=rotateDot(this.normal,rotateCross(this.previous,next));
-        const cosine=rotateDot(this.previous,next);
-        const incremental=Math.atan2(sine,cosine)*180/Math.PI;
-        if (!Number.isFinite(incremental)) return null;
-        this.totalDegrees+=incremental;
-        this.previous=next;
+    public move(ray: RotateRay, pointer?: {x:number;y:number}): RotateVec3 | null {
+        if (this.screenStart) {
+            if(!pointer || !this.screenFallback) return null;
+            const vector=this.screenFallback.tangent;
+            const pixels=(pointer.x-this.screenStart.x)*vector.x +
+                (pointer.y-this.screenStart.y)*vector.y;
+            this.totalDegrees=pixels/this.screenFallback.radiusPixels*180/Math.PI;
+        } else {
+            if (!this.previous) return null;
+            const next=this.onPlane(ray);
+            if (!next) return null;
+            const sine=rotateDot(this.normal,rotateCross(this.previous,next));
+            const cosine=rotateDot(this.previous,next);
+            const incremental=Math.atan2(sine,cosine)*180/Math.PI;
+            if (!Number.isFinite(incremental)) return null;
+            this.totalDegrees+=incremental;
+            this.previous=next;
+        }
         const delta=this.options.snap ?
             Math.round(this.totalDegrees/this.options.snap)*this.options.snap :
             this.totalDegrees;

@@ -463,6 +463,25 @@ function repaintCanvasMove(component: Component): void {
     repaintWholeScene();
 }
 
+/** The direction of the longest visible circle diameter becomes a stable
+ * fallback drag tangent when 3D X/Y rings are edge-on to the Scene camera.
+ */
+function rotationScreenFallback(ring: RotateRing, view: any): {
+    tangent: {x:number;y:number}; radiusPixels: number;
+} | null {
+    const center=projectMovePoint(view,ring.center);
+    const u=projectMovePoint(view,ring.points[0]);
+    const v=projectMovePoint(view,ring.points[16]);
+    if(!center || !u || !v) return null;
+    const du={x:u.x-center.x,y:u.y-center.y};
+    const dv={x:v.x-center.x,y:v.y-center.y};
+    const vector=du.x*du.x+du.y*du.y >= dv.x*dv.x+dv.y*dv.y ? du : dv;
+    const length=Math.hypot(vector.x,vector.y);
+    if (!Number.isFinite(length) || length < 8) return null;
+    return {tangent:{x:vector.x/length,y:vector.y/length},
+        radiusPixels:length};
+}
+
 function drawSelectedPositionMarkers(component: Component): void {
     if (!component?.node?.isValid || typeof component.onGizmoHandles !== 'function') return;
     const fields: Field[] = component.onGizmoHandles() || [];
@@ -1901,10 +1920,11 @@ function createEditorGizmo(
                         axis: entry.field.axis as RotateAxis,
                         space: entry.field.space === 'world' ? 'world' : 'local',
                         snap: entry.field.snap, twoD: isCanvas2D(target.node),
-                    },port,hooks) :
+                    },port,hooks,rotationScreenFallback(ring,camera())) :
                     new GizmoMoveCommand(original,transform,normal,
                         entry.field,port,hooks);
-                if (!command.begin(ray)) return;
+                if (ring ? !command.begin(ray,view || undefined) :
+                    !command.begin(ray)) return;
                 this.drag = { entry, command };
                 activePositionDrags.add(this);
                 this.setHover(entry);
@@ -1919,7 +1939,11 @@ function createEditorGizmo(
             const view = readScenePointer(event);
             const ray = view && sceneRay(view);
             if (!ray) return;
-            try { drag.command.update(ray); }
+            try {
+                if(drag.entry.field.visual === 'rotation')
+                    (drag.command as GizmoRotateCommand).update(ray,view || undefined);
+                else drag.command.update(ray);
+            }
             catch (error) {
                 try { this.finish(true); }
                 finally { console.warn('[cocos-gizmos/handles] Position edit cancelled:', error); }
