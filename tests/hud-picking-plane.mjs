@@ -287,6 +287,7 @@ const sandbox = {
             './PlaneHandleGeometry': planes, './AxisHandleGeometry': axes,
             './MoveHitGeometry': hit,
             './MoveScreenScale': scale, './MoveStrokeGeometry': strokes,
+            './ExecuteGizmos': { tickOnce() {} },
             './GizmoMoveCommand': commands,
             './GizmoEditSession': edit,
             './GizmoHudControls': controls, './GizmoHudProjection': projection,

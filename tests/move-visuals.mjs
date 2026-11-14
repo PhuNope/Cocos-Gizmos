@@ -49,5 +49,9 @@ assert.doesNotMatch(adapter,/if \(!hitA \|\| !hitB\) return 0\.3/);
 assert.match(adapter,/moveWorldPerPixel\(world, project/);
 assert.match(adapter,/drawMoveStroke\(node, a, b, color, onCanvas, pixel, canvasPoint\)/);
 assert.match(adapter,/if \(this\.drag\?\.entry && component\?\.node\?\.isValid/);
+assert.match(adapter,/function repaintCanvasMove\(component: Component\)/);
+assert.match(adapter,/repaintWholeScene\(\)/);
+assert.doesNotMatch(adapter, /drawSelectedPositionMarkers\(target\);\s*Gizmos2D\.flushEditorFrame\(\)/,
+    'Drag repaint must include the entire Scene, not only selected Move strokes');
 assert.match(adapter,/Gizmos2D\.flushEditorFrame\(\)/);
 console.log('[move-visuals] constant zoom size, soft feather ribbons and immediate 2D drag repaint OK');

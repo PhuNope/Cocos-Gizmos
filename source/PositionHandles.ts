@@ -2,6 +2,7 @@ import { CCObject, Color, Component, director, Director, gfx, Layers,
     ImageAsset, Material, Mesh, MeshRenderer, Node, Quat, RenderRoot2D,
     Sprite, SpriteFrame, Texture2D, UITransform, utils, Vec3 } from 'cc';
 import { Gizmos2D } from './Gizmos2D';
+import { tickOnce as repaintWholeScene } from './ExecuteGizmos';
 import { Gizmos3D } from './Gizmos3D';
 import {
     handlePlaneNormal,
@@ -358,6 +359,18 @@ function drawMoveStroke(
     draw(bands.core, color);
 }
 
+// The Scene callback runner is the sole owner of the complete 2D Graphics
+// stream. Repaint through it, rather than submitting only Move shapes during
+// mousemove (which erased unrelated 2D debug drawings for up to 750ms).
+const lastCanvasPaint = new WeakMap<Component, number>();
+function repaintCanvasMove(component: Component): void {
+    if (!component?.node?.isValid || !isCanvas2D(component.node)) return;
+    // Synchronous manual scheduler tick flushes all selected/ordinary
+    // callback geometry in the same input event; reentrant calls are guarded
+    // by SceneUpdateScheduler.
+    repaintWholeScene();
+}
+
 function drawSelectedPositionMarkers(component: Component): void {
     if (!component?.node?.isValid || typeof component.onGizmoHandles !== 'function') return;
     const fields: Field[] = component.onGizmoHandles() || [];
@@ -474,6 +487,7 @@ function drawSelectedPositionMarkers(component: Component): void {
             Gizmos2D.endLocalPosition(node);
             Gizmos2D.beginLayer(node, Gizmos2D.DEFAULT_LAYER);
             Gizmos2D.beginColor(node, Gizmos2D.DEFAULT_COLOR);
+            lastCanvasPaint.set(component, Date.now());
         } else {
             Gizmos3D.setDepTest(node, true);
             Gizmos3D.beginColor(node, Gizmos3D.DEFAULT_COLOR);
@@ -907,15 +921,14 @@ function createEditorGizmo(
             // on every rotation/zoom of the new camera.
             this.refreshSceneCamera();
             this.updateMarkers();
-            // The Scene scheduler can miss an update during a drag or a
-            // wheel zoom. Render and flush before the same GPU draw, rather
-            // than leaving red/green 2D arrows one or two frames behind.
+            // Unsaved tabs may not receive an Engine BEFORE_UPDATE during
+            // a drag. Repaint the *whole* Scene only if no normal Scene
+            // callback frame has painted the 2D handles recently.
             const component = this.target as Component;
             if (this.drag?.entry && component?.node?.isValid &&
-                isCanvas2D(component.node)) {
-                drawSelectedPositionMarkers(component);
-                Gizmos2D.flushEditorFrame();
-            }
+                isCanvas2D(component.node) &&
+                Date.now() - (lastCanvasPaint.get(component) || 0) > 32)
+                repaintCanvasMove(component);
         };
         private refreshSceneCamera(): void {
             const sceneCamera = cceNamespace()?.Camera;
@@ -1667,18 +1680,12 @@ function createEditorGizmo(
                             this.onControlUpdate?.(property, index);
                             this.onComponentChanged?.(target.node);
                             this.updateMarkers();
-                            if (isCanvas2D(target.node)) {
-                                drawSelectedPositionMarkers(target);
-                                Gizmos2D.flushEditorFrame();
-                            }
+                            repaintCanvasMove(target);
                             cceNamespace()?.Engine?.repaintInEditMode?.();
                         },
                         rollback: () => {
                             this.onComponentChanged?.(target.node);
-                            if (isCanvas2D(target.node)) {
-                                drawSelectedPositionMarkers(target);
-                                Gizmos2D.flushEditorFrame();
-                            }
+                            repaintCanvasMove(target);
                             cceNamespace()?.Engine?.repaintInEditMode?.();
                         },
                         end: (_value, cancelled, changed) => {
@@ -1688,10 +1695,7 @@ function createEditorGizmo(
                             } finally {
                                 this.closeControl(property, index, cancelled || !changed);
                                 this.updateMarkers();
-                                if (isCanvas2D(target.node)) {
-                                    drawSelectedPositionMarkers(target);
-                                    Gizmos2D.flushEditorFrame();
-                                }
+                                repaintCanvasMove(target);
                             }
                         },
                     },
