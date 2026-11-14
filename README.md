@@ -174,14 +174,14 @@ code still require a runtime guard. The type-only package does not provide
 
 ## Install the extension
 
-1. Download `Cocos-Gizmos-v2.0.3.zip` from GitHub Releases (or the CI artifact).
+1. Download the latest **v3** ZIP from the [GitHub Actions artifacts](https://github.com/PhuNope/Cocos-Gizmos/actions?query=branch%3Av3). It contains `Cocos-Gizmos-v3.0.0.zip`; a 3.0.0 GitHub Release has not been published.
 2. In Cocos Creator, open **Extensions → Extension Manager**, choose **Project** (or **Global**), click **Import Extension (+)** and select the ZIP.
 3. Enable `cocos-gizmos`. The Scene Script handles Editor drawing, and the read-only `cocos-gizmos` asset package supplies global TypeScript declarations.
 
 **Important:** The ZIP contains `package.json` **at its root**, plus `README.md` and `dist/`. Do not extract and import the two generated files separately. Do not add another enclosing directory inside the ZIP.
 
 ```text
-Cocos-Gizmos-v2.0.3.zip
+Cocos-Gizmos-v3.0.0.zip
 ├── package.json
 ├── README.md
 ├── main.js       # Editor extension lifecycle
@@ -651,7 +651,7 @@ wide. See `docs/EDITOR_SMOKE_TEST.md` for manual zoom, idle and drag tests.
 ### Creator 3.8.8 Scene camera and missing HUD
 
 If Gizmos lines or shapes render but **HUD text and draggable points are
-missing**, install the current `v2` build. The Editor's internal
+missing**, install the current `v3` build. The Editor's internal
 `renderer.scene.Camera` uses `worldToScreen(out, world)` and
 `screenPointToRay(out, x, y)`; the public `cc.Camera` Component uses the
 opposite argument order. The Scene camera compatibility bridge now supports
@@ -692,22 +692,22 @@ npm ci
 npm run pack
 ```
 
-`npm run pack` type-checks source, generates `dist/Gizmos.d.ts` and the type-only `editor-assets/GizmosGlobal.ts`, runs API tests, and packages the complete extension into `release/Cocos-Gizmos-v2.0.3.zip`.
+`npm run pack` type-checks source, generates `dist/Gizmos.d.ts` and the type-only `editor-assets/GizmosGlobal.ts`, runs API tests, and packages the complete extension into `release/Cocos-Gizmos-v3.0.0.zip`.
 
 The generated `.generated/Gizmos.ts` is an internal intermediate and is **not** shipped.
 
 ## Release workflow
 
-Pushes to `v2`, `dev`, and `master` run build and tests without publishing. To publish, create and push a version tag matching `v<package.json version>`. The tag workflow then publishes the extension ZIP and declarations. Type-only repository synchronization runs only when configured.
+Pushes to `v3`, `dev`, and `master` run build and tests without publishing. To publish, create and push a version tag matching `v<package.json version>`. The tag workflow then publishes the extension ZIP and declarations. Type-only repository synchronization runs only when configured.
 
 ## Type-only companion repo
 
 When `PhuNope/Cocos-Gizmos-Type` exists with a `main` branch and the main repository has Actions secret `TYPES_REPO_TOKEN` (Contents read/write access to the type repo) and repository variable `TYPES_REPO_READY=true`, a tag release synchronizes the declaration and matching tag to the companion repo.
 
-Another project can install only its types:
+After the optional companion type repository has published the matching `v3.0.0` tag, another project can install only its types:
 
 ```bash
-npm install -D github:PhuNope/Cocos-Gizmos-Type#v2.0.3
+npm install -D github:PhuNope/Cocos-Gizmos-Type#v3.0.0
 ```
 
 That package does **not** install runtime behavior; use the extension ZIP for that.

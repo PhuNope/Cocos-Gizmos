@@ -2,6 +2,26 @@
 
 All notable changes to Cocos-Gizmos are documented here.
 
+## [3.0.0] - 2026-11-14
+
+### Added
+- Global `Gizmos2D.move()` handles with X/Y axes, XY plane dragging, undo/redo, precision movement and editable callbacks.
+- `@registerGizmos(CustomDrawer)` for Editor-only Component gizmos in a separate class implementing `IDrawGizmos`.
+- Configurable and interactive Scene HUD with buttons, toggles, checkboxes, sliders, click-to-set, `order`, `fontSize`, `size`, and control `width`.
+- **Gizmos → Open Document** API panel and full-size standalone Open Document / Settings windows.
+- Editor-only demonstrations packaged inside the extension.
+
+### Improved
+- Constant-pixel Move geometry at close/far zoom; softened 2D/3D arrow and plane borders and synchronized viewport camera changes.
+- Drag/wheel repaints coalesced to prevent Editor stalls and delayed arrows.
+- Safer 3D GeometryRenderer triangle budgeting, camera rebinds, arrow winding and preservation of user depth-test state.
+- Extended Editor diagnostics, docs and automated regression suites.
+
+### Migration
+- Development branch renamed from `v2` to `v3` (maintainer updates the GitHub default branch in repository settings).
+- Extension version is now `3.0.0`; Cocos Creator's manifest `package_version: 2` remains unchanged because it describes the manifest schema.
+- Development ZIPs are uploaded to GitHub Actions under `Cocos-Gizmos-v3-<commit>`; no GitHub Release or version tag is created by a branch push.
+
 ## [2.0.3] - 2026-10-23
 
 ### Fixed

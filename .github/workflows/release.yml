@@ -2,9 +2,9 @@ name: Build and release Gizmos
 
 on:
   pull_request:
-    branches: [dev, master, v2]
+    branches: [dev, master, v3]
   push:
-    branches: [dev, master, v2]
+    branches: [dev, master, v3]
     tags: ['v*']
 
 permissions:
@@ -25,15 +25,15 @@ jobs:
         run: npm test
 
       # Development builds are downloadable Actions artifacts, NOT Releases.
-      # Every v2 push packages a testable ZIP; only version tags publish releases.
+      # Every v3 push packages a testable ZIP; only explicit version tags publish releases.
       - name: Pack Cocos Creator extension ZIP
         run: npm run pack
 
       - name: Upload development extension artifact
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/v2' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/v3' }}
         uses: actions/upload-artifact@v4
         with:
-          name: Cocos-Gizmos-v2-${{ github.sha }}
+          name: Cocos-Gizmos-v3-${{ github.sha }}
           path: release/Cocos-Gizmos-*.zip
           if-no-files-found: error
           retention-days: 30

@@ -1,4 +1,4 @@
-# Cocos-Gizmos v2 – kiến trúc Editor
+# Cocos-Gizmos v3 – kiến trúc Editor
 
 ## Mục tiêu
 
