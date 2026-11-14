@@ -255,7 +255,28 @@ class GizmosDebugDraw extends Component {
     }
 
     public setDepthTest(value: boolean) {
-        this._depthTest = value;
+        this._depthTest = !!value;
+    }
+
+    /** Preserve a caller's depth state while Move draws temporary overlays. */
+    public getDepthTest(): boolean {
+        return this._depthTest;
+    }
+
+    /** Cocos Creator 3.8 allocates 10,000 triangles per depth queue.
+     * It resets this shared camera buffer only when the Scene is rendered.
+     * Manual Editor redraws and high-resolution spheres can overflow it.
+     *
+     * Read the actual camera buffer so we can degrade gracefully without
+     * touching native renderer state. Other engine versions may hide it.
+     */
+    private remainingTriangles(): number | null {
+        const buffer: any =
+            (this._renderer as any)?._buffers?.triangles?.[this._depthTest ? 1 : 0];
+        const count = buffer?._vertexCount;
+        const maximum = buffer?._maxVertices;
+        return Number.isFinite(count) && Number.isFinite(maximum) && maximum > 0 ?
+            Math.max(0, Math.floor((maximum - count) / 3)) : null;
     }
 
     public setColor(color: Color) {
@@ -487,19 +508,49 @@ class GizmosDebugDraw extends Component {
         const p2 = this._useLocalPosition ? this.localToWorld(point2) : point2;
         const p3 = this._useLocalPosition ? this.localToWorld(point3) : point3;
         const p4 = this._useLocalPosition ? this.localToWorld(point4) : point4;
-        this._renderer?.addQuad(p1, p2, p3, p4, color, wireFrame, this._depthTest);
+        if (!this._renderer) return;
+        const available = this.remainingTriangles();
+        // Keep a visible outline if Cocos' shared triangle buffer is full.
+        if (!wireFrame && available !== null && available < 2) {
+            this._renderer.addLine(p1, p2, color, this._depthTest);
+            this._renderer.addLine(p2, p3, color, this._depthTest);
+            this._renderer.addLine(p3, p4, color, this._depthTest);
+            this._renderer.addLine(p4, p1, color, this._depthTest);
+            return;
+        }
+        this._renderer.addQuad(p1, p2, p3, p4, color, wireFrame, this._depthTest);
     }
 
     public drawSphere(
         center: Vec3,
         radius: number,
         wireFrame: boolean = false,
-        segmentsX: number = 32,
-        segmentsY: number = 16,
+        segmentsX: number = 16,
+        segmentsY: number = 8,
     ) {
+        if (!this._renderer || !Number.isFinite(radius) || radius <= 0) return;
         const color = this._color;
         const c = this._useLocalPosition ? this.localToWorld(center) : center;
-        this._renderer?.addSphere(c, radius, color, segmentsX, segmentsY, wireFrame, this._depthTest);
+        // A default 32x16 sphere emits 1,024 triangles per draw. Adaptive
+        // detail ensures multiple Editor paints can share Cocos' 10k cache.
+        let x = Math.max(6, Math.min(32, Math.floor(segmentsX) || 16));
+        let y = Math.max(4, Math.min(16, Math.floor(segmentsY) || 8));
+        if (!wireFrame) {
+            const available = this.remainingTriangles();
+            if (available !== null) {
+                while (2 * x * y > available && (x > 6 || y > 4)) {
+                    if (x > 6 && (x >= y || y <= 4)) x--;
+                    else if (y > 4) y--;
+                }
+                if (2 * x * y > available) {
+                    // No triangles left: display a small cross instead of
+                    // calling addSphere, which would warn once per triangle.
+                    this._renderer.addCross(c, radius, color, this._depthTest);
+                    return;
+                }
+            }
+        }
+        this._renderer.addSphere(c, radius, color, x, y, wireFrame, this._depthTest);
     }
 
     public drawArc(
@@ -781,8 +832,13 @@ export class Gizmos3D {
     }
 
     public static setDepTest(node: Node, value: boolean) {
-        let debugNode = this.getDebugNode(node);
+        const debugNode = this.getDebugNode(node);
         debugNode?.setDepthTest(value);
+    }
+
+    /** Return the current depth-test state without changing it. */
+    public static getDepTest(node: Node): boolean {
+        return this.getDebugNode(node)?.getDepthTest() ?? true;
     }
 
     public static beginColor(node: Node, color: Color) {
@@ -963,8 +1019,8 @@ export class Gizmos3D {
         center: Vec3,
         radius: number,
         wireFrame: boolean = false,
-        segmentsX: number = 32,
-        segmentsY: number = 16,
+        segmentsX: number = 16,
+        segmentsY: number = 8,
     ) {
         const debugNode = this.getDebugNode(node);
         debugNode?.drawSphere(center, radius, wireFrame, segmentsX, segmentsY);
