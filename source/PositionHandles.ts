@@ -140,10 +140,7 @@ function writeField(target: Component, field: Field, value: Point): boolean {
 function markerSize(world: Point): number {
     const view = camera();
     if (typeof view?.worldToScreen !== 'function') return 0.22;
-    // The camera bridge's wrapper is recreated per request; synchronizing
-    // avoids reading a stale inverse/projection matrix after Scene zoom.
-    view.sync?.();
-    const project = (p: Point): { x: number; y: number } | null => {
+    // Callers synchronize the camera once per frame before sampling.    const project = (p: Point): { x: number; y: number } | null => {
         try {
             const screen = new Vec3();
             view.worldToScreen(new Vec3(p.x, p.y, p.z), screen);
@@ -193,7 +190,7 @@ function isCanvas2D(node: any): boolean {
  * retain the correct movement plane without changing the target Vec3.
  */
 function planePlacement(component: Component, field: Field,
-    local: Point, world: Point): PlaneHandleGeometry | null {
+    local: Point, world: Point, resolvedPixel = markerSize(world) / 22): PlaneHandleGeometry | null {
     if (field.visual !== 'plane' || field.plane === 'view' || !field.plane) return null;
     const space = spaceFor(component, field);
     const basis = (axis: 'x' | 'y' | 'z'): Point => {
@@ -201,7 +198,7 @@ function planePlacement(component: Component, field: Field,
         const point = space.toWorld(next);
         return { x: point.x - world.x, y: point.y - world.y, z: point.z - world.z };
     };
-    const pixel = markerSize(world) / 22;
+    const pixel = resolvedPixel;
     return planeHandleGeometry(world, {
         x: basis('x'), y: basis('y'), z: basis('z'),
     }, field.plane, pixel,
@@ -212,7 +209,7 @@ function planePlacement(component: Component, field: Field,
  * editable Vec3; no new serialized properties or Scene nodes are created.
  */
 function axisPlacement(component: Component, field: Field,
-    local: Point, world: Point): AxisRayGeometry | null {
+    local: Point, world: Point, resolvedPixel = markerSize(world) / 22): AxisRayGeometry | null {
     if (field.visual !== 'axis' || !field.axis) return null;
     const space = spaceFor(component, field);
     const next = { ...local, [field.axis]: local[field.axis] + 1 };
@@ -223,7 +220,7 @@ function axisPlacement(component: Component, field: Field,
         direction;
     const axes = { x: unit, y: unit, z: unit };
     return axisHandleGeometry(world, axes, field.axis,
-        markerSize(world) / 22, field.axisSize ?? 66);
+        resolvedPixel, field.axisSize ?? 66);
 }
 
 function isMoveHandle(field: Field): boolean {
@@ -366,6 +363,7 @@ function drawSelectedPositionMarkers(component: Component): void {
     if (!Array.isArray(fields) || !fields.length) return;
     const node = component.node;
     const onCanvas = isCanvas2D(node);
+    camera()?.sync?.();
     const nodeScale = node.worldScale || new Vec3(1, 1, 1);
     const sx = Number.isFinite(nodeScale.x) && Math.abs(nodeScale.x) > 1e-8 ?
         Math.abs(nodeScale.x) : 1;
@@ -429,7 +427,7 @@ function drawSelectedPositionMarkers(component: Component): void {
                 return point;
             };
             const pixel = diameter / 22;
-            const ray = axisPlacement(component, field, local, world);
+            const ray = axisPlacement(component, field, local, world, pixel);
             if (ray) {
                 // A soft-edged 2px ribbon replaces zoom-dependent Graphics
                 // lineWidth=5 and jagged native 3D one-pixel debug lines.
@@ -440,7 +438,7 @@ function drawSelectedPositionMarkers(component: Component): void {
                 ]) drawMoveStroke(node, a, b, color, onCanvas, pixel, canvasPoint);
                 continue;
             }
-            const plane = planePlacement(component, field, local, world);
+            const plane = planePlacement(component, field, local, world, pixel);
             if (plane) {
                 const corners = plane.corners;
                 if (onCanvas) {
@@ -670,9 +668,9 @@ type ProjectedMoveGeometry = {
 };
 
 function projectedMoveGeometry(component: Component, field: Field,
-    local: Point, world: Point, view: any): ProjectedMoveGeometry | null {
+    local: Point, world: Point, view: any, pixel?: number): ProjectedMoveGeometry | null {
     if (field.visual === 'axis') {
-        const arrow = axisPlacement(component, field, local, world);
+        const arrow = axisPlacement(component, field, local, world, pixel);
         if (!arrow) return null;
         const start = projectMovePoint(view, arrow.start);
         const end = projectMovePoint(view, arrow.end);
@@ -682,7 +680,7 @@ function projectedMoveGeometry(component: Component, field: Field,
         } : null;
     }
     if (field.visual === 'plane') {
-        const tile = planePlacement(component, field, local, world);
+        const tile = planePlacement(component, field, local, world, pixel);
         if (!tile) return null;
         const corners = tile.corners.map(p => projectMovePoint(view, p));
         if (corners.some(p => !p)) return null;
@@ -1331,16 +1329,17 @@ function createEditorGizmo(
                     Color.fromHEX(color, entry.field.color);
                 if (!entry.picking)
                     configurePositionHitProxy(entry.controller, color, true);
-                const tile = planePlacement(component, entry.field, local, world);
-                const ray = axisPlacement(component, entry.field, local, world);
+                const pixel = markerSize(world) / 22;
+                const tile = planePlacement(component, entry.field, local, world, pixel);
+                const ray = axisPlacement(component, entry.field, local, world, pixel);
                 const center = ray?.center || tile?.center || world;
                 entry.controller.setPosition?.(new Vec3(center.x, center.y, center.z));
                 entry.controller.setRotation?.(new Quat());
-                const size = ray?.size || tile?.size || markerSize(world);
+                const size = ray?.size || tile?.size || pixel * 22;
                 if (!entry.picking) setMarkerSize(entry.controller, size);
                 if (entry.picking) {
                     updateMovePickingQuad(entry,
-                        projectedMoveGeometry(component, entry.field, local, world, moveView),
+                        projectedMoveGeometry(component, entry.field, local, world, moveView, pixel),
                         moveView, moveProjection);
                     if (entry.controller._editHandlesShape)
                         entry.controller._editHandlesShape.active = false;

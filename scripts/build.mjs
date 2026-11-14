@@ -304,7 +304,7 @@ if (globalThis.Editor && globalThis.Editor.App && globalThis.Editor.App.path) {
     module.paths.push(require('node:path').join(globalThis.Editor.App.path, 'node_modules'));
 }
 `;
-for (const name of ['GizmoDiagnostics', 'GizmoExampleClassDiagnostics', 'SceneGizmoInput', 'GizmoEditSession', 'GizmoPresentation', 'GizmoHudControls', 'GizmoHudLayout', 'GizmoHudProjection', 'SceneCameraBridge', 'GizmoHudOverlay', 'GizmoPresentationService', 'GizmoMoveCommand', 'GizmoHandlePresets', 'PositionDragSolver', 'PlaneHandleGeometry', 'AxisHandleGeometry', 'MoveHitGeometry', 'PositionHandles', 'SceneUpdateScheduler', 'DrawCommandBuffer2D', 'Gizmos2D', 'Gizmos3D', 'ExecuteGizmos']) {
+for (const name of ['GizmoDiagnostics', 'GizmoExampleClassDiagnostics', 'SceneGizmoInput', 'GizmoEditSession', 'GizmoPresentation', 'GizmoHudControls', 'GizmoHudLayout', 'GizmoHudProjection', 'SceneCameraBridge', 'GizmoHudOverlay', 'GizmoPresentationService', 'GizmoMoveCommand', 'GizmoHandlePresets', 'PositionDragSolver', 'PlaneHandleGeometry', 'AxisHandleGeometry', 'MoveHitGeometry', 'MoveScreenScale', 'MoveStrokeGeometry', 'PositionHandles', 'SceneUpdateScheduler', 'DrawCommandBuffer2D', 'Gizmos2D', 'Gizmos3D', 'ExecuteGizmos']) {
     const fileName = path.join(SRC_DIR, name + '.ts');
     const result = ts.transpileModule(readFileSync(fileName, 'utf8'), {
         fileName,

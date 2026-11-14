@@ -36,6 +36,16 @@ assert.match(entries.get('editor-runtime/MoveHitGeometry.js') || '',
     /insideProjectedPlane/, 'Native installer must contain Move screen hit math');
 assert.match(entries.get('editor-runtime/PositionHandles.js') || '',
     /updateMovePickingQuad/, 'Installer must bind transparent Move pick quads');
+assert.match(entries.get('editor-runtime/PositionHandles.js') || '',
+    /require\(["']\.\/MoveScreenScale["']\)/,
+    'Installed adapter must import the constant-pixel camera scale helper');
+assert.match(entries.get('editor-runtime/PositionHandles.js') || '',
+    /require\(["']\.\/MoveStrokeGeometry["']\)/,
+    'Installed adapter must import the soft-edge stroke helper');
+assert.match(entries.get('editor-runtime/MoveScreenScale.js') || '',
+    /moveWorldPerPixel/, 'Installer must include camera scale math for close zoom');
+assert.match(entries.get('editor-runtime/MoveStrokeGeometry.js') || '',
+    /moveStrokeBands/, 'Installer must include anti-aliased Move ribbons');
 assert.doesNotMatch(entries.get('editor-runtime/PositionHandles.js') || '',
     /moveTo\(20, 32\)/,
     'Point marker sprite must not draw the old center plus sign');
