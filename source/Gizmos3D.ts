@@ -202,7 +202,6 @@ class GizmosDebugDraw extends Component {
     }
 
     private ensureGeometryRenderer(): boolean {
-        if (this._renderer) return true;
         const editorCce = (globalThis as any).window?.cce || (globalThis as any).cce || cce;
         const editorCamera = editorCce?.Camera?._camera?.camera;
         let camera = editorCamera;
@@ -210,6 +209,13 @@ class GizmosDebugDraw extends Component {
             const root = director.getScene();
             camera = root?.getComponentInChildren(Camera)?.camera;
         }
+        // Scene tabs and 2D/3D view switching can replace the renderer
+        // camera while the user's Component (and this DebugDraw) survives.
+        // Never continue drawing into the previous camera's triangle pool.
+        if (this._renderer && camera?.geometryRenderer === this._renderer)
+            return true;
+        this._renderer = null;
+        this._camera = null;
         if (!camera) {
             if (!this._warnedNoCamera) {
                 this._warnedNoCamera = true;
@@ -255,6 +261,9 @@ class GizmosDebugDraw extends Component {
     }
 
     public setDepthTest(value: boolean) {
+        // Move 3D temporarily changes depth state on each selected frame.
+        // Rebind to the currently active Scene camera at the same time.
+        this.ensureGeometryRenderer();
         this._depthTest = !!value;
     }
 
