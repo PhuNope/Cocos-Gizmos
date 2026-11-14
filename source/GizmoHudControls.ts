@@ -46,7 +46,7 @@ export function normalizeHudControls(value: unknown, maxItems = 12): HudControl[
             ids.has(item.id) || typeof item.text !== 'string' ||
             (item.type !== 'button' && item.type !== 'slider' &&
              item.type !== 'toggle' && item.type !== 'checkbox')) continue;
-        const base = {
+        const base: HudControlAppearance & { id: string; text: string; color: string } = {
             id: item.id,
             text: item.text.slice(0, 128),
             color: typeof item.color === 'string' && HEX_COLOR.test(item.color) ?
