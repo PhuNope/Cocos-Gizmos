@@ -77,6 +77,11 @@ declare global {
         bounds?: GizmoHandleDescriptor['bounds'];
     }
 
+    /** Gizmos2D.move(): only X, Y and XY; no 3D body/box handle.
+     * Uses the Move descriptor options without boxSize.
+     */
+    type GizmosMove2DHandleOptions = Omit<GizmosMoveHandleOptions, 'boxSize'>;
+
     /** Options for Gizmos2D.point() and Gizmos2D.points(). */
     interface GizmoPointOptions {
         plane?: GizmoHandlePlane;

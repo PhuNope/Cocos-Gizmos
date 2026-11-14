@@ -368,36 +368,76 @@ function drawSelectedPositionMarkers(component: Component): void {
             const colorText = highlighted ? (field.hoverColor || '#ffff65') : field.color;
             if (typeof colorText === 'string' && typeof Color.fromHEX === 'function')
                 Color.fromHEX(color, colorText);
-            if (field.showPositionLabel && !onCanvas) {
-                // drawPositionLabel caches a reusable Label by ID and clamps
-                // screen font size while moving or zooming the Scene camera.
-                Gizmos3D.drawPositionLabel(node,
-                    'selected-pos:' + field.property + ':' + (field.index ?? 'single'),
-                    new Vec3(world.x, world.y, world.z),
-                    { offsetPixels: field.positionLabelOffset ?? 94,
-                      digits: 2, minSize: 12, maxSize: 22 });
+            if (field.showPositionLabel) {
+                const labelId = 'selected-pos:' + field.property + ':' +
+                    (field.index ?? 'single');
+                if (onCanvas) {
+                    const at = new Vec3();
+                    node.inverseTransformPoint(at, new Vec3(world.x, world.y, world.z));
+                    // The 2D label is drawn in local Canvas space but sized in
+                    // screen pixels, matching the 3D position label zoom policy.
+                    const offset = (field.positionLabelOffset ?? 82) *
+                        diameter / 22 / sy;
+                    Gizmos2D.beginColor(node, Color.WHITE);
+                    Gizmos2D.drawLabel(node, labelId,
+                        'X: ' + local.x.toFixed(2) + '  Y: ' + local.y.toFixed(2),
+                        new Vec3(at.x, at.y + offset, 0), 16,
+                        undefined, 12, 22);
+                } else {
+                    Gizmos3D.drawPositionLabel(node, labelId,
+                        new Vec3(world.x, world.y, world.z),
+                        { offsetPixels: field.positionLabelOffset ?? 82,
+                          digits: 2, minSize: 12, maxSize: 22 });
+                }
             }
             // The owning Component already draws the exact editable box.
             // This descriptor contributes only its invisible hit zone.
             if (field.visual === 'box') continue;
-            const ray = !onCanvas ? axisPlacement(component, field, local, world) : null;
+            // World geometry is shared with screen hit-testing and drag.
+            // Canvas targets must be painted via Gizmos2D Graphics rather than
+            // the 3D geometry renderer, otherwise their arrows disappear.
+            const canvasPoint = (v: Point): Vec3 => {
+                const point = new Vec3();
+                node.inverseTransformPoint(point, new Vec3(v.x, v.y, v.z));
+                return point;
+            };
+            const ray = axisPlacement(component, field, local, world);
             if (ray) {
-                const point = (v: Point) => new Vec3(v.x, v.y, v.z);
-                Gizmos3D.beginColor(node, color);
-                Gizmos3D.drawLine(node, point(ray.start), point(ray.end));
-                Gizmos3D.drawLine(node, point(ray.end), point(ray.tipLeft));
-                Gizmos3D.drawLine(node, point(ray.end), point(ray.tipRight));
+                if (onCanvas) {
+                    const start = canvasPoint(ray.start);
+                    const end = canvasPoint(ray.end);
+                    const left = canvasPoint(ray.tipLeft);
+                    const right = canvasPoint(ray.tipRight);
+                    Gizmos2D.beginColor(node, color);
+                    Gizmos2D.drawLine(node, start, end);
+                    Gizmos2D.drawLine(node, end, left);
+                    Gizmos2D.drawLine(node, end, right);
+                } else {
+                    const point = (v: Point) => new Vec3(v.x, v.y, v.z);
+                    Gizmos3D.beginColor(node, color);
+                    Gizmos3D.drawLine(node, point(ray.start), point(ray.end));
+                    Gizmos3D.drawLine(node, point(ray.end), point(ray.tipLeft));
+                    Gizmos3D.drawLine(node, point(ray.end), point(ray.tipRight));
+                }
                 continue;
             }
-            const plane = !onCanvas ? planePlacement(component, field, local, world) : null;
+            const plane = planePlacement(component, field, local, world);
             if (plane) {
-                const corners = plane.corners.map(p => new Vec3(p.x, p.y, p.z));
-                Gizmos3D.beginColor(node, new Color(color.r, color.g, color.b, 85));
-                Gizmos3D.drawQuad(node, corners[0], corners[1],
-                    corners[2], corners[3], false);
-                Gizmos3D.beginColor(node, color);
-                for (let i = 0; i < 4; i++)
-                    Gizmos3D.drawLine(node, corners[i], corners[(i + 1) % 4]);
+                if (onCanvas) {
+                    const corners = plane.corners.map(canvasPoint);
+                    Gizmos2D.beginColor(node, new Color(color.r, color.g, color.b, 85));
+                    Gizmos2D.drawSolidPolygon(node, corners);
+                    Gizmos2D.beginColor(node, color);
+                    Gizmos2D.drawLineList(node, corners, true);
+                } else {
+                    const corners = plane.corners.map(p => new Vec3(p.x, p.y, p.z));
+                    Gizmos3D.beginColor(node, new Color(color.r, color.g, color.b, 85));
+                    Gizmos3D.drawQuad(node, corners[0], corners[1],
+                        corners[2], corners[3], false);
+                    Gizmos3D.beginColor(node, color);
+                    for (let i = 0; i < 4; i++)
+                        Gizmos3D.drawLine(node, corners[i], corners[(i + 1) % 4]);
+                }
                 continue;
             }
             if (onCanvas) {

@@ -15,7 +15,7 @@ import {
     Vec3,
 } from 'cc';
 import { DrawCommandBuffer2D } from './DrawCommandBuffer2D';
-import { makePointGizmo, makePointGizmos } from './GizmoHandlePresets';
+import { makeMoveGizmo2D, makePointGizmo, makePointGizmos } from './GizmoHandlePresets';
 
 const { ccclass, executeInEditMode } = _decorator;
 
@@ -410,6 +410,16 @@ class GizmosDebugDraw extends Component {
 }
 
 export class Gizmos2D {
+    /** Two arrows (X/Y) and an XY tile to edit one Vec3 in the 2D Scene.
+     * Dragging preserves Z, uses fractional coordinates by default, and
+     * participates in the same undo/callback pipeline as Gizmos3D.move().
+     */
+    public static move(
+        property: string, options: GizmosMove2DHandleOptions = {},
+    ): GizmoHandleDescriptor[] {
+        return makeMoveGizmo2D(property, options);
+    }
+
     /** Edit one Vec3 property using a screen-sized 2D drag handle. */
     public static point(
         property: string, options: GizmoPointOptions = {},

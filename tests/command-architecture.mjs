@@ -28,6 +28,23 @@ assert.equal(move.filter(h => h.showPositionLabel).length, 1);
 assert.equal(move.every(h => h.property === 'position' && h.snap === 0.25 &&
     h.pickSize === 32), true);
 assert.notEqual(move[0], move[1], 'Descriptors never share mutable model objects');
+const move2D = presets.makeMoveGizmo2D('position', {
+    snap: 0.25, pickSize: 32,
+});
+assert.equal(move2D.length, 3, '2D Move only exposes X/Y and XY');
+assert.deepEqual(plain(move2D.map(h => h.id)), ['axis-x', 'axis-y', 'plane-xy']);
+assert.deepEqual(plain(move2D.map(h => h.axis)), ['x', 'y', null]);
+assert.deepEqual(plain(move2D.map(h => h.plane)), ['view', 'view', 'xy']);
+assert.equal(move2D.every(h => h.snap === 0.25 && h.pickSize === 32), true);
+assert.equal(move2D.filter(h => h.showPositionLabel).length, 1);
+const smooth2D = presets.makeMoveGizmo2D('position');
+assert.equal(smooth2D.length, 3);
+assert.ok(smooth2D.every(h => h.snap === undefined),
+    '2D Move must move continuously by default');
+assert.ok(smooth2D.every(h => h.axis !== 'z' && h.plane !== 'xz' && h.plane !== 'yz'));
+assert.notEqual(smooth2D[0], smooth2D[1], '2D handles must not share descriptors');
+assert.throws(() => presets.makeMoveGizmo2D(''), /non-empty/);
+assert.throws(() => presets.makeMoveGizmo2D('position', { planeOffset: 11 }), /planeOffset/);
 const compactDefaults = presets.makeMoveGizmo('compact');
 assert.equal(compactDefaults[0].axisSize, 66);
 assert.equal(compactDefaults[0].pickSize, 24);

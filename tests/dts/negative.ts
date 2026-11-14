@@ -16,6 +16,11 @@ const invalidHandlePhase: GizmoHandlePhase = 'drag';
 // @ts-expect-error — snap is a number, not a string
 const invalidHandleSnap: GizmoHandleDescriptor = { property: 'target', snap: '5' };
 
+// @ts-expect-error — 2D Move has no 3D selectable object box
+const invalid2DMove: GizmosMove2DHandleOptions = { boxSize: 0.5 };
+// @ts-expect-error — 2D Move has no Z-specific axis selection
+Gizmos2D.move('position', { axis: 'z' });
+
 // @ts-expect-error — toggle needs a boolean component property name
 const invalidToggle: GizmoHudToggle = { type: 'toggle', id: 'x', text: 'Toggle' };
 // @ts-expect-error — checkbox is distinct from slider

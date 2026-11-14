@@ -28,6 +28,9 @@ export default class CocosGizmos2DDemo extends Component {
     @property({ type: Vec3 })
     public point = new Vec3(0, 0, 0);
 
+    @property({ type: Vec3 })
+    public moveObject = new Vec3(110, -10, 0);
+
     @property({ type: [Vec3] })
     public waypoints: Vec3[] = [
         new Vec3(-75, -90, 0),
@@ -47,6 +50,11 @@ export default class CocosGizmos2DDemo extends Component {
             max: { x: 600, y: 450 },
         };
         return [
+            ...Gizmos2D.move('moveObject', {
+                space: 'local', axisSize: 66, pickSize: 24,
+                planeSize: 18, planeOffset: 14,
+                showPositionLabel: true, bounds,
+            }),
             Gizmos2D.point('point', {
                 color: '#ffcc00', bounds,
             }),
@@ -61,7 +69,9 @@ export default class CocosGizmos2DDemo extends Component {
             { id: 'title', text: 'Gizmos2D API Test', order: 0, color: '#ffff88' },
             { id: 'radius', text: 'Radius: ' + this.radius, order: 1 },
             { id: 'point', text: 'Point: ' + this.point.x + ', ' + this.point.y, order: 2 },
-            { id: 'event', text: 'Last event: ' + this.lastEvent, order: 3, fontSize: 12 },
+            { id: 'move', text: 'Move XY: ' + this.moveObject.x.toFixed(1) +
+                ', ' + this.moveObject.y.toFixed(1), order: 3 },
+            { id: 'event', text: 'Last event: ' + this.lastEvent, order: 4, fontSize: 12 },
         ];
     }
 
@@ -85,6 +95,7 @@ export default class CocosGizmos2DDemo extends Component {
         this.showLabels = true;
         this.showSprite = true;
         this.point = new Vec3();
+        this.moveObject = new Vec3(110, -10, 0);
         this.waypoints = [new Vec3(-75, -90, 0), new Vec3(75, -90, 0)];
         this.lastEvent = 'reset button';
     }
@@ -150,7 +161,7 @@ export default class CocosGizmos2DDemo extends Component {
             Gizmos2D.beginColor(n, Color.WHITE);
             Gizmos2D.drawLabel(n, 'api2d-title', 'Gizmos2D | Scene API',
                 v(-260, 260), 20, Vec2.ONE, 12, 26);
-            Gizmos2D.drawLabel(n, 'api2d-bottom', 'Drag the 3 points when selected',
+            Gizmos2D.drawLabel(n, 'api2d-bottom', 'Drag 3 points or X/Y/XY Move handles when selected',
                 v(-160, -250), 16, Vec2.ONE, 11, 22);
         }
         if (this.showSprite && this.testSprite) {

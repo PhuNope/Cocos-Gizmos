@@ -39,6 +39,14 @@ normal class methods rather than arrow-function fields. For a ready-to-drag
 example, use **Assets → cocos-gizmos → Examples → CocosGizmosDecoratorDemo**.
 Browse **Gizmos → OpenDoc → Decorators** for examples and the binding diagram.
 
+## Move gizmo 2D
+
+Use `...Gizmos2D.move('position')` in `onGizmoHandles()` to show two axes
+(X/Y) and the XY drag tile. There is no Z handle, and dragging does not
+snap unless `snap` is supplied. See the mounted 2D demo in Assets and the
+**Gizmos → OpenDoc → Move / Points** section for a visual example.
+The handle descriptors also work in `@registerGizmos` drawers.
+
 ## API reference inside Cocos Creator
 
 Open **Gizmos → OpenDoc** (next to **Reset Gizmos**) to browse the dockable

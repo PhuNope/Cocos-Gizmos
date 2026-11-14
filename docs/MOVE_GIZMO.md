@@ -1,4 +1,23 @@
-# Move Gizmo 3D – XYZ, mặt phẳng, hover và tọa độ
+# Move Gizmo
+
+## Gizmos2D.move() — Move Object Position trong Canvas 2D
+
+```ts
+onGizmoHandles(): GizmoHandleList {
+    return [...Gizmos2D.move('targetPosition', {
+        space: 'local', axisSize: 66, pickSize: 24,
+        planeSize: 18, planeOffset: 14, showPositionLabel: true,
+    })];
+}
+```
+
+Gồm hai trục X (đỏ), Y (xanh lá) và ô XY (vàng) sát tâm.
+Kéo trục chỉ đổi một tọa độ; ô XY đổi cả X và Y nhưng không đổi Z.
+Mặc định kéo liên tục, không snap; muốn căn lưới thêm `snap: 5`.
+Giữ nguyên Undo/Redo và các phase `onGizmoChanged`.
+Hoạt động với `@registerGizmos(CustomDrawer)` vì dùng cùng interface `onGizmoHandles`.
+
+ 3D – XYZ, mặt phẳng, hover và tọa độ
 
 Cocos Creator **3.8.x** – Editor Scene View. Cách dùng lấy cảm hứng từ các ví dụ `Point3D`, `Line3D`, `Plane3D` và `OnDrawGizmos` trong Creator Gizmo Kit. Không phụ thuộc vào SDK của plugin mẫu.
 

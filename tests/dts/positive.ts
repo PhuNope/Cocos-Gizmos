@@ -10,6 +10,12 @@ comp.onDrawGizmos?.();
 comp.onDrawGizmosSelected?.();
 
 // All handle types are global: components do not import the extension runtime.
+const move2dOptions: GizmosMove2DHandleOptions = {
+    space: 'local', axisSize: 66, pickSize: 24,
+    planeSize: 18, planeOffset: 14, showPositionLabel: true,
+};
+const move2dHandles: GizmoHandleList = Gizmos2D.move('target', move2dOptions);
+void move2dHandles;
 const handle: GizmoHandleDescriptor = {
     property: 'target',
     plane: 'xy',

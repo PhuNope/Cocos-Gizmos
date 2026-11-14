@@ -4,6 +4,7 @@
  *
  * New public authoring API:
  *   Gizmos3D.move('position', { snap: .25 })
+ *   Gizmos2D.move('position') // X, Y and XY only; continuous by default
  *   Gizmos2D.point('origin')
  *   Gizmos2D.points('vertices', this.vertices.length)
  */
@@ -68,6 +69,18 @@ export function makeMoveGizmo(
             plane: 'view' as const, boxSize, color: '#ffb94a',
         }]),
     ];
+}
+
+/** Two editable axes and the XY plane. Reuses 3D Move constraints, picking,
+ * hover and undo, without publishing Z/XZ/YZ/box descriptors in Scene 2D.
+ * The 2D Canvas renderer paints these world-space regions with Gizmos2D.
+ */
+export function makeMoveGizmo2D(
+    property: string, options: GizmosMove2DHandleOptions = {},
+): GizmoHandleDescriptor[] {
+    return makeMoveGizmo(property, options).filter((handle) =>
+        (handle.visual === 'axis' && (handle.axis === 'x' || handle.axis === 'y')) ||
+        (handle.visual === 'plane' && handle.plane === 'xy'));
 }
 
 export function makePointGizmo(
