@@ -49,6 +49,15 @@ comp.onGizmoChanged?.('target', 'update', 0);
 
 const sceneSettings: GizmoViewSettings = { display: 'selected', hud: 'off' };
 const displayMode: GizmoDisplayMode = 'always';
+const sizedHud: GizmoHudControlList = [
+    { type: 'slider', id: 's', text: 'Speed', property: 'speed',
+      min: 0, max: 100, order: 1, size: 'large', width: 210, fontSize: 16 },
+    { type: 'button', id: 'r', text: 'Reset', width: 110, order: 2,
+      size: 'small', fontSize: 12 },
+    { type: 'checkbox', id: 'c', text: 'Grid', property: 'grid',
+      order: 0, size: 'normal' },
+];
+void sizedHud;
 const hudLabels: GizmoHudItem[] = [
     { id: 'speed', text: 'Speed: 10', order: 0, fontSize: 14, color: '#00ff00' },
 ];

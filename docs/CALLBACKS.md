@@ -95,5 +95,13 @@ kéo tương đối cũ. `onGizmoHudChanged` nhận `begin → update → end`
 ngay cả khi click mà không kéo. Nhấn Escape trong lúc giữ chuột để
 `cancel` và khôi phục giá trị ban đầu.
 
+**Size/layout của HUD:** Các control hỗ trợ `order`, `fontSize` (10–18px)
+và `size: 'small' | 'normal' | 'large'`. Slider/button thêm `width` (px);
+riêng slider, `width` là độ dài track, đồng bộ với click-to-set/drag.
+`order` sắp thứ tự các control sau các dòng text, giữ nguyên thứ tự
+mảng nếu giá trị order bằng nhau. Kích thước hình được giới hạn trong
+row 22px để không trùng vùng picking. HUD hiện vẫn dock ở đáy Scene
+và tự chia cột; chưa có API tự đặt anchor / row height.
+
 Nút bấm không dùng `onGizmoHudChanged()`; phải khai báo
 `onGizmoHudAction()` để nhận `id`.

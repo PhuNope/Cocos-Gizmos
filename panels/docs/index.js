@@ -179,7 +179,7 @@ const examples = Object.freeze([
     },
     {
         id: 'hud', group: 'hud', heading: 'Scene HUD: text và controls',
-        summary: 'Tạo HUD từ callback để hiển thị nhãn và tương tác: slider, toggle, checkbox, button.',
+        summary: 'Tạo HUD từ callback. Tùy chỉnh từng control bằng order, size (small/normal/large), fontSize và width (button/slider); vùng click slider đồng bộ với track.',
         apis: ['onGizmoHud', 'onGizmoHudControls', 'onGizmoHudAction', 'onGizmoHudChanged', 'GizmoHudItem', 'GizmoHudControlList'],
         figure: 'hud', caption: 'Minh họa HUD gồm slider, toggle, checkbox và nút bấm',
         code: [
@@ -189,7 +189,8 @@ const examples = Object.freeze([
             'onGizmoHudControls(): GizmoHudControlList {',
             '  return [',
             "    { type: 'slider', id: 'size', text: 'Size',",
-            "      property: 'size', min: 0, max: 100 },",
+            "      property: 'size', min: 0, max: 100,",
+            "      width: 220, size: 'large', fontSize: 16, order: 1 },",
             "    { type: 'checkbox', id: 'visible', text: 'Visible',",
             "      property: 'visible' },",
             "    { type: 'button', id: 'reset', text: 'Reset' },",
@@ -315,6 +316,7 @@ const examples = Object.freeze([
         figure: "hud", caption: "Giá trị được ghi trước callback update; button dùng event riêng",
         notes: [
             "Slider có thể phát cancel khi kéo bị hủy; toggle/checkbox là click, không có quá trình drag kéo dài.",
+            "Slider click trên track đặt value ngay, width tùy chỉnh luôn dùng chung tọa độ giữa HUD và picking.",
             "Click vào thanh slider sẽ set value ngay; click-trên-track và kéo dùng tọa độ tuyệt đối, tuân theo min/max/step.",
             "Nhấn Escape khi đang giữ slider sẽ hoàn nguyên cả giá trị được chọn bằng click (cancel); thả chuột commit trong một phiên Undo/Redo.",
             "onGizmoHudChanged nhận value: number | boolean; kiểm tra typeof khi dùng dữ liệu.",

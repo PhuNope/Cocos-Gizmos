@@ -55,6 +55,33 @@ Sliders have rounded tracks and thumb indicators. Text-only fallbacks use
 Unicode checkboxes instead of `[x]` or `[ ]`. Native picking rectangles
 are unchanged and no Canvas Sprite/Mask conflict is introduced.
 
+### Configuring HUD control size and order
+
+Inside `onGizmoHudControls()`, each control accepts `order` (sort controls
+after text entries), `fontSize` (10–18 screen pixels), and `size`
+(`small`, `normal`, `large`). Slider and button also accept `width`
+in screen pixels. A slider's `width` specifies its track length; the
+click-to-set and drag solvers use **exactly the same track coordinates**.
+
+```ts
+onGizmoHudControls(): GizmoHudControlList {
+    return [
+        { type: 'slider', id: 'radius', text: 'Radius',
+          property: 'radius', min: 0, max: 100,
+          width: 220, size: 'large', fontSize: 16, order: 1 },
+        { type: 'button', id: 'reset', text: 'Reset',
+          width: 110, size: 'small', order: 2 },
+    ];
+}
+```
+
+Informational `onGizmoHud()` text already supports `order`,
+`fontSize`, `minSize`, `maxSize`. The Scene HUD still uses its bottom
+docking, automatic column wrapping, and fixed 22px native picking rows.
+Sizes change visuals within each row, not the row hitboxes. A custom
+anchor, freely resizable row height, or grid-column width would need
+a separate coordinated layout and picking API.
+
 ## API reference inside Cocos Creator
 
 Open **Gizmos → Open Document** (next to **Reset Gizmos**) to browse the dockable
@@ -413,7 +440,7 @@ Editor.Message.request('scene', 'execute-scene-script', {
 Components can return buttons, sliders, toggles, and checkboxes from
 `onGizmoHudControls(): GizmoHudControlList`. The Editor displays these controls
 beside the node in Scene View. A toggle displays `[ON]` or `[OFF]`, and a
-checkbox displays `[x]` or `[ ]`. Click them to flip a serialized
+checkbox displays a real rounded checkmark. Click them to flip a serialized
 boolean property; sliders drag a numeric property.
 
 ```ts

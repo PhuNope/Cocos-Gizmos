@@ -247,6 +247,27 @@ assert.ok(drawnWidgets.some(call => call[0] === 'circle'),
     'Toggle has a rounded switch thumb');
 assert.ok(drawnWidgets.some(call => call[0] === 'curve'),
     'Controls have rounded backgrounds');
+// A wider slider and large visual size change the existing HUD Canvas,
+// without any second mesh or a separate picking coordinate formula.
+component.radius = 35;
+const resizeStart = drawCalls.length;
+overlay.beginFrame();
+overlay.render(component, [
+    { id: 'control:radius', text: 'Radius', color: '#ffffff', fontSize: 18 },
+], {
+    namespace: 'sized', startRow: 0, textCount: 0,
+    controls: [{
+        type: 'slider', id: 'radius', text: 'Radius', property: 'radius',
+        min: 0, max: 100, width: 210, size: 'large', fontSize: 18,
+    }],
+});
+overlay.finishFrame(1);
+const resized = drawCalls.slice(resizeStart);
+const drawTrack = controls.exports.hudSliderScreenTrack(camera.viewport, 0, 1, 210);
+assert.equal(drawTrack.width, 210);
+assert.ok(resized.some(call => call[0] === 'circle' &&
+    Math.abs(call[3] - 5 * 1.12 * 2) < 0.01),
+    'Large slider draws its thumb at the matching DPI-adjusted size');
 assert.ok(drawnWidgets.every(call => call[0] !== 'text' ||
     !/\[[ x]\]|\[Reset\]|\[ON\]/.test(call[1])),
     'ASCII checkbox/button/toggle strings must not be shown');

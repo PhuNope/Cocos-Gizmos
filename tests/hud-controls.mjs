@@ -67,6 +67,34 @@ assert.equal(absolute.move(-100), 0, 'Absolute drag clamps below min');
 assert.equal(absolute.cancel(), 80, 'Cancel restores initial value');
 assert.throws(() => new HudSliderDrag(controls[1], 20, 100, 0, 10));
 assert.throws(() => new HudSliderDrag(controls[1], 20, 100, 100, NaN));
+// Visual appearance and row ordering are part of the public control API.
+const styled = normalizeHudControls([
+    { type: 'slider', id: 'a', text: 'A', property: 'radius',
+        min: 0, max: 100, order: 5, width: 230, size: 'large', fontSize: 19 },
+    { type: 'button', id: 'b', text: 'B', order: -10,
+        width: 180, size: 'small', fontSize: 11 },
+    { type: 'checkbox', id: 'c', text: 'C', property: 'grid',
+        fontSize: -200, size: 'giant' },
+]);
+assert.deepEqual(Array.from(styled, c => c.id), ['b', 'c', 'a'],
+    'Custom order determines the HUD control rows');
+assert.equal(styled[0].width, 180);
+assert.equal(styled[0].size, 'small');
+assert.equal(styled[2].width, 230);
+assert.equal(styled[2].size, 'large');
+assert.equal(styled[2].fontSize, 18);
+assert.equal(styled[1].fontSize, 10);
+assert.equal(styled[1].size, 'normal');
+const { hudSliderScreenTrack } = scope.exports;
+const defaultTrack = hudSliderScreenTrack({ width: 960, height: 560 }, 0, 4);
+const customTrack = hudSliderScreenTrack({ width: 960, height: 560 }, 0, 4, 230);
+assert.equal(customTrack.width, 230, 'Slider width is specified in screen pixels');
+assert.equal(customTrack.left, defaultTrack.left, 'A custom width keeps track origin');
+assert.ok(hudSliderScreenTrack({ width: 960, height: 560 }, 0, 4, 600).width < 600,
+    'Slider width is clamped to avoid covering the value column');
+assert.notEqual(hudControlLayoutSignature(styled),
+    hudControlLayoutSignature(styled.map(c => ({ ...c, size: 'normal' }))),
+    'Appearance changes invalidate the HUD layout signature');
 const pos = hudRowScreenPosition({ x: 20, y: 30 }, 2);
 assert.equal(pos.x, 40);
 assert.equal(pos.y, 10);

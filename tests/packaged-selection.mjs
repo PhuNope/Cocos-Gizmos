@@ -75,9 +75,11 @@ assert.ok(installed.contributions.menu.some(item =>
     item.path === 'Gizmos' && item.label === 'Open Document' && item.message === 'open-doc'),
     'Installed extension must expose Gizmos > Open Document beside Reset Gizmos');
 assert.equal(installed.panels.docs.main, './panels/docs/index.js');
+assert.equal(installed.panels.docs.title, 'Gizmos Open Document');
 assert.deepEqual(installed.contributions.messages['open-doc'].methods, ['openDoc']);
 assert.match(entries.get('main.js') || '', /openDoc/);
 assert.match(entries.get('panels/docs/index.js') || '', /Gizmos Open Document/);
+assert.match(entries.get('panels/docs/index.js') || '', /width: 220/);
 assert.match(entries.get('panels/docs/index.js') || '', /<svg/);
 assert.match(entries.get('panels/docs/index.js') || '', /Gizmos3D.move/);
 assert.match(entries.get('panels/docs/index.js') || '', /Callback: khai báo/);
