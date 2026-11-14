@@ -1,9 +1,15 @@
 /** Validated controls and pointer-based value editing for the Scene View HUD. */
-export type HudControl = {
+export interface HudControlAppearance {
+    size: 'small' | 'normal' | 'large';
+    fontSize: number;
+    order?: number;
+}
+export type HudControl = ({
     type: 'button';
     id: string;
     text: string;
     color: string;
+    width?: number;
 } | {
     type: 'slider';
     id: string;
@@ -13,13 +19,14 @@ export type HudControl = {
     max: number;
     step?: number;
     color: string;
+    width?: number;
 } | {
     type: 'toggle' | 'checkbox';
     id: string;
     text: string;
     property: string;
     color: string;
-};
+}) & HudControlAppearance;
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/;
 const FIELD_NAME = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
@@ -44,9 +51,18 @@ export function normalizeHudControls(value: unknown, maxItems = 12): HudControl[
             text: item.text.slice(0, 128),
             color: typeof item.color === 'string' && HEX_COLOR.test(item.color) ?
                 item.color : '#ffffff',
+            size: item.size === 'small' || item.size === 'large' ?
+                item.size : 'normal',
+            fontSize: Number.isFinite(item.fontSize) ?
+                Math.max(10, Math.min(18, Math.round(item.fontSize as number))) : 14,
+            order: Number.isFinite(item.order) ?
+                Math.max(-1000, Math.min(1000, Math.trunc(item.order as number))) :
+                undefined,
         };
+        const width = Number.isFinite(item.width) ?
+            Math.max(60, Math.min(600, Math.round(item.width as number))) : undefined;
         if (item.type === 'button') {
-            controls.push({ type: 'button', ...base });
+            controls.push({ type: 'button', ...base, width });
         } else if (item.type === 'toggle' || item.type === 'checkbox') {
             if (typeof item.property !== 'string' || !FIELD_NAME.test(item.property)) continue;
             controls.push({ type: item.type, ...base, property: item.property });
@@ -63,10 +79,13 @@ export function normalizeHudControls(value: unknown, maxItems = 12): HudControl[
                 min: item.min as number,
                 max: item.max as number,
                 step: item.step as number | undefined,
+                width,
             });
         }
         ids.add(item.id);
     }
+    // Stable array ordering when two controls share the same priority.
+    controls.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     return controls;
 }
 
@@ -76,12 +95,16 @@ export function normalizeHudControls(value: unknown, maxItems = 12): HudControl[
  */
 export function hudControlLayoutSignature(controls: readonly HudControl[]): string {
     return JSON.stringify(controls.map((control) => {
+        const style = [control.order, control.size, control.fontSize,
+            control.type === 'button' || control.type === 'slider' ?
+                control.width : undefined];
         if (control.type === 'slider') {
             return [control.type, control.id, control.property,
-                control.min, control.max, control.step, control.color];
+                control.min, control.max, control.step, control.color, ...style];
         }
-        if (control.type === 'button') return [control.type, control.id, control.color];
-        return [control.type, control.id, control.property, control.color];
+        if (control.type === 'button')
+            return [control.type, control.id, control.color, ...style];
+        return [control.type, control.id, control.property, control.color, ...style];
     }));
 }
 
@@ -133,14 +156,22 @@ export function hudControlScreenRect(
     };
 }
 
-/** Matches the track drawing (36% left, 38% wide) inside each HUD column. */
+/** Geometry shared by the painted slider and Editor pointer adapter.
+ * Custom widths are clamped to leave room for the numeric value.
+ */
 export function hudSliderScreenTrack(
     viewport: { width: number; height: number }, index: number, totalRows: number,
+    requestedWidth?: number,
 ): { left: number; width: number } {
     const row = hudRowScreenPosition({ x: 0, y: 0 }, index, viewport, totalRows);
     const grid = hudGrid(viewport, totalRows);
-    return { left: row.x + grid.columnWidth * 0.36,
-        width: Math.max(50, grid.columnWidth * 0.38) };
+    const maxWidth = Math.max(50, grid.columnWidth * 0.62 - 38);
+    const preferred = Number.isFinite(requestedWidth) ?
+        requestedWidth! : Math.max(50, grid.columnWidth * 0.38);
+    return {
+        left: row.x + grid.columnWidth * 0.36,
+        width: Math.max(50, Math.min(maxWidth, preferred)),
+    };
 }
 
 export function formatHudControl(control: HudControl, value: unknown): string {

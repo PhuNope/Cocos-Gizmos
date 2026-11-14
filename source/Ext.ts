@@ -121,16 +121,30 @@ declare global {
         color?: string;
     }
 
+    /** Shared visual sizing and ordering for Scene HUD controls. Controls
+     * stay inside their original 22px picking row to prevent overlap.
+     */
+    interface GizmoHudControlStyle {
+        /** Reorder the controls following text rows; equal orders are stable. */
+        order?: number;
+        /** Font height in on-screen pixels, clamped to 10–18 (default 14). */
+        fontSize?: number;
+        /** Control visual scale within its 22px row. */
+        size?: 'small' | 'normal' | 'large';
+    }
+
     /** A clickable Scene View HUD button. */
-    interface GizmoHudButton {
+    interface GizmoHudButton extends GizmoHudControlStyle {
         type: 'button';
         id: string;
         text: string;
         color?: string;
+        /** Width of the button in Scene pixels. */
+        width?: number;
     }
 
     /** A Scene View slider bound to a serialized numeric component property. */
-    interface GizmoHudSlider {
+    interface GizmoHudSlider extends GizmoHudControlStyle {
         type: 'slider';
         id: string;
         text: string;
@@ -139,10 +153,12 @@ declare global {
         max: number;
         step?: number;
         color?: string;
+        /** Slider track width in Scene pixels, shared with click picking. */
+        width?: number;
     }
 
     /** A two-state switch bound to a serialized boolean property. */
-    interface GizmoHudToggle {
+    interface GizmoHudToggle extends GizmoHudControlStyle {
         type: 'toggle';
         id: string;
         text: string;
@@ -151,7 +167,7 @@ declare global {
     }
 
     /** A tickable box bound to a serialized boolean property. */
-    interface GizmoHudCheckbox {
+    interface GizmoHudCheckbox extends GizmoHudControlStyle {
         type: 'checkbox';
         id: string;
         text: string;

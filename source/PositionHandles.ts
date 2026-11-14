@@ -1582,7 +1582,8 @@ function createEditorGizmo(
                 const track = view?.viewport ?
                     hudSliderScreenTrack(view.viewport,
                         (placement?.startRow || 0) + (placement?.textCount || 0) +
-                            entry.index, total || entry.index + 1) : null;
+                            entry.index, total || entry.index + 1,
+                        entry.control.width) : null;
                 // Use the same pixel track as the textured HUD. Clicks
                 // inside the visible track jump to that value immediately.
                 // A press on the label keeps the old relative drag behavior.

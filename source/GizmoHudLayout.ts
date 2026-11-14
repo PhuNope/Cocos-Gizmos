@@ -102,7 +102,7 @@ export class GizmoHudLayout {
                     id: 'control:' + control.id,
                     text: formatHudControl(control, value),
                     order: items.length,
-                    fontSize: 14,
+                    fontSize: control.fontSize,
                     color: control.color,
                 });
             }
