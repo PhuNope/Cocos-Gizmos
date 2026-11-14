@@ -46,8 +46,8 @@ const renderer = readFileSync(path.join(root, 'source/PositionHandles.ts'), 'utf
 const sample = readFileSync(path.join(root, 'editor-assets/Examples/CocosGizmos2DDemo.ts'), 'utf8');
 assert.match(source2D, /public static move\(/);
 assert.match(source2D, /return makeMoveGizmo2D\(property, options\)/);
-assert.match(renderer, /if \(onCanvas\) \{\s*const start = canvasPoint\(ray.start\)/);
-assert.match(renderer, /Gizmos2D\.drawSolidPolygon\(node, corners\)/);
+assert.match(renderer, /if \(ray\) \{[\s\S]*drawMoveStroke\(node, a, b, color, onCanvas, pixel, canvasPoint\)/);
+assert.match(renderer, /Gizmos2D\.drawSolidPolygon\(node, corners\.map\(canvasPoint\)\)/);
 assert.match(renderer, /drawMoveStroke\(node, corners\[i\]/);
 assert.match(renderer, /Gizmos2D\.flushEditorFrame\(\)/);
 assert.match(sample, /Gizmos2D\.move\('moveObject'/);
