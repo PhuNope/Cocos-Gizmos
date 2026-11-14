@@ -87,5 +87,13 @@ onGizmoHudAction(id: string): void {
 }
 ```
 
+**Slider click-to-set:** Click vào bất kỳ vị trí nào trên thanh slider
+sẽ set giá trị tương ứng ngay ở mouse-down, có áp dụng `min/max/step`.
+Kéo tiếp từ vị trí đó sẽ chỉnh theo tọa độ tuyệt đối trên thanh, không bị
+nhảy về giá trị trước khi click. Click phần nhãn (ngoài thanh) giữ cách
+kéo tương đối cũ. `onGizmoHudChanged` nhận `begin → update → end`
+ngay cả khi click mà không kéo. Nhấn Escape trong lúc giữ chuột để
+`cancel` và khôi phục giá trị ban đầu.
+
 Nút bấm không dùng `onGizmoHudChanged()`; phải khai báo
 `onGizmoHudAction()` để nhận `id`.

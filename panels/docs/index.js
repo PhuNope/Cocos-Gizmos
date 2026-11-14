@@ -315,6 +315,8 @@ const examples = Object.freeze([
         figure: "hud", caption: "Giá trị được ghi trước callback update; button dùng event riêng",
         notes: [
             "Slider có thể phát cancel khi kéo bị hủy; toggle/checkbox là click, không có quá trình drag kéo dài.",
+            "Click vào thanh slider sẽ set value ngay; click-trên-track và kéo dùng tọa độ tuyệt đối, tuân theo min/max/step.",
+            "Nhấn Escape khi đang giữ slider sẽ hoàn nguyên cả giá trị được chọn bằng click (cancel); thả chuột commit trong một phiên Undo/Redo.",
             "onGizmoHudChanged nhận value: number | boolean; kiểm tra typeof khi dùng dữ liệu.",
             "onGizmoHudAction(id) dùng cho button, không nhận phase hoặc value.",
             "Không gán lại field vô điều kiện trong callback update; Editor đã cập nhật field trước đó.",
