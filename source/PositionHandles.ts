@@ -9,6 +9,10 @@ import {
     intersectHandlePlane,
 } from './PositionDragSolver';
 import { GizmoMoveCommand } from './GizmoMoveCommand';
+import { GizmoRotateCommand } from './GizmoRotateCommand';
+import { rotateBasis, rotationRingGeometry, rotationRingDistanceSquared,
+    ROTATE_IDENTITY, RotateAxis, RotateQuat, RotateRing,
+} from './RotationHandleGeometry';
 import { HudControl, HudSliderDrag, hudGrid, hudRowScreenPosition, hudControlScreenRect,
     hudSliderScreenTrack, normalizeHudControls, hudControlLayoutSignature } from './GizmoHudControls';
 import { createSceneHudProjection, createViewportHudProjection } from './GizmoHudProjection';
@@ -40,7 +44,7 @@ type Entry = { field: Field; controller: any; key: string;
 };
 /** Editor-only hover state (never serialized onto user components). */
 const selectedHover = new WeakMap<Component, string>();
-type DragState = { entry: Entry; command: GizmoMoveCommand };
+type DragState = { entry: Entry; command: GizmoMoveCommand | GizmoRotateCommand };
 type HudPickingQuad = { node: Node; renderer: MeshRenderer; material: Material; mesh: Mesh };
 type HudEntry = { control: HudControl; controller: any; key: string; index: number;
     picking?: HudPickingQuad | null };
@@ -114,6 +118,30 @@ function spaceFor(component: Component, field: Field): {
             return { x: result.x, y: result.y, z: result.z };
         },
     };
+}
+
+/** Rotation Euler values are orientation, NOT a world/local position.
+ * The ring's pivot stays at the Component Node's world position.
+ */
+function handleWorldOrigin(component: Component, field: Field, value: Point): Point {
+    if (field.visual === 'rotation') {
+        const pivot = component.node.worldPosition;
+        return { x: pivot.x, y: pivot.y, z: pivot.z };
+    }
+    return spaceFor(component, field).toWorld(value);
+}
+function rotationFrame(component: Component): RotateQuat {
+    const frame: any = component.node.worldRotation;
+    return frame && [frame.x,frame.y,frame.z,frame.w].every(Number.isFinite) ?
+        {x:frame.x,y:frame.y,z:frame.z,w:frame.w} : ROTATE_IDENTITY;
+}
+function rotationPlacement(component: Component, field: Field,
+    euler: Point, world: Point, pixel: number): RotateRing | null {
+    if (field.visual !== 'rotation' || !field.axis) return null;
+    const basis = rotateBasis(euler,rotationFrame(component),
+        field.space === 'world' ? 'world' : 'local');
+    return rotationRingGeometry(world,basis,field.axis as RotateAxis,
+        pixel*(field.ringSize ?? 72),64);
 }
 
 function readField(target: Component, field: Field): Point | null {
@@ -226,7 +254,9 @@ function axisPlacement(component: Component, field: Field,
 }
 
 function isMoveHandle(field: Field): boolean {
-    return field.visual === 'axis' || field.visual === 'plane' || field.visual === 'box';
+    // Shared render/pick/hover lifecycle for translation and rotation overlays.
+    return field.visual === 'axis' || field.visual === 'plane' ||
+        field.visual === 'box' || field.visual === 'rotation';
 }
 
 function boxPlacement(component: Component, field: Field,
@@ -459,7 +489,7 @@ function drawSelectedPositionMarkers(component: Component): void {
             if (!field || typeof field.property !== 'string') continue;
             const local = readField(component, field);
             if (!local) continue;
-            const world = spaceFor(component, field).toWorld(local);
+            const world = handleWorldOrigin(component, field, local);
             if (!validPoint(world)) continue;
             const diameter = markerSize(world);
             const radius = diameter * 0.4;
@@ -504,6 +534,16 @@ function drawSelectedPositionMarkers(component: Component): void {
                 return point;
             };
             const pixel = diameter / 22;
+            const ring = rotationPlacement(component, field, local, world, pixel);
+            if (ring) {
+                // Soft rings are drawn through the same camera-facing stroke
+                // routine as Move, with fixed ~2px width at any Scene zoom.
+                // The native annulus mesh handles raycast; this is visual only.
+                for(let i=1;i<ring.points.length;i++)
+                    drawMoveStroke(node,ring.points[i-1],ring.points[i],
+                        color,onCanvas,pixel,canvasPoint);
+                continue;
+            }
             const ray = axisPlacement(component, field, local, world, pixel);
             if (ray) {
                 // A soft-edged 2px ribbon replaces zoom-dependent Graphics
@@ -701,7 +741,8 @@ function disposePositionVisual(visual?: PositionVisual | null): void {
     if (visual.node.isValid) visual.node.destroy();
 }
 
-function createHudPickingQuad(purpose = 'Hud'): HudPickingQuad | null {
+function createHudPickingQuad(purpose = 'Hud',
+    ring?: { radiusPixels: number; pickSize: number }): HudPickingQuad | null {
     const parent = cceNamespace()?.Gizmo?.gizmoRootNode;
     if (!parent?.isValid || typeof Node !== 'function' ||
         typeof MeshRenderer !== 'function' ||
@@ -725,11 +766,30 @@ function createHudPickingQuad(purpose = 'Hud'): HudPickingQuad | null {
         });
         material.setProperty('mainColor', new Color(255, 255, 255, 0));
         renderer.setMaterial(material, 0);
-        mesh = utils.createMesh({
+        // Native raycast mesh matches the visible circle rather than using
+        // a square that blocks unrelated controls inside its empty center.
+        const geometry = ring ? (() => {
+            const positions: number[] = [];
+            const indices: number[] = [];
+            const thickness = Math.max(0.05,Math.min(0.3,
+                ring.pickSize/(2*ring.radiusPixels)));
+            const segments = 64;
+            for(let i=0;i<=segments;i++){
+                const a=i*2*Math.PI/segments;
+                for (const radius of [1-thickness,1+thickness])
+                    positions.push(Math.cos(a)*radius,Math.sin(a)*radius,0);
+                if(i<segments){
+                    const n=i*2;
+                    indices.push(n,n+1,n+2,n+1,n+3,n+2);
+                }
+            }
+            return {positions,indices};
+        })() : {
             positions: [-0.5, -0.5, 0, -0.5, 0.5, 0,
                 0.5, 0.5, 0, 0.5, -0.5, 0],
             indices: [0, 3, 1, 3, 2, 1],
-        }, undefined, { calculateBounds: true });
+        };
+        mesh = utils.createMesh(geometry, undefined, { calculateBounds: true });
         renderer.mesh = mesh;
         return { node, renderer, material, mesh };
     } catch (error) {
@@ -741,14 +801,25 @@ function createHudPickingQuad(purpose = 'Hud'): HudPickingQuad | null {
     }
 }
 type ProjectedMoveGeometry = {
-    type: 'axis' | 'plane' | 'box';
+    type: 'axis' | 'plane' | 'box' | 'rotation';
     rect: { left: number; right: number; bottom: number; top: number };
     axis?: { start: ScreenPoint; end: ScreenPoint };
     corners?: ScreenPoint[];
+    ring?: ScreenPoint[];
 };
 
 function projectedMoveGeometry(component: Component, field: Field,
     local: Point, world: Point, view: any, pixel?: number): ProjectedMoveGeometry | null {
+    if (field.visual === 'rotation') {
+        const ring = rotationPlacement(component,field,local,world,
+            pixel ?? markerSize(world)/22);
+        if(!ring) return null;
+        const points = ring.points.map(p => projectMovePoint(view,p));
+        if(points.some(p=>!p)) return null;
+        const projected = points as ScreenPoint[];
+        const rect = boundsOf(projected);
+        return rect ? {type:'rotation',rect,ring:projected}:null;
+    }
     if (field.visual === 'axis') {
         const arrow = axisPlacement(component, field, local, world, pixel);
         if (!arrow) return null;
@@ -838,6 +909,27 @@ function updateMovePickingQuad(
         projection.pixelSize * height, 1,
     ));
     if (entry.controller?.shape) entry.controller.shape.active = true;
+    return true;
+}
+
+function updateRotationPickingRing(
+    entry: Entry, ring: RotateRing | null,
+): boolean {
+    const node = entry.picking?.node;
+    if(!node?.isValid || !ring) {
+        if(node?.isValid) node.active=false;
+        return false;
+    }
+    node.active=true;
+    node.setWorldPosition(new Vec3(ring.center.x,ring.center.y,ring.center.z));
+    if(typeof Quat.rotationTo === 'function') {
+        const q=new Quat();
+        Quat.rotationTo(q,new Vec3(0,0,1),
+            new Vec3(ring.normal.x,ring.normal.y,ring.normal.z));
+        node.setWorldRotation(q);
+    }
+    node.setWorldScale(new Vec3(ring.radius,ring.radius,ring.radius));
+    if(entry.controller?.shape) entry.controller.shape.active=true;
     return true;
 }
 
@@ -1163,7 +1255,7 @@ function createEditorGizmo(
             return JSON.stringify({
                 fields: fields.map((field) => [
                     field.property, field.index, field.plane || 'xy',
-                    field.space || 'local', field.axis, field.snap,
+                    field.space || 'local', field.axis, field.snap, field.ringSize,
                     field.color, field.bounds, field.id,
                     field.visual || 'point', field.planeSize, field.planeOffset,
                     field.axisSize, field.pickSize, field.boxSize,
@@ -1191,7 +1283,11 @@ function createEditorGizmo(
                     // 3D Move arrows, plane squares and the optional body box.
                     // It is the actual registered controller hit target,
                     // while drawSelectedPositionMarkers provides the visuals.
-                    entry.picking = isMoveHandle(field) ?
+                    entry.picking = field.visual === 'rotation' ?
+                        createHudPickingQuad('Rotation',{
+                            radiusPixels:field.ringSize ?? 72,
+                            pickSize:field.pickSize ?? 14,
+                        }) : isMoveHandle(field) ?
                         createHudPickingQuad('Move') : null;
                     const color = new Color();
                     if (field.color && Color.fromHEX) Color.fromHEX(color, field.color);
@@ -1410,7 +1506,7 @@ function createEditorGizmo(
                     this.hideUnavailableMarker(entry.controller);
                     continue;
                 }
-                const world = spaceFor(component, entry.field).toWorld(local);
+                const world = handleWorldOrigin(component, entry.field, local);
                 if (!validPoint(world)) {
                     this.hideUnavailableMarker(entry.controller);
                     continue;
@@ -1426,13 +1522,16 @@ function createEditorGizmo(
                 const pixel = markerSize(world) / 22;
                 const tile = planePlacement(component, entry.field, local, world, pixel);
                 const ray = axisPlacement(component, entry.field, local, world, pixel);
-                const center = ray?.center || tile?.center || world;
+                const ring = rotationPlacement(component, entry.field, local, world, pixel);
+                const center = ray?.center || tile?.center || ring?.center || world;
                 entry.controller.setPosition?.(new Vec3(center.x, center.y, center.z));
                 entry.controller.setRotation?.(new Quat());
                 const size = ray?.size || tile?.size || pixel * 22;
                 if (!entry.picking) setMarkerSize(entry.controller, size);
                 if (entry.picking) {
-                    updateMovePickingQuad(entry,
+                    if (entry.field.visual === 'rotation')
+                        updateRotationPickingRing(entry,ring);
+                    else updateMovePickingQuad(entry,
                         projectedMoveGeometry(component, entry.field, local, world, moveView, pixel),
                         moveView, moveProjection);
                     if (entry.controller._editHandlesShape)
@@ -1742,61 +1841,69 @@ function createEditorGizmo(
             if (!original) return;
             const transform = spaceFor(target, entry.field);
             const forward = camera()?.node?.forward || ray.d;
+            const ring = rotationPlacement(target, entry.field,original,
+                handleWorldOrigin(target,entry.field,original),
+                markerSize(handleWorldOrigin(target,entry.field,original))/22);
             const axis = entry.field.visual === 'axis' ?
                 axisPlacement(target, entry.field, original,
                     transform.toWorld(original)) : null;
-            const normal = axis ?
+            const normal = ring?.normal || (axis ?
                 axisDragNormal(axis.unit, forward) :
-                handlePlaneNormal(entry.field.plane || 'xy', transform, original, forward);
+                handlePlaneNormal(entry.field.plane || 'xy', transform, original, forward));
             if (!normal) return;
             try {
                 const property = entry.field.property;
                 const index = entry.field.index;
                 // Application command contains all gesture/constraint/undo
                 // orchestration; this adapter only binds Cocos callbacks.
-                const command = new GizmoMoveCommand(
-                    original, transform, normal, entry.field,
-                    {
-                        read: () => readField(target, entry.field) as Point,
-                        write: (value) => {
-                            if (!writeField(target, entry.field, value))
-                                throw new Error('Position handle property is no longer editable');
-                        },
+                const port = {
+                    read: () => readField(target, entry.field) as Point,
+                    write: (value: Point) => {
+                        if (!writeField(target, entry.field, value))
+                            throw new Error('Gizmo rotation/move value is no longer editable');
                     },
-                    {
-                        begin: () => {
-                            this.onControlBegin?.(property, index);
-                            try { target.onGizmoChanged?.(property, 'begin', index); }
-                            catch (error) {
-                                this.closeControl(property, index, true);
-                                throw error;
-                            }
-                        },
-                        update: () => {
-                            target.onGizmoChanged?.(property, 'update', index);
-                            this.onControlUpdate?.(property, index);
-                            this.onComponentChanged?.(target.node);
+                };
+                const hooks = {
+                    begin: () => {
+                        this.onControlBegin?.(property, index);
+                        try { target.onGizmoChanged?.(property, 'begin', index); }
+                        catch (error) {
+                            this.closeControl(property, index, true);
+                            throw error;
+                        }
+                    },
+                    update: () => {
+                        target.onGizmoChanged?.(property, 'update', index);
+                        this.onControlUpdate?.(property, index);
+                        this.onComponentChanged?.(target.node);
+                        this.updateMarkers();
+                        repaintCanvasMove(target);
+                        cceNamespace()?.Engine?.repaintInEditMode?.();
+                    },
+                    rollback: () => {
+                        this.onComponentChanged?.(target.node);
+                        repaintCanvasMove(target);
+                        cceNamespace()?.Engine?.repaintInEditMode?.();
+                    },
+                    end: (_value: Point, cancelled: boolean, changed: boolean) => {
+                        try {
+                            target.onGizmoChanged?.(
+                                property, cancelled ? 'cancel' : 'end', index);
+                        } finally {
+                            this.closeControl(property, index, cancelled || !changed);
                             this.updateMarkers();
                             repaintCanvasMove(target);
-                            cceNamespace()?.Engine?.repaintInEditMode?.();
-                        },
-                        rollback: () => {
-                            this.onComponentChanged?.(target.node);
-                            repaintCanvasMove(target);
-                            cceNamespace()?.Engine?.repaintInEditMode?.();
-                        },
-                        end: (_value, cancelled, changed) => {
-                            try {
-                                target.onGizmoChanged?.(
-                                    property, cancelled ? 'cancel' : 'end', index);
-                            } finally {
-                                this.closeControl(property, index, cancelled || !changed);
-                                this.updateMarkers();
-                                repaintCanvasMove(target);
-                            }
-                        },
+                        }
                     },
-                );
+                };
+                const command = ring ? new GizmoRotateCommand(
+                    original,ring.center,ring.normal,rotationFrame(target),{
+                        axis: entry.field.axis as RotateAxis,
+                        space: entry.field.space === 'world' ? 'world' : 'local',
+                        snap: entry.field.snap, twoD: isCanvas2D(target.node),
+                    },port,hooks) :
+                    new GizmoMoveCommand(original,transform,normal,
+                        entry.field,port,hooks);
                 if (!command.begin(ray)) return;
                 this.drag = { entry, command };
                 activePositionDrags.add(this);
@@ -1846,6 +1953,8 @@ function createEditorGizmo(
             const component = this.target as Component;
             let plane: Entry | null = null;
             let axis: Entry | null = null;
+            let rotation: Entry | null = null;
+            let rotationDistance = Infinity;
             let box: Entry | null = null;
             let point: Entry | null = null;
             let planeDistance = Infinity, axisDistance = Infinity;
@@ -1853,10 +1962,18 @@ function createEditorGizmo(
             for (const entry of this.entries) {
                 const local = readField(component, entry.field);
                 if (!local) continue;
-                const world = spaceFor(component, entry.field).toWorld(local);
+                const world = handleWorldOrigin(component, entry.field, local);
                 if (!validPoint(world)) continue;
                 const projected = projectedMoveGeometry(
                     component, entry.field, local, world, view);
+                if (projected?.type === 'rotation' && projected.ring) {
+                    const distance = rotationRingDistanceSquared(pointer,projected.ring);
+                    const pickSize = entry.field.pickSize ?? 14;
+                    if(distance <= pickSize*pickSize && distance < rotationDistance) {
+                        rotation = entry; rotationDistance = distance;
+                    }
+                    continue;
+                }
                 if (projected?.type === 'plane' && projected.corners) {
                     // The exact visible parallelogram takes precedence over
                     // overlapping strips and the large selectable object box.
@@ -1911,7 +2028,7 @@ function createEditorGizmo(
                     pointDistance = distance;
                 }
             }
-            return plane || axis || box || point;
+            return rotation || plane || axis || box || point;
         }
 
         /** Fallback hit-test when Creator consumes a HUD pointer event before
