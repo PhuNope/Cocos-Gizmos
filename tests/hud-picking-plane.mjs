@@ -567,8 +567,14 @@ try {
         'Unchanged camera never redraws Move on every BEFORE_DRAW');
     visibleZoom = 0.6;
     cameraFrame();
+    assert.equal(immediateSceneRepaints, hoveredFrames + 1,
+        'Multiple wheel events in one rendering interval are coalesced');
+    // The most recent wheel position is submitted on the next paint slot,
+    // rather than adding redundant 3D triangles in the same engine frame.
+    await new Promise(resolve => setTimeout(resolve, 35));
+    cameraFrame();
     assert.equal(immediateSceneRepaints, hoveredFrames + 2,
-        'Reverse wheel zoom also repaints Move immediately');
+        'Reverse wheel zoom repaints after the 30ms coalescing interval');
 } finally {
     rendererCamera.worldToScreen = redrawCamera;
 }
@@ -607,9 +613,10 @@ const oldAfterMouseUp = rendererCamera.worldToScreen;
 rendererCamera.worldToScreen = (out, point) =>
     out.set(point.x * 1.75, point.y * 1.75, point.z);
 try {
+    await new Promise(resolve => setTimeout(resolve, 35));
     beforeDraw();
     assert.equal(immediateSceneRepaints, repaintAfterMouseUp + 1,
-        'Wheel hover redraw resumes immediately after drag release');
+        'Wheel hover redraw resumes after drag release and the frame budget');
 } finally {
     rendererCamera.worldToScreen = oldAfterMouseUp;
 }
