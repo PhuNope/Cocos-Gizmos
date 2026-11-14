@@ -15,7 +15,7 @@ import {
     Vec3,
 } from 'cc';
 import { DrawCommandBuffer2D } from './DrawCommandBuffer2D';
-import { makeMoveGizmo2D, makePointGizmo, makePointGizmos } from './GizmoHandlePresets';
+import { makeMoveGizmo2D, makeRotateGizmo2D, makePointGizmo, makePointGizmos } from './GizmoHandlePresets';
 
 const { ccclass, executeInEditMode } = _decorator;
 
@@ -418,6 +418,15 @@ export class Gizmos2D {
         property: string, options: GizmosMove2DHandleOptions = {},
     ): GizmoHandleDescriptor[] {
         return makeMoveGizmo2D(property, options);
+    }
+
+    /** One circular Z rotation ring to edit a Vec3 of Euler degrees.
+     * Drag with the pointer; support angular snapping and undo/redo.
+     */
+    public static rotate(
+        property: string, options: GizmosRotate2DHandleOptions = {},
+    ): GizmoHandleDescriptor[] {
+        return makeRotateGizmo2D(property, options);
     }
 
     /** Edit one Vec3 property using a screen-sized 2D drag handle. */

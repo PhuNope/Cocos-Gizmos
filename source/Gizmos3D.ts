@@ -22,7 +22,7 @@ import {
     Vec3,
 } from 'cc';
 import { cce } from './Define';
-import { makeMoveGizmo } from './GizmoHandlePresets';
+import { makeMoveGizmo, makeRotateGizmo } from './GizmoHandlePresets';
 
 const { ccclass, executeInEditMode } = _decorator;
 
@@ -817,6 +817,15 @@ export class Gizmos3D {
         property: string, options: GizmosMoveHandleOptions = {},
     ): GizmoHandleDescriptor[] {
         return makeMoveGizmo(property, options);
+    }
+
+    /** Three X/Y/Z colored rings to edit Euler degrees with undo/redo.
+     * The returned descriptors work inside Component.onGizmoHandles().
+     */
+    public static rotate(
+        property: string, options: GizmosRotateHandleOptions = {},
+    ): GizmoHandleDescriptor[] {
+        return makeRotateGizmo(property, options);
     }
 
     public static readonly DEFAULT_COLOR = Color.BLUE;

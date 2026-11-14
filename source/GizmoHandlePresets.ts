@@ -83,6 +83,37 @@ export function makeMoveGizmo2D(
         (handle.visual === 'plane' && handle.plane === 'xy'));
 }
 
+/** A rotation preset edits one Euler Vec3 in degrees through colored rings. */
+export function makeRotateGizmo(
+    property: string, options: GizmosRotateHandleOptions = {},
+): GizmoHandleDescriptor[] {
+    const name = propertyName(property);
+    const ringSize = size(options.ringSize, 72, 24, 180, 'ringSize');
+    const pickSize = size(options.pickSize, 14, 8, 32, 'pickSize');
+    if (options.space !== undefined &&
+        options.space !== 'local' && options.space !== 'world') {
+        throw new RangeError('space must be local or world');
+    }
+    if (options.snap !== undefined &&
+        (!Number.isFinite(options.snap) || options.snap <= 0)) {
+        throw new RangeError('rotation snap must be positive degrees');
+    }
+    return ([
+        ['x', '#ff595e'], ['y', '#43df66'], ['z', '#4b8fff'],
+    ] as ReadonlyArray<readonly ['x'|'y'|'z',string]>)
+        .map(([axis, color]): GizmoHandleDescriptor => ({
+            property: name, id: 'rotation-' + axis, visual: 'rotation',
+            axis, plane: 'view', space: options.space ?? 'local',
+            snap: options.snap, ringSize, pickSize, color,
+            hoverColor: options.hoverColor ?? '#ffff65',
+        }));
+}
+export function makeRotateGizmo2D(
+    property: string, options: GizmosRotate2DHandleOptions = {},
+): GizmoHandleDescriptor[] {
+    return makeRotateGizmo(property, options).filter(field => field.axis === 'z');
+}
+
 export function makePointGizmo(
     property: string, options: GizmoPointOptions = {},
 ): GizmoHandleDescriptor {

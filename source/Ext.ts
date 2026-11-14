@@ -37,7 +37,7 @@ declare global {
          * For 'axis' set axis: 'x' | 'y' | 'z'. Three axis handles can
          * reference the same Vec3 property using distinct ids.
          */
-        visual?: 'point' | 'plane' | 'axis' | 'box';
+        visual?: 'point' | 'plane' | 'axis' | 'box' | 'rotation';
         /** Visible length of an axis arrow in Scene pixels (default 66). */
         axisSize?: number;
         /** Radius in Scene pixels used for easier axis/plane selection (default 24). */
@@ -58,6 +58,8 @@ declare global {
         planeSize?: number;
         /** Offset of the square along its two axes in pixels (default 14). */
         planeOffset?: number;
+        /** Screen-pixel radius of a Rotation Gizmo ring (default 72). */
+        ringSize?: number;
     }
 
     /** Settings for Gizmos3D.move(property, options). */
@@ -76,6 +78,25 @@ declare global {
         positionLabelOffset?: number;
         bounds?: GizmoHandleDescriptor['bounds'];
     }
+
+    /** Settings for Gizmos3D.rotate(property, options): one Vec3 of Euler
+     * angles in DEGREES. Rotation rings are centered on the Component node.
+     * Local axes use node's world frame followed by the stored Euler rotation;
+     * world axes stay aligned to global XYZ. The Vec3 belongs to the
+     * Component, not to Node.eulerAngles unless the user applies it.
+     */
+    interface GizmosRotateHandleOptions {
+        space?: GizmoHandleSpace;
+        /** Snapping in angular degrees, e.g. 15; omitted = smooth rotation. */
+        snap?: number;
+        /** Radius in Scene pixels (24..180, default 72). */
+        ringSize?: number;
+        /** Size of transparent ring hit area in pixels (8..32, default 14). */
+        pickSize?: number;
+        hoverColor?: string;
+    }
+    /** Options for the single Z rotation ring of Gizmos2D.rotate(). */
+    type GizmosRotate2DHandleOptions = GizmosRotateHandleOptions;
 
     /** Gizmos2D.move(): only X, Y and XY; no 3D body/box handle.
      * Uses the Move descriptor options without boxSize.
