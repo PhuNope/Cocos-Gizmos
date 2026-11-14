@@ -16,6 +16,10 @@ const axes = { exports: {} };
 vm.runInNewContext(compile('AxisHandleGeometry'), axes);
 const hit = { exports: {} };
 vm.runInNewContext(compile('MoveHitGeometry'), hit);
+const scale = { exports: {} };
+vm.runInNewContext(compile('MoveScreenScale'), scale);
+const strokes = { exports: {} };
+vm.runInNewContext(compile('MoveStrokeGeometry'), strokes);
 const math = { exports: {} };
 vm.runInNewContext(compile('PositionDragSolver'), math);
 const edits = { exports: {} };
@@ -218,6 +222,8 @@ const sandbox = {
             drawPositionLabel(...args) { visibleDots.scene3d.push(args); },
         } };
         if (name === './MoveHitGeometry') return hit.exports;
+        if (name === './MoveScreenScale') return scale.exports;
+        if (name === './MoveStrokeGeometry') return strokes.exports;
         if (name === './AxisHandleGeometry') return axes.exports;
         if (name === './PlaneHandleGeometry') return planes.exports;
         if (name === './PositionDragSolver') return math.exports;
