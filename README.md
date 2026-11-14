@@ -37,14 +37,14 @@ only Editor Scene installs callback forwarding, with a cached drawer per
 Component instance. Define the drawer before the decorated class, and use
 normal class methods rather than arrow-function fields. For a ready-to-drag
 example, use **Assets → cocos-gizmos → Examples → CocosGizmosDecoratorDemo**.
-Browse **Gizmos → OpenDoc → Decorators** for examples and the binding diagram.
+Browse **Gizmos → Open Document → Decorators** for examples and the binding diagram.
 
 ## Move gizmo 2D
 
 Use `...Gizmos2D.move('position')` in `onGizmoHandles()` to show two axes
 (X/Y) and the XY drag tile. There is no Z handle, and dragging does not
 snap unless `snap` is supplied. See the mounted 2D demo in Assets and the
-**Gizmos → OpenDoc → Move / Points** section for a visual example.
+**Gizmos → Open Document → Move / Points** section for a visual example.
 The handle descriptors also work in `@registerGizmos` drawers.
 
 ## Scene HUD control design
@@ -57,7 +57,7 @@ are unchanged and no Canvas Sprite/Mask conflict is introduced.
 
 ## API reference inside Cocos Creator
 
-Open **Gizmos → OpenDoc** (next to **Reset Gizmos**) to browse the dockable
+Open **Gizmos → Open Document** (next to **Reset Gizmos**) to browse the dockable
 API guide for Gizmos2D, Gizmos3D, Move/Point handles and HUD callbacks. It includes
 searchable TypeScript examples and self-contained SVG diagrams.
 The **Callbacks** tab explains Gizmo lifecycle hooks, begin/update/end/cancel
@@ -66,7 +66,7 @@ Internet access and does not change project Scene assets.
 
 The installable extension ZIP does **not** bundle the repository `docs/`
 folder. Markdown development notes remain available in the repository; the
-installed guide is the OpenDoc panel.
+installed guide is the Open Document panel.
 
 
 **API gọn cho Scene Editor:** `Gizmos3D.move('position')`,

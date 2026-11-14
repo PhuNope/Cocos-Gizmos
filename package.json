@@ -46,7 +46,7 @@
             },
             {
                 "path": "Gizmos",
-                "label": "OpenDoc",
+                "label": "Open Document",
                 "message": "open-doc"
             },
             {
@@ -111,7 +111,7 @@
             "main": "./panels/settings/index.js"
         },
         "docs": {
-            "title": "Gizmos OpenDoc",
+            "title": "Gizmos Open Document",
             "type": "dockable",
             "main": "./panels/docs/index.js"
         }

@@ -441,7 +441,7 @@ function renderExample(example) {
 exports.template = [
     '<main class="cg-docs">',
     '<header class="cg-hero"><span class="cg-eyebrow">COCOS-GIZMOS · EDITOR API</span>',
-    '<h1>Gizmos OpenDoc</h1><p>Tra cứu API, ví dụ TypeScript và sơ đồ minh họa ngay trong Cocos Creator.</p>',
+    '<h1>Gizmos Open Document</h1><p>Tra cứu API, ví dụ TypeScript và sơ đồ minh họa ngay trong Cocos Creator.</p>',
     '<p class="cg-hint">Gizmos chỉ vẽ trong Scene Editor; callback có thể tồn tại trong component mà không chạy trong game.</p></header>',
     '<div class="cg-toolbar"><label for="cg-doc-search">Tìm API</label>',
     '<input id="cg-doc-search" type="search" placeholder="move, callback, begin/update, HUD..." autocomplete="off" /></div>',

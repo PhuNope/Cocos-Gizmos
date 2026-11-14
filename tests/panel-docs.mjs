@@ -8,7 +8,7 @@ const extension = require('../main.js');
 assert.equal(packageManifest.panels.docs.main, './panels/docs/index.js');
 const menu = packageManifest.contributions.menu;
 const resetIndex = menu.findIndex(m => m.label === 'Reset Gizmos');
-assert.equal(menu[resetIndex + 1].label, 'OpenDoc');
+assert.equal(menu[resetIndex + 1].label, 'Open Document');
 assert.equal(menu[resetIndex + 1].message, 'open-doc');
 assert.deepEqual(packageManifest.contributions.messages['open-doc'].methods, ['openDoc']);
 assert.match(doc.template, /Gizmos3D\.move/);
@@ -18,14 +18,14 @@ assert.match(doc.template, /onGizmoHudControls/);
 assert.match(doc.template, /<svg[^>]+role="img"/);
 assert.match(doc.style, /cg-api-card/);
 assert.equal((doc.template.match(/class="cg-api-card"/g) || []).length, 14,
-    'OpenDoc ships fourteen API cards, including 2D Move, decorator and callback examples');
+    'Open Document ships fourteen API cards, including 2D Move, decorator and callback examples');
 for (const callback of ['onGizmoChanged', 'onGizmoHudChanged', 'onGizmoHudAction',
     'onRestore', 'GizmoHandlePhase']) {
-    assert.ok(doc.template.includes(callback), 'OpenDoc documents ' + callback);
+    assert.ok(doc.template.includes(callback), 'Open Document documents ' + callback);
 }
 for (const phase of ['begin', 'update', 'end', 'cancel']) {
     assert.ok(doc.template.includes(phase),
-        'OpenDoc documents the drag phase ' + phase);
+        'Open Document documents the drag phase ' + phase);
 }
 assert.match(doc.template, /data-doc-group="callbacks"/,
     'Callback cards are filterable in their own category');
@@ -100,7 +100,7 @@ try {
     assert.equal(elements.search._handlers.size, 0);
     assert.equal(elements.tabs._handlers.size, 0);
     assert.equal(elements.cards._handlers.size, 0);
-    console.log('[panel-docs] OpenDoc menu, API examples, illustrations, search and cleanup OK');
+    console.log('[panel-docs] Open Document menu, API examples, illustrations, search and cleanup OK');
 } finally {
     if (originalEditor === undefined) delete globalThis.Editor;
     else globalThis.Editor = originalEditor;
