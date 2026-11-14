@@ -6,6 +6,36 @@ export type MovePoint3 = { x: number; y: number; z: number };
 export type MovePoint2 = { x: number; y: number };
 export type MoveProject = (point: MovePoint3) => MovePoint2 | null;
 
+/**
+ * Stable fingerprint of the view/projection used by visible Move arrows.
+ *
+ * BEFORE_UPDATE can skip a Scene wheel frame, while BEFORE_DRAW still runs
+ * and updates native transparent picking quads. Sampling the projected
+ * origin and three world-space basis directions also detects 3D orbit/pan,
+ * perspective FOV changes and 2D orthographic zoom without relying on
+ * undocumented Scene wheel events or private camera matrices.
+ *
+ * Coordinates are quantized to 1/32 screen pixel so floating point camera
+ * jitter cannot trigger a new full Scene render every engine frame.
+ */
+export function moveCameraProjectionSignature(
+    anchor: MovePoint3, project: MoveProject,
+): string | null {
+    const probes: MovePoint3[] = [
+        anchor,
+        { x: anchor.x + 1, y: anchor.y, z: anchor.z },
+        { x: anchor.x, y: anchor.y + 1, z: anchor.z },
+        { x: anchor.x, y: anchor.y, z: anchor.z + 1 },
+    ];
+    const result: number[] = [];
+    for (const point of probes) {
+        const xy = project(point);
+        if (!valid2(xy)) return null;
+        result.push(Math.round(xy.x * 32), Math.round(xy.y * 32));
+    }
+    return result.join(':');
+}
+
 const valid2 = (p: MovePoint2 | null): p is MovePoint2 =>
     !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 

@@ -207,6 +207,7 @@ const projection = evaluate('GizmoHudProjection', {
 });
 const cameraBridge = evaluate('SceneCameraBridge');
 const input = evaluate('SceneGizmoInput');
+let immediateSceneRepaints = 0;
 class Base {
     constructor() { this.controllers = []; }
     createController() {
@@ -287,7 +288,7 @@ const sandbox = {
             './PlaneHandleGeometry': planes, './AxisHandleGeometry': axes,
             './MoveHitGeometry': hit,
             './MoveScreenScale': scale, './MoveStrokeGeometry': strokes,
-            './ExecuteGizmos': { tickOnce() {} },
+            './ExecuteGizmos': { tickOnce() { immediateSceneRepaints++; } },
             './GizmoMoveCommand': commands,
             './GizmoEditSession': edit,
             './GizmoHudControls': controls, './GizmoHudProjection': projection,
@@ -540,6 +541,38 @@ assert.ok(arrowControl.hitTarget.worldScale.x >
 assert.ok(planeControl.hitTarget.worldScale.x > 0 &&
     planeControl.hitTarget.worldScale.y > 0,
     'Native plane picker covers the projected square');
+
+// Hover + wheel regression: native invisible hit quads already follow the
+// camera in BEFORE_DRAW; now visible Move geometry must update in the same
+// frame even when there is no drag/BEFORE_UPDATE from the Editor.
+assert.ok(beforeDraw, 'Native Move Gizmo registered its BEFORE_DRAW callback');
+const redrawCamera = rendererCamera.worldToScreen;
+let visibleZoom = 1;
+rendererCamera.worldToScreen = (out, point) => {
+    out.set(point.x * visibleZoom, point.y * visibleZoom, point.z);
+};
+try {
+    const cameraFrame = beforeDraw;
+    cameraFrame(); // establish the initial projected-camera fingerprint
+    arrowControl.onControllerHoverIn({});
+    const hoveredFrames = immediateSceneRepaints;
+    assert.equal(moveGizmo.diagnosticState().draggingPosition, false,
+        'Pointer hovering over Move must not begin a drag');
+    visibleZoom = 2;
+    cameraFrame(); // wheel changed the camera; engine frame may be skipped
+    assert.equal(immediateSceneRepaints, hoveredFrames + 1,
+        'Hover + wheel repaints the Move arrows in this same BEFORE_DRAW frame');
+    cameraFrame();
+    assert.equal(immediateSceneRepaints, hoveredFrames + 1,
+        'Unchanged camera never redraws Move on every BEFORE_DRAW');
+    visibleZoom = 0.6;
+    cameraFrame();
+    assert.equal(immediateSceneRepaints, hoveredFrames + 2,
+        'Reverse wheel zoom also repaints Move immediately');
+} finally {
+    rendererCamera.worldToScreen = redrawCamera;
+}
+
 const click = (controller, x, y) => controller.onControllerMouseDown({
     button: 0, handleName: controller.key, x, y,
 });

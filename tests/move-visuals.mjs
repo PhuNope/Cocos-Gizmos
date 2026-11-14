@@ -15,7 +15,7 @@ function load(name) {
     vm.runInNewContext(output, scope, { filename: name + '.ts' });
     return scope.exports;
 }
-const { moveWorldPerPixel } = load('MoveScreenScale');
+const { moveWorldPerPixel, moveCameraProjectionSignature } = load('MoveScreenScale');
 const { moveStrokeBands } = load('MoveStrokeGeometry');
 const center = { x: 320, y: 120, z: 0 };
 const right = {x:1,y:0,z:0}, up={x:0,y:1,z:0};
@@ -42,6 +42,26 @@ for(const pixelsPerUnit of [0.01, 1, 100, 1000000]) {
 }
 assert.equal(moveStrokeBands({x:0,y:0,z:0},{x:0,y:0,z:1},
     {x:0,y:0,z:1},1),null,'Camera-facing degeneracy does not create invalid ribbons');
+// Wheel-zoom, camera pan and orbit must trigger a render while hovering.
+const probe = { x: 5, y: 7, z: 11 };
+const projected = (zoom, panX = 0, orbit = 0) => point => ({
+    x: (point.x * Math.cos(orbit) - point.y * Math.sin(orbit)) * zoom + panX,
+    y: (point.x * Math.sin(orbit) + point.y * Math.cos(orbit)) * zoom,
+});
+const base = moveCameraProjectionSignature(probe, projected(1));
+assert.equal(typeof base, 'string');
+assert.equal(moveCameraProjectionSignature(probe, projected(1)), base,
+    'Unchanged Scene camera cannot schedule redundant full redraws');
+assert.notEqual(moveCameraProjectionSignature(probe, projected(2)), base,
+    'Wheel zoom changes the projected Move footprint without a drag');
+assert.notEqual(moveCameraProjectionSignature(probe, projected(1, 5)), base,
+    'Scene camera pan changes projected Move position');
+assert.notEqual(moveCameraProjectionSignature(probe, projected(1, 0, 0.2)), base,
+    'Scene camera orbit changes the projection basis');
+assert.equal(moveCameraProjectionSignature(probe, () => null), null,
+    'Unavailable camera must not request redraw');
+assert.equal(moveCameraProjectionSignature(probe, () => ({ x: NaN, y: 0 })), null,
+    'Broken renderer camera must not request redraw');
 assert.equal(moveWorldPerPixel(center, () => null), null);
 assert.equal(moveWorldPerPixel(center,p=>({x:NaN,y:p.y})), null);
 const adapter = readFileSync(path.join(root,'source/PositionHandles.ts'),'utf8');
@@ -50,6 +70,9 @@ assert.match(adapter,/moveWorldPerPixel\(world, project/);
 assert.match(adapter,/drawMoveStroke\(node, a, b, color, onCanvas, pixel, canvasPoint\)/);
 assert.match(adapter,/if \(this\.drag\?\.entry && component\?\.node\?\.isValid/);
 assert.match(adapter,/function repaintCanvasMove\(component: Component\)/);
+assert.match(adapter,/function repaintMoveAfterCameraChange\(\)/);
+assert.match(adapter,/if \(this\.entries\.some\(entry => isMoveHandle\(entry\.field\)\)\)/);
+assert.match(adapter,/lastMoveViewKey = key;\s*repaintWholeScene\(\)/);
 assert.match(adapter,/repaintWholeScene\(\)/);
 assert.doesNotMatch(adapter, /drawSelectedPositionMarkers\(target\);\s*Gizmos2D\.flushEditorFrame\(\)/,
     'Drag repaint must include the entire Scene, not only selected Move strokes');

@@ -15,7 +15,7 @@ import { createSceneHudProjection, createViewportHudProjection } from './GizmoHu
 import { normalizeHudItems } from './GizmoPresentation';
 import { GizmoEditSession } from './GizmoEditSession';
 import { planeHandleGeometry, PlaneHandleGeometry } from './PlaneHandleGeometry';
-import { moveWorldPerPixel } from './MoveScreenScale';
+import { moveWorldPerPixel, moveCameraProjectionSignature } from './MoveScreenScale';
 import { moveStrokeBands, MoveStrokePoint } from './MoveStrokeGeometry';
 import { axisHandleGeometry, axisDragNormal, AxisRayGeometry } from './AxisHandleGeometry';
 import { boundsOf, centerDistanceSquared, distanceToSegmentSquared,
@@ -363,6 +363,44 @@ function drawMoveStroke(
 // stream. Repaint through it, rather than submitting only Move shapes during
 // mousemove (which erased unrelated 2D debug drawings for up to 750ms).
 const lastCanvasPaint = new WeakMap<Component, number>();
+// Shared between native per-Component Gizmo controllers. On a wheel frame,
+// only the first Move controller should schedule a full redraw; repeated
+// BEFORE_DRAW callbacks for other selected controllers observe the same key.
+let lastMoveViewKey: string | null = null;
+function repaintMoveAfterCameraChange(): void {
+    const view = camera();
+    if (typeof view?.worldToScreen !== 'function') return;
+    const rawNode: any = view.node;
+    const location: Point = rawNode?.worldPosition &&
+        validPoint(rawNode.worldPosition) ? rawNode.worldPosition :
+        { x: 0, y: 0, z: 0 };
+    const forward = rawNode?.forward;
+    // Perspective cameras might be standing directly at the world origin.
+    // Sample 10 world units ahead of the Scene camera when possible.
+    const origin: Point = forward && validPoint(forward) ? {
+        x: location.x + forward.x * 10,
+        y: location.y + forward.y * 10,
+        z: location.z + forward.z * 10,
+    } : location;
+    const key = moveCameraProjectionSignature(origin, point => {
+        try {
+            const screen = new Vec3();
+            view.worldToScreen(new Vec3(point.x, point.y, point.z), screen);
+            return { x: screen.x, y: screen.y };
+        } catch { return null; }
+    });
+    if (key === null) return;
+    if (lastMoveViewKey === null) {
+        lastMoveViewKey = key;
+        return;
+    }
+    if (key === lastMoveViewKey) return;
+    // Set the key BEFORE repainting, so reentrant draw notifications and
+    // multiple selected components cannot cause a redraw feedback loop.
+    lastMoveViewKey = key;
+    repaintWholeScene();
+}
+
 function repaintCanvasMove(component: Component): void {
     if (!component?.node?.isValid || !isCanvas2D(component.node)) return;
     // Synchronous manual scheduler tick flushes all selected/ordinary
@@ -906,6 +944,10 @@ function createEditorGizmo(
                 if (next) selectedHover.set(component, next);
                 else selectedHover.delete(component);
             }
+            // Repaint the highlighted handle immediately; Cocos may consume
+            // the hover event without dispatching an engine update first.
+            if (this.entries.some(item => isMoveHandle(item.field)))
+                repaintWholeScene();
             cceNamespace()?.Engine?.repaintInEditMode?.();
         }
         private lastSceneCamera: any = null;
@@ -921,6 +963,12 @@ function createEditorGizmo(
             // on every rotation/zoom of the new camera.
             this.refreshSceneCamera();
             this.updateMarkers();
+            // Wheel, pan or orbit can update the native picking quads in
+            // BEFORE_DRAW without a matching BEFORE_UPDATE draw callback.
+            // Keep the visible 2D/3D arrow/plane exactly in sync while
+            // hovering, not only after a mouse-down starts a drag.
+            if (this.entries.some(entry => isMoveHandle(entry.field)))
+                repaintMoveAfterCameraChange();
             // Unsaved tabs may not receive an Engine BEFORE_UPDATE during
             // a drag. Repaint the *whole* Scene only if no normal Scene
             // callback frame has painted the 2D handles recently.

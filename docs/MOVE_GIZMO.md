@@ -6,8 +6,12 @@ Move 2D/3D dùng kích thước tính từ phép chiếu camera theo pixel, khô
 còn dựa vào giao ray có thể mất ổn định ở mức zoom lớn. Arrow và viền
 plane được vẽ dưới dạng dải 2px với viền alpha mềm (~1px), không phụ thuộc
 vào độ dày đường Graphics mặc định hoặc MSAA của Scene.
-Trong 2D, dữ liệu hình được flush ngay khi drag thay đổi để giảm
-độ trễ một vài frame khi chuột kéo nhanh.
+Khi drag, dữ liệu hình 2D được cập nhật đồng bộ qua lượt vẽ Scene.
+Ngay cả khi chỉ **hover + lăn chuột** (không nhấn), camera được kiểm tra
+trước mỗi lần vẽ: nếu phép chiếu đã thay đổi vì zoom/pan/orbit, plugin
+vẽ lại arrow và plane 2D/3D ngay trong frame, không phải chờ lượt cập
+nhật Scene 250ms tiếp theo. Chỉ phát vẽ lại khi fingerprint camera
+thay đổi để tránh giật và tốn CPU khi camera đứng yên.
 
 ## Gizmos2D.move() — Move Object Position trong Canvas 2D
 
