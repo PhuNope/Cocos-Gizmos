@@ -140,7 +140,8 @@ function writeField(target: Component, field: Field, value: Point): boolean {
 function markerSize(world: Point): number {
     const view = camera();
     if (typeof view?.worldToScreen !== 'function') return 0.22;
-    // Callers synchronize the camera once per frame before sampling.    const project = (p: Point): { x: number; y: number } | null => {
+    // Callers synchronize the camera once per frame before sampling.
+    const project = (p: Point): { x: number; y: number } | null => {
         try {
             const screen = new Vec3();
             view.worldToScreen(new Vec3(p.x, p.y, p.z), screen);
