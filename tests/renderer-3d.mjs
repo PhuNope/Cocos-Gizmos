@@ -372,7 +372,7 @@ const adaptive = calls.spheres.at(-1);
 assert.ok(adaptive.sx <= 16 && adaptive.sy <= 8 &&
     adaptive.sx * adaptive.sy * 2 <= 52,
     'A nearly-full no-depth pool lowers sphere detail');
-trianglePools[0]._vertexCount = trianglePools[0]._maxVertices - 6;
+trianglePools[0]._vertexCount = trianglePools[0]._maxVertices - 3;
 const crossesBefore = calls.crosses.length;
 const sphereCount = calls.spheres.length;
 Gizmos3D.drawSphere(node, c, 0.3);
