@@ -59,6 +59,19 @@ assert.deepEqual(Array.from(presets.makeRotateGizmo('rotationEuler'), h => h.axi
 assert.deepEqual(Array.from(presets.makeRotateGizmo2D('rotationEuler'), h => h.axis), ['z']);
 assert.throws(()=>presets.makeRotateGizmo('angle',{snap:-15}));
 assert.throws(()=>presets.makeRotateGizmo('angle',{ringSize:400}));
+const selectedPivot=presets.makeRotateGizmo('tangentRotation',{
+    pivotProperty:'activeKnotPosition',pivotSpace:'local',space:'world'});
+assert.equal(selectedPivot.length,3);
+assert.deepEqual(Array.from(selectedPivot,x=>x.pivotProperty),
+    ['activeKnotPosition','activeKnotPosition','activeKnotPosition']);
+assert.deepEqual(Array.from(selectedPivot,x=>x.pivotSpace),['local','local','local']);
+assert.throws(()=>presets.makeRotateGizmo('angle',{pivotProperty:''}),/pivotProperty/);
+assert.throws(()=>presets.makeRotateGizmo('angle',{pivotSpace:'wrong'}),/pivotSpace/);
+const positionAdapterSource=readFileSync(path.join(root,'source','PositionHandles.ts'),'utf8');
+assert.match(positionAdapterSource,/field\.pivotProperty/);
+assert.match(positionAdapterSource,/Vec3\.transformMat4\(world,new Vec3\(pivot\.x/);
+assert.match(positionAdapterSource,/field\.pivotProperty, field\.pivotSpace/);
+
 
 const circular = new solver.RotationDragSolver(initial,center,{x:0,y:0,z:1},
     ROTATE_IDENTITY,{axis:'z',space:'local',twoD:true});

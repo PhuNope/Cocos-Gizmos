@@ -98,6 +98,12 @@ export function makeRotateGizmo(
         (!Number.isFinite(options.snap) || options.snap <= 0)) {
         throw new RangeError('rotation snap must be positive degrees');
     }
+    if (options.pivotProperty !== undefined &&
+        (typeof options.pivotProperty !== 'string' || !options.pivotProperty.trim()))
+        throw new Error('Rotation pivotProperty must be a non-empty property name');
+    if (options.pivotSpace !== undefined &&
+        options.pivotSpace !== 'local' && options.pivotSpace !== 'world')
+        throw new Error('Rotation pivotSpace must be local or world');
     return ([
         ['x', '#ff595e'], ['y', '#43df66'], ['z', '#4b8fff'],
     ] as ReadonlyArray<readonly ['x'|'y'|'z',string]>)
@@ -105,6 +111,7 @@ export function makeRotateGizmo(
             property: name, id: 'rotation-' + axis, visual: 'rotation',
             axis, plane: 'view', space: options.space ?? 'local',
             snap: options.snap, ringSize, pickSize, color,
+            pivotProperty: options.pivotProperty, pivotSpace: options.pivotSpace,
             hoverColor: options.hoverColor ?? '#ffff65',
         }));
 }

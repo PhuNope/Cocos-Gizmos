@@ -125,6 +125,16 @@ function spaceFor(component: Component, field: Field): {
  */
 function handleWorldOrigin(component: Component, field: Field, value: Point): Point {
     if (field.visual === 'rotation') {
+        if (field.pivotProperty) {
+            const pivot = (component as any)[field.pivotProperty];
+            if (!validPoint(pivot))return {x:NaN,y:NaN,z:NaN};
+            if (field.pivotSpace === 'world')
+                return {x:pivot.x,y:pivot.y,z:pivot.z};
+            const world = new Vec3();
+            Vec3.transformMat4(world,new Vec3(pivot.x,pivot.y,pivot.z),
+                component.node.worldMatrix);
+            return {x:world.x,y:world.y,z:world.z};
+        }
         const pivot = component.node.worldPosition;
         return { x: pivot.x, y: pivot.y, z: pivot.z };
     }
@@ -1244,6 +1254,9 @@ function createEditorGizmo(
                 /^(xy|xz|yz|view)$/.test(field.plane || 'xy') &&
                 (field.index === undefined || Number.isInteger(field.index) && field.index >= 0) &&
                 readField(component, field) !== null &&
+                (!field.pivotProperty ||
+                    typeof field.pivotProperty === 'string' &&
+                    validPoint((component as any)[field.pivotProperty])) &&
                 (field.visual !== 'plane' || field.plane !== 'view') &&
                 (field.visual !== 'axis' || field.axis === 'x' ||
                     field.axis === 'y' || field.axis === 'z') &&
@@ -1278,7 +1291,7 @@ function createEditorGizmo(
                     field.color, field.bounds, field.id,
                     field.visual || 'point', field.planeSize, field.planeOffset,
                     field.axisSize, field.pickSize, field.boxSize,
-                    field.hoverColor,
+                    field.hoverColor, field.pivotProperty, field.pivotSpace,
                     field.showPositionLabel, field.positionLabelOffset,
                 ]),
                 controls: hudControlLayoutSignature(controls),

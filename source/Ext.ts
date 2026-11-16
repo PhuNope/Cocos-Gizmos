@@ -58,6 +58,10 @@ declare global {
         planeSize?: number;
         /** Offset of the square along its two axes in pixels (default 14). */
         planeOffset?: number;
+        /** Optional Vec3 property for a rotation ring pivot, independent of the Euler property. */
+        pivotProperty?: string;
+        /** The pivot Vec3 is Path/Component local by default; 'world' is already global. */
+        pivotSpace?: GizmoHandleSpace;
         /** Screen-pixel radius of a Rotation Gizmo ring (default 72). */
         ringSize?: number;
     }
@@ -89,6 +93,9 @@ declare global {
         space?: GizmoHandleSpace;
         /** Snapping in angular degrees, e.g. 15; omitted = smooth rotation. */
         snap?: number;
+        /** Vec3 position property on this Component used as the ring pivot. */
+        pivotProperty?: string;
+        pivotSpace?: GizmoHandleSpace;
         /** Radius in Scene pixels (24..180, default 72). */
         ringSize?: number;
         /** Size of transparent ring hit area in pixels (8..32, default 14). */

@@ -810,6 +810,8 @@ export interface GizmosMoveHandleOptions {
 }
 
 export class Gizmos3D {
+    /** Feature probe for movable rotation pivots. */
+    public static readonly supportsRotationPivot = true;
     /** One call creates the complete XYZ + XY/XZ/YZ Move Gizmo.
      * This façade only builds descriptors; Editor adapters own interactions.
      */

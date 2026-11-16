@@ -410,6 +410,7 @@ class GizmosDebugDraw extends Component {
 }
 
 export class Gizmos2D {
+    public static readonly supportsRotationPivot = true;
     /** Two arrows (X/Y) and an XY tile to edit one Vec3 in the 2D Scene.
      * Dragging preserves Z, uses fractional coordinates by default, and
      * participates in the same undo/callback pipeline as Gizmos3D.move().

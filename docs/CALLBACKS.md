@@ -105,3 +105,23 @@ và tự chia cột; chưa có API tự đặt anchor / row height.
 
 Nút bấm không dùng `onGizmoHudChanged()`; phải khai báo
 `onGizmoHudAction()` để nhận `id`.
+
+## Rotation Gizmos at a selected Vec3 pivot (v3)
+
+The optional `Gizmos3D.rotate('euler', {pivotProperty:'activePoint'})`
+and `Gizmos2D.rotate(...)` descriptor accepts any valid Vec3 getter on
+the selected Component. The Vec3 is **local** to its Component Node by
+default; pass `pivotSpace:'world'` for a pre-converted global point.
+This moves the visible/pickable rotation ring and the rotation drag
+solver centre together. The editable `euler` value is still an
+Euler Vec3 on the Component, not a Node transform.
+
+`Gizmos3D.supportsRotationPivot` and
+`Gizmos2D.supportsRotationPivot` are true on SDK builds with this
+feature, so callers can opt out cleanly on older SDKs rather than
+accidentally rotating at the Node origin. The pivot getter is read
+again on every marker update; missing or non-finite pivot data hides
+the handle rather than drawing an invalid ring. The SDK does not
+create child Knot Nodes, serialize the pivot or infer how to apply
+Euler values to an application-specific spline; that remains the
+Component's responsibility.
