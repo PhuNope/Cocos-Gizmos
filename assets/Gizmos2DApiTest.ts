@@ -75,27 +75,28 @@ export default class Gizmos2DApiTest extends Component {
     public onGizmoHud(): GizmoHudItem[] {
         return [
             { id: 'title', text: '2D · Gizmos', order: 0,
-                size: 'normal', style: { color: '#93ddd3', fontWeight: 600 } },
-            { id: 'radius', text: 'Radius: ' + this.radius, order: 1 },
-            { id: 'point', text: 'Point: ' + this.point.x + ', ' + this.point.y, order: 2 },
-            { id: 'move', text: 'Move XY: ' + this.moveObject.x.toFixed(1) +
-                ', ' + this.moveObject.y.toFixed(1), order: 3 },
-            { id: 'rotation', text: 'Rotate Z: ' +
-                this.rotationEuler.z.toFixed(1) + ' deg', order: 4 },
-            { id: 'event', text: 'Last event: ' + this.lastEvent, order: 5, fontSize: 12 },
+                style: { color: '#93ddd3', fontWeight: 600 } },
+            { id: 'point', text: 'Point: ' + this.point.x + ', ' + this.point.y,
+                order: 1, size: 'small', style: { color: '#bac8d6' } },
+            { id: 'event', text: 'Last: ' + this.lastEvent, order: 2,
+                size: 'small', style: { color: '#a7b6c5', fontSize: 11 } },
         ];
     }
 
     public onGizmoHudControls(): GizmoHudControlList {
         return [
-            {
-                type: 'slider', id: 'radius', text: 'Radius',
-                property: 'radius', min: 10, max: 90, step: 5,
-            },
-            { type: 'toggle', id: 'filled', text: 'Filled shapes', property: 'showFilled' },
-            { type: 'checkbox', id: 'labels', text: 'Labels', property: 'showLabels' },
-            { type: 'checkbox', id: 'sprite', text: 'Sprite', property: 'showSprite' },
-            { type: 'button', id: 'reset', text: 'Reset test values' },
+            { type: 'slider', id: 'radius', text: 'Radius',
+                property: 'radius', min: 10, max: 90, step: 5 },
+            { type: 'toggle', id: 'filled', text: 'Filled shapes',
+                property: 'showFilled', size: 'small' },
+            { type: 'checkbox', id: 'labels', text: 'Labels',
+                property: 'showLabels', size: 'small' },
+            { type: 'checkbox', id: 'sprite', text: 'Sprite',
+                property: 'showSprite', size: 'small' },
+            { type: 'button', id: 'reset', text: 'Reset 2D',
+                size: { width: 126, height: 22 },
+                style: { backgroundColor: '#28656a', color: '#e9fffc',
+                    borderRadius: 7, fontWeight: 600 } },
         ];
     }
 
