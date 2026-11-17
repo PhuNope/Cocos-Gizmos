@@ -411,7 +411,10 @@ function createSelectHandleGizmo(
                 if(drag)drag.session.finish(cancelled);
                 if(!click || cancelled)return;
                 const component=this.component();
-                if(!component || event && this.pickHud(event)!==click)return;
+                // HUD descriptors are re-created on each Scene frame. Do not
+                // compare object identity across pointer-down and pointer-up.
+                const released=event ? this.pickHud(event) : click;
+                if(!component || !released || released.key!==click.key)return;
                 const control=click.control;
                 if(control.type==='button') {
                     this.beginEdit(click.key);
@@ -519,7 +522,9 @@ function createSelectHandleGizmo(
         }
         public onKeyDown(event:any):boolean|void {
             if(captured===this&&(event?.key==='Escape'||event?.keyCode===27)){
-                this.finishHandle(true);this.finishHud(true);return true;
+                try {this.finishHandle(true);this.finishHud(true);}
+                finally {this.deferredHide=false;}
+                return true;
             }
         }
 
