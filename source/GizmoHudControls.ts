@@ -1,6 +1,11 @@
+import {
+    HudDomStyle, HudSize, hudSizePixels, normalizeHudSize, normalizeHudStyle,
+} from './GizmoHudStyle';
+
 /** Validated controls and pointer-based value editing for the Scene View HUD. */
 export interface HudControlAppearance {
-    size: 'small' | 'normal' | 'large';
+    size: HudSize;
+    style: HudDomStyle;
     fontSize: number;
     order?: number;
 }
@@ -50,9 +55,9 @@ export function normalizeHudControls(value: unknown, maxItems = 12): HudControl[
             id: item.id,
             text: item.text.slice(0, 128),
             color: typeof item.color === 'string' && HEX_COLOR.test(item.color) ?
-                item.color : '#ffffff',
-            size: item.size === 'small' || item.size === 'large' ?
-                item.size : 'normal',
+                item.color : '#dce7ef',
+            size: normalizeHudSize(item.size),
+            style: normalizeHudStyle(item.style),
             fontSize: Number.isFinite(item.fontSize) ?
                 Math.max(10, Math.min(18, Math.round(item.fontSize as number))) : 14,
             order: Number.isFinite(item.order) ?
@@ -95,7 +100,7 @@ export function normalizeHudControls(value: unknown, maxItems = 12): HudControl[
  */
 export function hudControlLayoutSignature(controls: readonly HudControl[]): string {
     return JSON.stringify(controls.map((control) => {
-        const style = [control.order, control.size, control.fontSize,
+        const style = [control.order, control.size, control.style, control.fontSize,
             control.type === 'button' || control.type === 'slider' ?
                 control.width : undefined];
         if (control.type === 'slider') {
@@ -110,15 +115,18 @@ export function hudControlLayoutSignature(controls: readonly HudControl[]): stri
 
 /** Canvas HUD and native picking handles share this bottom-viewport grid. */
 export function hudGrid(viewport: { width: number; height: number }, count: number): {
-    rows: number; columns: number; columnWidth: number; height: number;
+    rows: number; columns: number; columnWidth: number; width: number; height: number;
 } {
-    const width = Math.max(220, viewport.width);
+    // A compact floating dock: wide Scene panels no longer create a
+    // full-width opaque strip. Keep the math shared with the picking adapter.
+    const width = Math.max(120, viewport.width);
     const maxRows = Math.max(3, Math.min(8, Math.floor(viewport.height * 0.34 / 26)));
     const columns = Math.max(1, Math.ceil(Math.max(1, count) / maxRows));
     const rows = Math.ceil(Math.max(1, count) / columns);
+    const dockWidth = Math.min(width, 16 + columns * 320);
     return {
-        rows, columns, columnWidth: width / columns,
-        height: rows * 26 + 22,
+        rows, columns, columnWidth: (dockWidth - 16) / columns,
+        width: dockWidth, height: rows * 26 + 18,
     };
 }
 
@@ -128,13 +136,13 @@ export function hudRowScreenPosition(
     viewport?: { width: number; height: number }, totalRows?: number,
 ): { x: number; y: number } {
     if (viewport && Number.isFinite(viewport.width) && Number.isFinite(viewport.height) &&
-        viewport.width > 220 && viewport.height > 120) {
+        viewport.width > 120 && viewport.height > 120) {
         const grid = hudGrid(viewport, Math.max(index + 1, totalRows || index + 1));
         const column = Math.floor(index / grid.rows);
         const row = index % grid.rows;
         return {
-            x: 14 + column * grid.columnWidth,
-            y: grid.height - 14 - row * 26,
+            x: 16 + column * grid.columnWidth,
+            y: grid.height - 20 - row * 26,
         };
     }
     return {
@@ -146,13 +154,16 @@ export function hudRowScreenPosition(
 /** Exact screen rectangle used by BOTH the HUD texture and native picking. */
 export function hudControlScreenRect(
     viewport: { width: number; height: number }, index: number, totalRows: number,
+    size?: HudSize,
 ): { left: number; right: number; bottom: number; top: number; width: number; height: number } {
     const row = hudRowScreenPosition({ x: 0, y: 0 }, index, viewport, totalRows);
     const grid = hudGrid(viewport, totalRows);
-    const width = Math.max(30, grid.columnWidth - 14);
+    const dimensions = hudSizePixels(size, Math.max(30, grid.columnWidth - 14));
+    const left = row.x - 5;
     return {
-        left: row.x - 5, right: row.x - 5 + width,
-        bottom: row.y - 11, top: row.y + 11, width, height: 22,
+        left, right: left + dimensions.width,
+        bottom: row.y - dimensions.height / 2, top: row.y + dimensions.height / 2,
+        width: dimensions.width, height: dimensions.height,
     };
 }
 
@@ -165,12 +176,13 @@ export function hudSliderScreenTrack(
 ): { left: number; width: number } {
     const row = hudRowScreenPosition({ x: 0, y: 0 }, index, viewport, totalRows);
     const grid = hudGrid(viewport, totalRows);
-    const maxWidth = Math.max(50, grid.columnWidth * 0.62 - 38);
+    // The numeric value needs free space to the right of the rail.
+    const maxWidth = Math.max(24, grid.columnWidth * 0.70 - 54);
     const preferred = Number.isFinite(requestedWidth) ?
         requestedWidth! : Math.max(50, grid.columnWidth * 0.38);
     return {
-        left: row.x + grid.columnWidth * 0.36,
-        width: Math.max(50, Math.min(maxWidth, preferred)),
+        left: row.x + grid.columnWidth * 0.30,
+        width: Math.max(24, Math.min(maxWidth, preferred)),
     };
 }
 
