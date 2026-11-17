@@ -12,7 +12,12 @@ const compile = (name) => ts.transpileModule(
 ).outputText;
 const solver = { exports: {} };
 vm.runInNewContext(compile('PositionDragSolver'), solver);
-const controls = { exports: {} };
+const appearance = { exports: {} };
+vm.runInNewContext(compile('GizmoHudStyle'), appearance);
+const controls = { exports: {}, require(id) {
+    if (id === './GizmoHudStyle') return appearance.exports;
+    throw Error(id);
+} };
 vm.runInNewContext(compile('GizmoHudControls'), controls);
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
