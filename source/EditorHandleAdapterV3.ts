@@ -93,6 +93,26 @@ export function resolveSelectGizmo(typeDefs: Record<string, unknown>): any | nul
     return null;
 }
 
+/**
+ * Last-resort editor-independent input host. The Editor's private Gizmo pool
+ * may differ between 3.8.x builds; pointer interaction should not disappear
+ * just because its SelectGizmo base cannot be discovered. This fallback is
+ * intentionally NOT an Undo adapter: status() reports the limitation.
+ */
+class StandaloneGestureHost {
+    public target: Component | null;
+    public shouldRegisterGizmoOperationEvent = false;
+    constructor(component: Component | null) { this.target=component; }
+    public show(): void { (this as any).onShow?.(); }
+    public hide(): void { (this as any).onHide?.(); }
+    public destroy(): void { (this as any).onDestroy?.(); }
+    public getCompPropPath(property: string): string { return property; }
+    public onControlBegin(_property: string): void {}
+    public onControlUpdate(_property: string): void {}
+    public onControlEnd(_property: string): void {}
+    public onComponentChanged(_node: any): void {}
+}
+
 function createSelectHandleGizmo(
     base: any, input: GizmoInputDiagnostics,
     allowHud: (component: Component) => boolean,
@@ -703,14 +723,17 @@ export function createV3HandleAdapter(
     const initialize=():boolean=>{
         const cce:any=(globalThis as any).cce||(globalThis as any).window?.cce;
         manager=cce?.Gizmo;
-        typeDefs=manager?._gizmoPool?._getPool?.('component')?.typeDefs;
-        if(!typeDefs){reason='component-gizmo-pool-unavailable';return false;}
+        typeDefs=manager?._gizmoPool?._getPool?.('component')?.typeDefs || null;
         if(!ctor){
-            const base=resolveSelectGizmo(typeDefs);
-            if(!base){reason='select-gizmo-base-unavailable';return false;}
-            ctor=createSelectHandleGizmo(base,input,allowHud,hudLayout,selectionLease);
+            const base=typeDefs ? resolveSelectGizmo(typeDefs) : null;
+            ctor=createSelectHandleGizmo(base || StandaloneGestureHost,
+                input,allowHud,hudLayout,selectionLease);
+            if(!base)console.warn(
+                '[cocos-gizmos/v3] Native SelectGizmo unavailable: ' +
+                'using direct mouse input without native Undo hooks');
         }
-        reason='ready-select-gizmo';
+        reason=ctor && typeDefs && resolveSelectGizmo(typeDefs) ?
+            'ready-select-gizmo' : 'ready-direct-input-no-native-undo';
         return true;
     };
 
@@ -744,7 +767,7 @@ export function createV3HandleAdapter(
             if(mounted instanceof ctor)gizmo=mounted;
         }catch {/* fallback to registered component Gizmo creation */}
         if(!(gizmo instanceof ctor)||gizmo.isHandleDisposed?.())gizmo=null;
-        if(!gizmo&&typeof manager.createGizmo==='function'){
+        if(!gizmo&&typeof manager?.createGizmo==='function'){
             for(const name of selectedKeys(component)){
                 try{
                     gizmo=manager.createGizmo(name,component)||
@@ -810,11 +833,13 @@ export function createV3HandleAdapter(
                     (typeof component.onGizmoHudControls!=='function' ||
                      (hudLayout&&!hudLayout.get(component)))))continue;
                 wanted.add(component);
-                let installed=false;
-                for(const key of selectedKeys(component)){
-                    if(!typeDefs[key]){
-                        typeDefs[key]=ctor;registered.set(key,ctor);installed=true;
-                    }else if(typeDefs[key]===ctor)installed=true;
+                let installed=!typeDefs; // DOM/engine input needs no Gizmo pool.
+                if(typeDefs) {
+                    for(const key of selectedKeys(component)){
+                        if(!typeDefs[key]){
+                            typeDefs[key]=ctor;registered.set(key,ctor);installed=true;
+                        }else if(typeDefs[key]===ctor)installed=true;
+                    }
                 }
                 if(!installed)continue;
                 const old=active.get(component);
