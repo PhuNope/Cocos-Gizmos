@@ -48,21 +48,25 @@ assert.match(entries.get('editor-runtime/PlaneHandleGeometry.js') || '',
     /planeHandleGeometry/);
 assert.match(entries.get('editor-runtime/MoveHitGeometry.js') || '',
     /insideProjectedPlane/, 'Native installer must contain Move screen hit math');
-assert.match(entries.get('editor-runtime/PositionHandles.js') || '',
-    /updateMovePickingQuad/, 'Installer must bind transparent Move pick quads');
-assert.match(entries.get('editor-runtime/PositionHandles.js') || '',
+assert.match(entries.get('editor-runtime/EditorHandleAdapterV3.js') || '',
+    /createV3HandleAdapter/, 'Installer must bind the SelectGizmo input adapter');
+assert.match(entries.get('editor-runtime/GizmoHitTest.js') || '',
+    /hitTestHandle/, 'Installer must include screen-space descriptor picking');
+assert.ok(!entries.has('editor-runtime/PositionHandles.js'),
+    'Do not ship the legacy BoxCollider-based adapter');
+assert.match(entries.get('editor-runtime/GizmoViewportGeometry.js') || '',
     /require\(["']\.\/MoveScreenScale["']\)/,
     'Installed adapter must import the constant-pixel camera scale helper');
-assert.match(entries.get('editor-runtime/PositionHandles.js') || '',
+assert.match(entries.get('editor-runtime/GizmoHandleRenderer.js') || '',
     /require\(["']\.\/MoveStrokeGeometry["']\)/,
     'Installed adapter must import the soft-edge stroke helper');
 assert.match(entries.get('editor-runtime/MoveScreenScale.js') || '',
     /moveWorldPerPixel/, 'Installer must include camera scale math for close zoom');
 assert.match(entries.get('editor-runtime/MoveStrokeGeometry.js') || '',
     /moveStrokeBands/, 'Installer must include anti-aliased Move ribbons');
-assert.doesNotMatch(entries.get('editor-runtime/PositionHandles.js') || '',
+assert.doesNotMatch(entries.get('editor-runtime/GizmoHandleRenderer.js') || '',
     /moveTo\(20, 32\)/,
-    'Point marker sprite must not draw the old center plus sign');
+    'Point marker renderer must not draw the old center plus sign');
 for (const [event, method] of [
     ['selection:select', 'onSelectionSelect'],
     ['selection:unselect', 'onSelectionUnselect'],
@@ -76,7 +80,7 @@ assert.match(entries.get('scene.js') || '', /gizmosSelectionChanged/);
 assert.match(entries.get('editor-runtime/ExecuteGizmos.js') || '', /syncSelection/);
 assert.match(entries.get('editor-runtime/GizmoHudOverlay.js') || '', /CocosGizmosScreenHud/);
 assert.match(entries.get('editor-runtime/GizmoHudOverlay.js') || '', /gizmoRootNode/);
-assert.match(entries.get('editor-runtime/PositionHandles.js') || '', /isHandleDisposed/);
+assert.match(entries.get('editor-runtime/EditorHandleAdapterV3.js') || '', /isHandleDisposed/);
 assert.match(entries.get('editor-runtime/GizmoMoveCommand.js') || '',
     /GizmoMoveCommand/, 'Installer includes application command');
 assert.match(entries.get('editor-runtime/GizmoHandlePresets.js') || '',
