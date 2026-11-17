@@ -171,6 +171,8 @@ assert.equal(overlay.render(component, [
 }), 2);
 overlay.finishFrame(2);
 assert.equal(overlay.isScreenHudActive, true);
+assert.equal(overlay.diagnosticState.renderMode, 'texture',
+    'Scene without a DOM host must report its textured fallback');
 assert.equal(rootGizmo.children.length, 1,
     'Screen HUD belongs to the editor Gizmo root, not Canvas/node');
 assert.equal(rootGizmo.children[0].layer, 4);
@@ -280,6 +282,8 @@ overlay.beginFrame();
 overlay.finishFrame(0);
 assert.equal(rootGizmo.children[0].active, false,
     'Deselecting every node hides the bottom HUD');
+assert.equal(overlay.diagnosticState.renderMode, 'none',
+    'Deselecting clears the HUD render mode');
 overlay.dispose();
 assert.equal(rootGizmo.children[0].isValid, false);
 assert.ok(directorEvents.some(([kind]) => kind === 'off'));
