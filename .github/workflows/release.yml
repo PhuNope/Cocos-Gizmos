@@ -24,8 +24,7 @@ jobs:
       - name: Build, type-check and verify public API
         run: npm test
 
-      # Every normal v3 push is artifact-only. A matching version tag or a
-      # one-time explicit "release: vX.Y.Z" branch commit can publish a Release.
+      # Every normal v3 push is artifact-only. Release requires an explicit version tag.
       - name: Pack Cocos Creator extension ZIP
         run: npm run pack
 
@@ -38,30 +37,17 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # Only a version tag or a branch HEAD with the exact subject
-      # "release: v<package.json version>" publishes the corresponding
-      # release. Refuse to republish an already tagged version.
+      # Only an explicit version tag matching package.json can publish a Release.
       - name: Validate explicit release request
         id: release
-        if: "${{ github.ref_type == 'tag' || (github.event_name == 'push' && github.ref == 'refs/heads/v3' && startsWith(github.event.head_commit.message, 'release: v')) }}"
+        if: "${{ github.ref_type == 'tag' }}"
         shell: bash
         run: |
           set -euo pipefail
           tag="v$(node -p 'require("./package.json").version')"
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            [[ "$GITHUB_REF_NAME" == "$tag" ]] || {
-              echo "::error::Tag $GITHUB_REF_NAME does not match package version $tag"; exit 1;
-            }
-          else
-            subject="$(git log -1 --pretty=%s)"
-            [[ "$GITHUB_REF" == "refs/heads/v3" && "$tag" == v3.* && "$subject" == "release: $tag" ]] || {
-              echo "::error::Release subject must exactly match release: $tag on v3"; exit 1;
-            }
-            if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
-              echo "::error::$tag already exists; refusing to republish"
-              exit 1
-            fi
-          fi
+          [[ "$GITHUB_REF_NAME" == "$tag" ]] || {
+            echo "::error::Tag $GITHUB_REF_NAME does not match package version $tag"; exit 1;
+          }
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "publish=true" >> "$GITHUB_OUTPUT"
 
