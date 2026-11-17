@@ -8,7 +8,13 @@ const controlsSource = readFileSync(new URL('../source/GizmoHudControls.ts', imp
 const compile = value => ts.transpileModule(value, {
     compilerOptions: { target: ts.ScriptTarget.ES2017, module: ts.ModuleKind.CommonJS },
 }).outputText;
-const controls = { exports: {} };
+const appearance = { exports: {} };
+vm.runInNewContext(compile(readFileSync(new URL('../source/GizmoHudStyle.ts',
+    import.meta.url), 'utf8')), appearance);
+const controls = { exports: {}, require(id) {
+    if (id === './GizmoHudStyle') return appearance.exports;
+    throw Error(id);
+} };
 vm.runInNewContext(compile(controlsSource), controls);
 class Element {
     constructor(tag) {
