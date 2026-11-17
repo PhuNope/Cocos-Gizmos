@@ -85,6 +85,31 @@ assert.equal(scene.style.position, 'relative');
 assert.equal(root.children.length, 4);
 assert.equal(root.children[0].textContent, '<b>not html</b>');
 assert.equal(root.children[1].children.length, 3);
+
+assert.ok(parseInt(root.style.width, 10) < viewport.width,
+    'A single-column dock never takes over the entire Scene width');
+const customized = rows.map((row) => ({ ...row }));
+customized[3] = {
+    ...customized[3],
+    size: { width: 136, height: 18 },
+    style: { backgroundColor: '#264653', color: '#e9fffc',
+        borderRadius: 8, fontWeight: 600, padding: 4,
+        pointerEvents: 'auto', position: 'fixed' },
+};
+assert.equal(hud.render(viewport, customized, 4), true);
+const button = root.children[3];
+const hit = controls.exports.hudControlScreenRect(viewport, 3, 4, customized[3].size);
+assert.equal(button.style.width, hit.width + 'px');
+assert.equal(button.style.height, hit.height + 'px');
+assert.equal(button.style.left, hit.left + 'px');
+assert.equal(button.style.backgroundColor, '#264653');
+assert.equal(button.style.borderRadius, '8px');
+assert.equal(button.style.fontWeight, '600');
+assert.equal(button.style.pointerEvents, undefined,
+    'User styles must not override native Editor pointer capture');
+assert.equal(button.style.position, 'absolute',
+    'User styles cannot reposition the picking rectangle');
+
 assert.equal(hud.render(viewport, rows, 4), true);
 assert.equal(scene.children.length, 1, 'Identical frame should reuse the mounted element');
 hud.hide();
