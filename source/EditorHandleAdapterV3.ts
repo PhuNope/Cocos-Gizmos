@@ -48,10 +48,19 @@ function requestSceneRepaint(): void {
 
 const selectedKeys = (component: Component): string[] => {
     const value: any=component;
-    const names=[value.__classname__,value.constructor?.__classname__,
-        value.constructor?.name].filter((v): v is string=>typeof v==='string'&&!!v);
+    // Prefer Creator's registered class name. A generic JS constructor name
+    // (Object/Component) must never be installed into the global Gizmo pool.
+    const explicit=[value.__classname__,value.constructor?.__classname__]
+        .filter((v): v is string=>typeof v==='string'&&!!v.trim());
+    const fallback=value.constructor?.name;
+    const names=explicit.length?explicit:
+        typeof fallback==='string'&&fallback.length>0&&
+        fallback!=='Object'&&fallback!=='Component'?[fallback]:[];
     const out=new Set<string>();
-    for(const name of names){out.add(name);if(!name.includes('.'))out.add('cc.'+name);}
+    for(const name of names) {
+        out.add(name);
+        if(!name.includes('.'))out.add('cc.'+name);
+    }
     return [...out];
 };
 
