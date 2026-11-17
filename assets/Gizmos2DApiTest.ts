@@ -74,7 +74,8 @@ export default class Gizmos2DApiTest extends Component {
 
     public onGizmoHud(): GizmoHudItem[] {
         return [
-            { id: 'title', text: 'Gizmos2D API Test', order: 0, color: '#ffff88' },
+            { id: 'title', text: '2D · Gizmos', order: 0,
+                size: 'normal', style: { color: '#93ddd3', fontWeight: 600 } },
             { id: 'radius', text: 'Radius: ' + this.radius, order: 1 },
             { id: 'point', text: 'Point: ' + this.point.x + ', ' + this.point.y, order: 2 },
             { id: 'move', text: 'Move XY: ' + this.moveObject.x.toFixed(1) +
