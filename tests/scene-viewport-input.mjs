@@ -111,6 +111,37 @@ assert.equal(mouseDoc.emit('mousedown').stopped,true);
 assert.equal(mouseDoc.emit('mousemove').stopped,true);
 assert.equal(mouseDoc.emit('mouseup').stopped,true);
 fallback.detach();
+// In the real Creator WebView, register on window capture instead of the
+// document. Window listeners run before Editor listeners on document/canvas.
+const windowDoc=new Document();
+const windowHandlers=new Map();
+windowDoc.defaultView={
+    PointerEvent:function PointerEvent(){},
+    addEventListener(name,fn,capture){
+        assert.equal(capture,true);
+        const list=windowHandlers.get(name)||[];
+        list.push(fn);windowHandlers.set(name,list);
+    },
+    removeEventListener(name,fn,capture){
+        assert.equal(capture,true);
+        windowHandlers.set(name,(windowHandlers.get(name)||[]).filter(x=>x!==fn));
+    },
+};
+const windowBridge=new SceneViewportInput(ports,()=>windowDoc);
+windowBridge.refresh();
+assert.equal(windowDoc.handlers.size,0,
+    'DOM capture must run before document-level Editor selection handlers');
+assert.equal(windowHandlers.get('pointerdown')?.length,1);
+const windowEvent={clientX:120,clientY:340,pointerId:5,
+    button:0,buttons:1,isPrimary:true,
+    stopImmediatePropagation(){this.stopped=true;},
+    preventDefault(){this.prevented=true;}};
+windowHandlers.get('pointerdown')[0](windowEvent);
+assert.equal(windowEvent.stopped,true);
+windowHandlers.get('pointerup')[0]({...windowEvent});
+windowBridge.detach();
+assert.equal(windowHandlers.get('pointerdown').length,0);
+
 const missing=new SceneViewportInput(ports,()=>null);
 missing.refresh();
 assert.equal(missing.status().active,false);
