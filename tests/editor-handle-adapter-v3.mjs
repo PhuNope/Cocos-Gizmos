@@ -130,7 +130,7 @@ adapter.refresh([component],new Set(['v3-target']),100);
 assert.ok(component.gizmo instanceof SelectGizmo);
 assert.ok(!(component.gizmo instanceof BuiltInCameraGizmo),
     'Standalone adapter derives from SelectGizmo, not a built-in component');
-assert.equal(typeDefs.MyV3Component instanceof Function,true);
+assert.equal(typeof typeDefs.MyV3Component,'function');
 assert.equal(adapter.status().reason,'ready-select-gizmo');
 assert.equal(adapter.status().positionHandles,1);
 assert.equal(adapter.status().hudControls,1);
