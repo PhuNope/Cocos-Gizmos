@@ -22,7 +22,7 @@ class SelectGizmo {
     constructor(target){this.target=target;}
     show(){this.onShow?.();}
     hide(){this.onHide?.();}
-    getCompPropPath(name){return name;}
+    getCompPropPath(name){return 'serialized.'+name;}
     onControlBegin(name){events.push(['begin',name]);}
     onControlUpdate(name){events.push(['update',name]);}
     onControlEnd(name){events.push(['end',name]);}
@@ -177,6 +177,10 @@ assert.equal(adapter.status().draggingPosition,0);
 assert.equal(component.gizmo.onNotGizmoMouseDown({x:600,y:250}),undefined,
     'Ordinary Scene clicks must remain available for Node selection');
 assert.ok(events.some(e=>e[0]==='handle'&&e[2]==='end'));
+assert.ok(events.some(e=>e[0]==='begin'&&e[1]==='serialized.position'));
+assert.ok(events.some(e=>e[0]==='update'&&e[1]==='serialized.position'));
+assert.ok(events.some(e=>e[0]==='end'&&e[1]==='serialized.position'),
+    'Native Undo hooks receive the SelectGizmo serialized Component path');
 assert.ok(events.some(e=>e[0]==='builder'&&e[1]==='move'),
     'The v3 adapter constructs domain commands through the fluent Builder');
 component.gizmo.onNotGizmoMouseDown({x:90,y:80});
