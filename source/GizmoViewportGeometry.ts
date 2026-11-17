@@ -26,27 +26,6 @@ export function validPoint(value: any): value is Point {
     return !!value && Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.z);
 }
 
-function selectedKeys(component: Component): string[] {
-    const value: any = component;
-    const names = [
-        value.__classname__,
-        value.constructor?.__classname__,
-        value.constructor?.name,
-    ].filter((key) => typeof key === 'string' && !!key) as string[];
-    const keys = new Set<string>();
-    for (const name of names) {
-        keys.add(name);
-        if (!name.includes('.')) keys.add('cc.' + name);
-    }
-    return [...keys];
-}
-
-function applyGizmoLayer(node: any): void {
-    if (!node) return;
-    node.layer = Layers.Enum.GIZMOS;
-    for (const child of node.children || []) applyGizmoLayer(child);
-}
-
 export function sceneRay(position: ScenePointer): { o: Point; d: Point } | null {
     const view = camera();
     if (typeof view?.screenPointToRay !== 'function') return null;
