@@ -5,6 +5,7 @@ All notable changes to Cocos-Gizmos are documented here.
 ## [Unreleased] — v3 development (not published)
 
 ### Added
+- The new Scene adapter constructs Move/Rotate edits through the fluent `GizmoCommands` Builder API.
 - New `EditorHandleAdapterV3` based on the Editor's `SelectGizmo` base instead of `BoxColliderComponentGizmo`; it owns Scene pointer capture and command integration.
 - Split `GizmoViewportGeometry`, `GizmoHandleRenderer`, and `GizmoHitTest` into dedicated Editor geometry, rendering and picking ports for 2D and 3D.
 - Regression tests for command gestures, HUD interactions, selection lifecycle and package contents.
