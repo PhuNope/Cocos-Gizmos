@@ -4,6 +4,13 @@ All notable changes to Cocos-Gizmos are documented here.
 
 ## [Unreleased] — v3 development (not published)
 
+### Fixed
+- Keep Move/Rotate and HUD Slider sessions alive across transient `SelectGizmo.hide()/destroy()` calls triggered by Cocos Creator 3.8.8 during property/Inspector refresh. Only actual mouse-up, Escape, or explicit Scene teardown ends the gesture.
+- Arm native pointer capture before `onControlBegin()` so a synchronous Editor visibility rebuild cannot drop the first drag frame.
+- Commit pending HUD button/checkbox clicks by stable control ID even when the Editor regenerates HUD descriptor objects between mouse-down and mouse-up.
+- Report suppressed transient Gizmo lifecycle changes in Scene diagnostics for follow-up Editor testing.
+
+
 ### Added
 - The new Scene adapter constructs Move/Rotate edits through the fluent `GizmoCommands` Builder API.
 - New `EditorHandleAdapterV3` based on the Editor's `SelectGizmo` base instead of `BoxColliderComponentGizmo`; it owns Scene pointer capture and command integration.
