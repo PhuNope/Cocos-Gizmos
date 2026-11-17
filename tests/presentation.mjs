@@ -58,6 +58,20 @@ assert.equal(hud[1].fontSize, 60);
 assert.equal(hud[2].color, '#dce7ef');
 assert.equal(normalizeHudItems([{ id: 'x', text: 'hello' }])[0].color, '#dce7ef');
 
+const themedText = normalizeHudItems([{
+    id: 'title', text: '<img src=x>',
+    size: { width: 220, height: 999 },
+    style: { backgroundColor: '#193940', color: '#acddd1',
+        fontWeight: 600, transform: 'translateX(400px)' },
+}])[0];
+assert.equal(themedText.size.width, 220);
+assert.equal(themedText.size.height, 22,
+    'Text height must not overlap the next picking row');
+assert.equal(themedText.style.backgroundColor, '#193940');
+assert.equal(themedText.style.transform, undefined);
+assert.equal(themedText.text, '<img src=x>');
+
+
 let rendered = [];
 let disposed = false;
 class FakeOverlay {
