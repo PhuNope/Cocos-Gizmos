@@ -176,6 +176,12 @@ const scope={
             status(){return {active:true,reason:'mock-pointer-capture',captured:false,
                 observed:0,intercepted:0,hover:0,cancelled:0};}
         }};
+        if(name==='./SceneEngineInput')return {SceneEngineInput:class {
+            refresh(enabled){events.push(['engine-fallback-enabled',enabled]);}
+            detach(){}
+            status(){return {active:false,reason:'webview-pointer-preferred',
+                captured:false,observed:0,intercepted:0,hover:0};}
+        }};
         if(name==='./ExecuteGizmos')return {tickOnce(){paints.push('tick');}};
         throw Error(name);
     },
@@ -199,6 +205,8 @@ assert.equal(typeDefs['cc.Object'],undefined);
 assert.equal(adapter.status().reason,'ready-select-gizmo');
 assert.ok(bridgePort && bridgeMounts>0,'Scene WebView bridge must be installed');
 assert.equal(adapter.status().viewportInput.active,true);
+assert.ok(events.some(e=>e[0]==='engine-fallback-enabled'&&e[1]===false),
+    'Native Cocos mouse fallback must not duplicate active WebView capture');
 assert.equal(adapter.status().positionHandles,1);
 assert.equal(adapter.status().hudControls,3);
 assert.ok(paints.includes(component),'2D/3D rendering is a separate port');
