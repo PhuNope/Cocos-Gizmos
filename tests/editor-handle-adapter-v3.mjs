@@ -277,7 +277,20 @@ editorRebuildsOnBegin=false;
 adapter.refresh([component],new Set(),1100);
 assert.equal(adapter.status().active,0);
 assert.equal(component.gizmo.isHandleVisible(),false);
+
+// Genuine Scene teardown is different from an Inspector visibility refresh:
+// it MUST cancel and restore the value, even while the mouse is held.
+adapter.refresh([component],new Set(['v3-target']),1500);
+const beforeSceneClose={...component.position};
+component.gizmo.onNotGizmoMouseDown({x:80,y:80});
+component.gizmo.onNotGizmoMouseMove({x:165,y:80});
+assert.equal(adapter.status().draggingPosition,1);
 adapter.clear();
+assert.deepEqual({ ...component.position },beforeSceneClose,
+    'Scene teardown must roll back a captured edit');
+assert.equal(adapter.status().active,0);
+assert.equal(component.gizmo,null);
+
 assert.equal(component.gizmo,null);
 adapter.dispose();
 assert.equal(typeDefs.MyV3Component,undefined,'Disposed adapter unregisters its class');
