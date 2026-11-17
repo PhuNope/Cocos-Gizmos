@@ -411,4 +411,21 @@ assert.equal(component.position.x,175);
 standalone.dispose();
 manager.createGizmo=previousCreate;
 manager.showComponentGizmo=previousShow;
+
+// A Creator patch release may expose no private component Gizmo pool at all.
+// Drawing and native pointer interactions should remain available, with
+// diagnostics explicitly showing that native Undo was not registered.
+const previousPool=manager._gizmoPool;
+manager._gizmoPool={_getPool(){return null;}};
+const unpooled=createV3HandleAdapter(()=>true,layout);
+unpooled.refresh([component],new Set(['v3-target']),2500);
+assert.equal(unpooled.status().reason,'ready-direct-input-no-native-undo');
+assert.equal(unpooled.status().active,1);
+assert.equal(bridgePort.down({x:80,y:80,button:0,buttons:1}),true);
+bridgePort.move({x:145,y:80,button:0,buttons:1});
+bridgePort.up({x:145,y:80,button:0,buttons:0});
+assert.equal(component.position.x,145);
+unpooled.dispose();
+manager._gizmoPool=previousPool;
+
 console.log('[editor-handle-adapter-v3] SelectGizmo discovery, command gestures, HUD, cancel, hide and cleanup OK');
