@@ -37,6 +37,8 @@ Component descriptors / Gizmos2D & Gizmos3D / HUD size+style
   Rendering creates no `BoxCollider` or native Controller.
 - **Picking:** `GizmoHitTest` tests screen-space shape descriptors, HUD
   rectangles and ring strokes without any mesh or Controller reference.
+  It prioritizes ring/plane/axis/box/point hits and leaves native Editor
+  transform-tool hits untouched; no BoxCollider/Controller raycast is used.
 - **Command Builder:** `GizmoCommands.move()` and `GizmoCommands.rotate()`
   build domain commands from typed values, constraints, value ports and
   hooks. The Editor adapter no longer calls the command constructors directly.
