@@ -55,8 +55,8 @@ assert.equal(hud.length, 3);
 assert.deepEqual(Array.from(hud, x => x.id), ['one', 'two', 'three']);
 assert.equal(hud[0].fontSize, 9);
 assert.equal(hud[1].fontSize, 60);
-assert.equal(hud[2].color, '#ffffff');
-assert.equal(normalizeHudItems([{ id: 'x', text: 'hello' }])[0].color, '#ffffff');
+assert.equal(hud[2].color, '#dce7ef');
+assert.equal(normalizeHudItems([{ id: 'x', text: 'hello' }])[0].color, '#dce7ef');
 
 let rendered = [];
 let disposed = false;
