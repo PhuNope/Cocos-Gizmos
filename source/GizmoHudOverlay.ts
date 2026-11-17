@@ -13,6 +13,7 @@ import { createSceneHudProjection, SceneHudCamera } from './GizmoHudProjection';
 import type { GizmoHudPlacement } from './GizmoHudLayout';
 import { resolveSceneCamera } from './SceneCameraBridge';
 import { SceneHudElement } from './SceneHudElement';
+import { HudDomStyle, HudSize } from './GizmoHudStyle';
 
 function isUnder2DRenderRoot(node: any): boolean {
     for (let current = node; current; current = current.parent) {
@@ -26,7 +27,8 @@ function isUnder2DRenderRoot(node: any): boolean {
 type ScreenRow = { index: number; text: string; color: string; fontSize: number;
     minSize?: number; maxSize?: number; isControl: boolean;
     kind?: 'button' | 'slider' | 'toggle' | 'checkbox';
-    size?: 'small' | 'normal' | 'large';
+    size?: HudSize;
+    style?: HudDomStyle;
     width?: number;
     value?: number | boolean; min?: number; max?: number };
 
@@ -611,7 +613,8 @@ export class GizmoHudOverlay {
                     maxSize: item.maxSize,
                     isControl: item.id.startsWith('control:'),
                     kind: control?.type,
-                    size: control?.size,
+                    size: control?.size || item.size,
+                    style: control?.style || item.style,
                     width: control?.type === 'button' ||
                         control?.type === 'slider' ? control.width : undefined,
                     value: typeof current === 'number' || typeof current === 'boolean' ?
