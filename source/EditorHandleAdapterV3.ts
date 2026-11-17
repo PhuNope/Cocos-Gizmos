@@ -23,7 +23,8 @@ import {
 import { tickOnce as repaintWholeScene } from './ExecuteGizmos';
 import { SceneSelectionLease, consumeOwnedSceneEvent } from './SceneSelectionLease';
 import { hudControlScreenRect } from './GizmoHudControls';
-import { SceneViewportInput, ViewportPointer } from './SceneViewportInput';
+import { SceneViewportInput, SceneViewportInputPorts, ViewportPointer } from './SceneViewportInput';
+import { SceneEngineInput } from './SceneEngineInput';
 
 type Drag = { entry: HandleHitTarget; command: GizmoMoveCommand | GizmoRotateCommand };
 type SliderDrag = { entry: HudHitTarget; solver: HudSliderDrag; session: GizmoEditSession<number> };
@@ -650,6 +651,7 @@ export interface V3HandleAdapter {
         suppressedLifecycleCancels:number; deferredVisibility:number;
         input:GizmoInputSnapshot;
         viewportInput: ReturnType<SceneViewportInput['status']>;
+        engineInput: ReturnType<SceneEngineInput['status']>;
     };
 }
 
@@ -666,7 +668,7 @@ export function createV3HandleAdapter(
     const owned=new Map<Component,any>();
     const input=new GizmoInputDiagnostics();
     const selectionLease=new SceneSelectionLease();
-    const viewportInput=new SceneViewportInput({
+    const pointerPorts: SceneViewportInputPorts = {
         viewport() { return camera()?.viewport || null; },
         down(event) {
             // HUD is first in draw order, so it owns clicks over any
@@ -691,7 +693,9 @@ export function createV3HandleAdapter(
         cancel() {
             (captured as any)?.onViewportCancel?.();
         },
-    });
+    };
+    const viewportInput=new SceneViewportInput(pointerPorts);
+    const engineInput=new SceneEngineInput(pointerPorts);
     let manager:any=null, typeDefs:any=null, ctor:any=null;
     let latestScan=-Infinity,reason='not-initialized';
     let lastSelected=new Set<string>();
@@ -727,6 +731,7 @@ export function createV3HandleAdapter(
     function clear():void {
         for(const [component,gizmo] of owned)release(component,gizmo);
         viewportInput.detach();
+        engineInput.detach();
         owned.clear();active.clear();lastSelected.clear();latestScan=-Infinity;
         captured=null;
         selectionLease.clear();
@@ -773,6 +778,7 @@ export function createV3HandleAdapter(
     return {
         refresh(components,selected,now) {
             viewportInput.refresh();
+            engineInput.refresh(!viewportInput.status().active);
             for(const component of components){
                 if(isSelectable(component)&&selected.has(component.node.uuid)){
                     try{drawSelectedPositionMarkers(component);}
@@ -860,7 +866,8 @@ export function createV3HandleAdapter(
             }
             return {registered:registered.size,active:active.size,
                 reason,...counts,input:input.snapshot(),
-                viewportInput:viewportInput.status()};
+                viewportInput:viewportInput.status(),
+                engineInput:engineInput.status()};
         },
     };
 }
