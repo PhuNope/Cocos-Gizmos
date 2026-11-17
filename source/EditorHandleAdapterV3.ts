@@ -439,13 +439,14 @@ function createSelectHandleGizmo(
                     return;
                 const control=click.control;
                 if(control.type==='button') {
-                    this.beginEdit(click.key);
-                    try {
-                        component.onGizmoHudAction?.(control.id);
-                        this.changed(click.key);
-                    } finally {
-                        this.endEdit(click.key,false);
-                    }
+                    // A button ID is NOT a serialized Component property.
+                    // Passing "hud:reset" through SelectGizmo.onControlBegin
+                    // makes Editor run an invalid property transaction and
+                    // can drop the currently selected Node. Actions should
+                    // update their own properties and notify Scene redraw.
+                    component.onGizmoHudAction?.(control.id);
+                    this.onComponentChanged?.(component.node);
+                    requestSceneRepaint();
                     return;
                 }
                 if(control.type!=='toggle' && control.type!=='checkbox')return;
