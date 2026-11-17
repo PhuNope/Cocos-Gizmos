@@ -293,9 +293,10 @@ class ScreenHudMesh {
                         weight === 'semibold' ? 600 : weight === 'medium' ? 500 :
                         weight === 'normal' ? 400 : weight) + ' ' +
                         font * scale + 'px sans-serif';
-                    ctx.fillStyle = row.style?.color ||
+                    ctx.fillStyle = row.style?.color || (!row.isControl &&
+                        row.index === 0 ? '#69b8ae' :
                         (/^#[a-fA-F0-9]{6,8}$/.test(row.color) ?
-                            row.color : '#dce7ef');
+                            row.color : '#dce7ef'));
                     if (row.kind === 'slider') {
                         const value = typeof row.value === 'number' ? row.value : row.min || 0;
                         const progress = Number.isFinite(value) &&
