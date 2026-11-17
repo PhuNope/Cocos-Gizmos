@@ -18,7 +18,7 @@ import { HudControl, HudSliderDrag, hudSliderScreenTrack,
 import type { GizmoHudLayout, GizmoHudPlacement } from './GizmoHudLayout';
 import {
     GizmoInputDiagnostics, GizmoInputSnapshot, readScenePointer,
-    isPrimaryScenePointer,
+    readSceneHandleName, isPrimaryScenePointer,
 } from './SceneGizmoInput';
 import { tickOnce as repaintWholeScene } from './ExecuteGizmos';
 
@@ -415,7 +415,15 @@ function createSelectHandleGizmo(
             input.record('outsideUp');this.pointerUp(event);
         }
         public onGizmoMouseDown(event:any):void {
-            input.record('gizmoDown');this.pointerDown(event);
+            input.record('gizmoDown');
+            // Our v3 handles deliberately have no native raycast mesh.
+            // A GizmoOperation "gizmo" hit normally belongs to Creator's
+            // transform tool or another extension. Never steal its drag.
+            // A future native adapter may explicitly register our own names.
+            const name=readSceneHandleName(event);
+            if(!name || !this.fields.some(e=>e.key===name) &&
+                !this.controls.some(e=>e.key===name))return;
+            this.pointerDown(event);
         }
         public onGizmoMouseMove(event:any):void {
             input.record('gizmoMove');this.moveInput(event);
