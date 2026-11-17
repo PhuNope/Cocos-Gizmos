@@ -36,6 +36,7 @@ type DomLike = {
  */
 export class SceneViewportInput {
     private doc: DomLike | null = null;
+    private eventRoot: DomLike | null = null;
     private canvas: any = null;
     private enabled = false;
     private captured = false;
@@ -66,14 +67,20 @@ export class SceneViewportInput {
         this.detach();
         this.doc = doc;
         this.canvas = canvas;
+        // Capture on window when possible: window is earlier than document,
+        // canvas or Editor gizmo-picking listeners in the DOM event path.
+        // Installing on document after Creator's own capture listener would
+        // be too late to keep the Scene from unselecting a clicked HUD Node.
+        this.eventRoot = doc.defaultView?.addEventListener ?
+            doc.defaultView as DomLike : doc;
         // Electron's WebView supports PointerEvent; older Scene backends
         // still use mouse events. Install exactly one family, not both.
         this.enabled = typeof doc.defaultView?.PointerEvent === 'function';
         const prefix = this.enabled ? 'pointer' : 'mouse';
-        doc.addEventListener(prefix + 'down', this.onDown, true);
-        doc.addEventListener(prefix + 'move', this.onMove, true);
-        doc.addEventListener(prefix + 'up', this.onUp, true);
-        if (this.enabled) doc.addEventListener('pointercancel', this.onCancel, true);
+        this.eventRoot.addEventListener(prefix + 'down', this.onDown, true);
+        this.eventRoot.addEventListener(prefix + 'move', this.onMove, true);
+        this.eventRoot.addEventListener(prefix + 'up', this.onUp, true);
+        if (this.enabled) this.eventRoot.addEventListener('pointercancel', this.onCancel, true);
         this.lastReason = this.enabled ? 'pointer-capture' : 'mouse-capture';
     }
 
@@ -166,15 +173,16 @@ export class SceneViewportInput {
     };
 
     public detach(): void {
-        if (this.doc) {
+        if (this.eventRoot) {
             const prefix = this.enabled ? 'pointer' : 'mouse';
-            this.doc.removeEventListener(prefix + 'down', this.onDown, true);
-            this.doc.removeEventListener(prefix + 'move', this.onMove, true);
-            this.doc.removeEventListener(prefix + 'up', this.onUp, true);
-            if (this.enabled) this.doc.removeEventListener('pointercancel', this.onCancel, true);
+            this.eventRoot.removeEventListener(prefix + 'down', this.onDown, true);
+            this.eventRoot.removeEventListener(prefix + 'move', this.onMove, true);
+            this.eventRoot.removeEventListener(prefix + 'up', this.onUp, true);
+            if (this.enabled) this.eventRoot.removeEventListener('pointercancel', this.onCancel, true);
         }
         this.onCancel();
         this.doc = null;
+        this.eventRoot = null;
         this.canvas = null;
         this.lastReason = 'detached';
     }
