@@ -13,10 +13,14 @@ let editorRebuildsOnBegin=false;
 const component={
     node:{uuid:'v3-target',isValid:true,activeInHierarchy:true},
     isValid:true,enabled:true, __classname__:'MyV3Component',
-    position:{x:0,y:0,z:0},visible:true,
+    position:{x:0,y:0,z:0},visible:true,radius:10,
     onGizmoHandles(){return [{property:'position',plane:'xy',visual:'point'}];},
-    onGizmoHudControls(){return [{id:'visible',type:'checkbox',text:'Visible',
-        property:'visible',color:'#ffffff',size:'normal'}];},
+    onGizmoHudControls(){return [
+        {id:'visible',type:'checkbox',text:'Visible',
+            property:'visible',color:'#ffffff',size:'normal'},
+        {id:'radius',type:'slider',text:'Radius',property:'radius',
+            min:0,max:100,step:1,color:'#ffffff',size:'normal'},
+    ];},
     onGizmoChanged(...args){events.push(['handle',...args]);},
     onGizmoHudChanged(...args){events.push(['hud',...args]);},
 };
@@ -80,6 +84,7 @@ const scope={
                 return point.x>=50&&point.x<200 ? items[0]||null:null;
             },
             hitTestHud(p,viewport,place,items){
+                if(p.x>=420&&p.x<=600)return items[1]||null;
                 return p.x>=200&&p.x<=400?items[0]||null:null;
             },
         };
@@ -132,7 +137,13 @@ const scope={
         }};
         if(name==='./GizmoHudControls')return {
             normalizeHudControls(){return component.onGizmoHudControls();},
-            hudSliderScreenTrack(){return {left:0,width:100};},
+            hudSliderScreenTrack(){return {left:400,width:100};},
+            HudSliderDrag:class {
+                constructor(control,value,startX) {
+                    this.value=value;this.startX=startX;this.base=control.min;
+                }
+                move(x){return Math.max(0,Math.min(100,x-400));}
+            },
         };
         if(name==='./SceneGizmoInput')return {
             GizmoInputDiagnostics:class {
@@ -166,7 +177,7 @@ assert.equal(typeDefs['cc.Object'],undefined);
 
 assert.equal(adapter.status().reason,'ready-select-gizmo');
 assert.equal(adapter.status().positionHandles,1);
-assert.equal(adapter.status().hudControls,1);
+assert.equal(adapter.status().hudControls,2);
 assert.ok(paints.includes(component),'2D/3D rendering is a separate port');
 assert.equal(component.gizmo.onGizmoMouseDown(
     {x:80,y:80,handleName:'transform:move:x'}),undefined,
@@ -243,6 +254,23 @@ assert.equal(adapter.status().draggingPosition,0);
 assert.equal(component.position.x,130,'Mouse-up commits final multi-frame value');
 assert.equal(events.filter(e=>e[0]==='handle'&&e[2]==='cancel').length,
     cancelsBefore,'Commit must not be converted into cancel');
+// The reported HUD regression: an update is followed by an unexpected
+// cancel on the first frame when the Editor refreshes the Gizmo.
+const hudCancelCount=events.filter(e=>e[0]==='hud'&&e[2]==='cancel').length;
+assert.equal(component.gizmo.onNotGizmoMouseDown({x:440,y:80}),false);
+assert.equal(adapter.status().draggingSlider,1);
+component.gizmo.onNotGizmoMouseMove({x:460,y:80});
+assert.equal(adapter.status().draggingSlider,1);
+component.gizmo.onNotGizmoMouseMove({x:480,y:80});
+assert.equal(component.radius,80);
+assert.equal(events.filter(e=>e[0]==='hud'&&e[2]==='cancel').length,
+    hudCancelCount,'HUD slider must not cancel during a held mouse drag');
+assert.equal(component.gizmo.onNotGizmoMouseUp({x:480,y:80}),false);
+assert.equal(adapter.status().draggingSlider,0);
+assert.equal(component.radius,80);
+assert.equal(events.filter(e=>e[0]==='hud'&&e[2]==='cancel').length,
+    hudCancelCount,'HUD slider should commit rather than cancel on mouse-up');
+assert.ok(events.some(e=>e[0]==='hud'&&e[2]==='end'&&e[3]===80));
 editorRebuildsOnUpdate=false;
 editorRebuildsOnBegin=false;
 
