@@ -304,7 +304,7 @@ class ScreenHudMesh {
                             Math.max(0, Math.min(1, (value - (row.min as number)) /
                                 ((row.max as number) - (row.min as number)))) : 0;
                         const track = hudSliderScreenTrack(
-                            viewport, row.index, totalRows, row.width);
+                            viewport, row.index, totalRows, row.width, row.size);
                         const trackX = track.left;
                         const trackWidth = track.width;
                         ctx.fillText(row.text, x * scale, y * scale,
