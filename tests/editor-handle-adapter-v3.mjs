@@ -133,6 +133,7 @@ const scope={
             readScenePointer(e){return Number.isFinite(e?.x)&&Number.isFinite(e?.y) ?
                 {x:e.x,y:e.y}:null;},
             isPrimaryScenePointer(e){return e?.button===undefined||e.button===0;},
+            readSceneHandleName(e){return e?.handleName||null;},
         };
         if(name==='./ExecuteGizmos')return {tickOnce(){paints.push('tick');}};
         throw Error(name);
@@ -155,6 +156,12 @@ assert.equal(adapter.status().reason,'ready-select-gizmo');
 assert.equal(adapter.status().positionHandles,1);
 assert.equal(adapter.status().hudControls,1);
 assert.ok(paints.includes(component),'2D/3D rendering is a separate port');
+component.gizmo.onGizmoMouseDown({x:80,y:80,handleName:'transform:move:x'});
+assert.equal(adapter.status().draggingPosition,0,
+    'Native transform gizmo must retain ownership of its own pointer-down');
+component.gizmo.onGizmoMouseDown({x:80,y:80});
+assert.equal(adapter.status().draggingPosition,0,
+    'Unnamed native raycast event must not hijack Creator selection');
 component.gizmo.onNotGizmoMouseDown({x:80,y:80});
 assert.equal(adapter.status().draggingPosition,1);
 component.gizmo.onNotGizmoMouseMove({x:90,y:80});
