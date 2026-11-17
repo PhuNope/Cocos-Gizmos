@@ -194,7 +194,7 @@ assert.equal(component.gizmo.onNotGizmoMouseMove({x:90,y:80}),false);
 assert.equal(component.position.x,90);
 assert.equal(component.gizmo.onNotGizmoMouseUp({x:90,y:80}),false);
 assert.equal(adapter.status().draggingPosition,0);
-assert.equal(component.gizmo.onNotGizmoMouseDown({x:600,y:250}),undefined,
+assert.equal(component.gizmo.onNotGizmoMouseDown({x:650,y:250}),undefined,
     'Ordinary Scene clicks must remain available for Node selection');
 assert.ok(events.some(e=>e[0]==='handle'&&e[2]==='end'));
 assert.ok(events.some(e=>e[0]==='begin'&&e[1]==='serialized.position'));
