@@ -22,8 +22,9 @@ function load(name, imports = {}) {
     return scope.exports;
 }
 
-const presentation = load('GizmoPresentation');
-const controls = load('GizmoHudControls');
+const appearance = load('GizmoHudStyle');
+const presentation = load('GizmoPresentation', { './GizmoHudStyle': appearance });
+const controls = load('GizmoHudControls', { './GizmoHudStyle': appearance });
 const layout = load('GizmoHudLayout', {
     './GizmoHudControls': controls,
     './GizmoPresentation': presentation,
