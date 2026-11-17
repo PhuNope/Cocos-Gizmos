@@ -539,7 +539,12 @@ function createSelectHandleGizmo(
             // tool. Never steal it unless it has our registered handle name.
             const name=readSceneHandleName(event);
             if(!name || !this.fields.some(e=>e.key===name) &&
-                !this.controls.some(e=>e.key===name))return;
+                !this.controls.some(e=>e.key===name)){
+                // Another native tool was clicked: the previous HUD lease
+                // must not revive our Node over the user's new selection.
+                if(!captured)selectionLease?.clear();
+                return;
+            }
             if(this.pointerDown(event))return false;
         }
         public onGizmoMouseMove(event:any):boolean|void {
