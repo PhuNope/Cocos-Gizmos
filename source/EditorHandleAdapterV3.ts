@@ -579,6 +579,7 @@ export interface V3HandleAdapter {
         registered:number;active:number;reason:string;
         positionHandles:number;hudControls:number;
         draggingPosition:number;draggingSlider:number;pendingClicks:number;
+        suppressedLifecycleCancels:number; deferredVisibility:number;
         input:GizmoInputSnapshot;
     };
 }
@@ -731,7 +732,8 @@ export function createV3HandleAdapter(
         },
         status() {
             const counts={positionHandles:0,hudControls:0,
-                draggingPosition:0,draggingSlider:0,pendingClicks:0};
+                draggingPosition:0,draggingSlider:0,pendingClicks:0,
+                suppressedLifecycleCancels:0,deferredVisibility:0};
             for(const gizmo of active.values()){
                 const stat=gizmo.diagnosticState?.();
                 if(!stat)continue;
@@ -740,6 +742,8 @@ export function createV3HandleAdapter(
                 if(stat.draggingPosition)counts.draggingPosition++;
                 if(stat.draggingSlider)counts.draggingSlider++;
                 if(stat.pendingClick)counts.pendingClicks++;
+                counts.suppressedLifecycleCancels+=stat.suppressedLifecycleCancels||0;
+                if(stat.deferredHide)counts.deferredVisibility++;
             }
             return {registered:registered.size,active:active.size,
                 reason,...counts,input:input.snapshot()};
