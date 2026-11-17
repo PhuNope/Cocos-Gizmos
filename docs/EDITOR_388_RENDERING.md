@@ -1,7 +1,9 @@
 # Editor 3.8.8: rendering, picking and HUD architecture
 
-This is a **design review**, not a claim that the experimental controller
-replacement has already shipped. No API compatibility with pre-v3 is required.
+This records the Editor 3.8.8 API review and the **new v3 development
+implementation**. It is built into development ZIPs, but has **not** yet been
+validated through live Editor mouse interaction or approved for release.
+No pre-v3 API compatibility is required.
 
 ## Findings from the supplied Creator 3.8.8 Editor build
 
@@ -35,48 +37,45 @@ separate: `Gizmos3D.ts` uses the Scene camera `GeometryRenderer`, and
 `Gizmos2D.ts` uses `Graphics`. The tight coupling is **interaction /
 picking**, not the shape-drawing APIs.
 
-## Target architecture (Command Pattern, ports/adapters)
+## Implemented development architecture (Command Pattern, ports/adapters)
+
+The active Scene runtime now uses `EditorHandleAdapterV3` instead of the
+old BoxCollider-derived `PositionHandles`. It subclasses the Editor's
+base `SelectGizmo` (resolved from a registered component Gizmo prototype,
+without depending on a specific BoxCollider class) and uses both
+`onGizmoMouse*` and `onNotGizmoMouse*` events from `GizmoOperation`.
+It does **not** create ControllerBase, QuadController, physics colliders
+or native mesh-picking proxies. The old module remains in source for test
+comparison only and is omitted from the installer.
 
 ```text
-Component declarations / Gizmos2D / Gizmos3D / Builder
-                        |
-              Gizmo presentation plan
-          /             |              \
- GeometryRenderer3D  Graphics2D    SceneHudElement
-          \             |              /
-          Camera projection / handle geometry
-                        |
-           Screen/mesh picking service
-                        |
-      Editor GizmoOperation / controller adapter
-                        |
-          MoveCommand / RotateCommand
-                        |
-          Property port + EditSession
+Component descriptors / HUD callbacks
+              |
+       GizmoViewportGeometry
+        /          \
+GizmoHandleRenderer  GizmoHitTest
+ |      |                |
+Gizmos2D Gizmos3D       SelectGizmo event adapter
+(Graphics)(Geometry)     |
+             GizmoMoveCommand / GizmoRotateCommand
+                         |
+                 GizmoEditSession
 ```
 
-1. **Render port:** 3D lines, solids, depth state go to
-   `GeometryRenderer`. 2D Canvas drawings go to `Graphics`. HUD widgets
-   and *optional* pixel-aligned annotations go to Scene WebView DOM. Avoid
-   HTML for world-space, depth-tested 3D primitives.
-2. **Input port:** own native Editor `SelectGizmo` and its controllers;
-   register narrow, custom mesh hit proxies against `GizmoOperation`.
-   Only use native `ControllerBase`/`QuadController` where the active
-   Editor runtime actually exposes them. Never instantiate a physics
-   `BoxCollider`; remove the private `_cubeNode`,
-   `_editHandlesShape`, `_wireFrameBoxNode` and +Y-face assumptions.
-3. **Domain/application:** keep `MoveHitGeometry`,
-   `PositionDragSolver`, `RotationDragSolver`,
-   `GizmoMoveCommand`, `GizmoRotateCommand` and `GizmoEditSession`
-   Editor-independent. The Editor adapter owns selection, mouse capture,
-   native undo, scene lifecycle and inspector refresh.
-4. **Lifecycle:** associate pick proxies with the target's selection;
-   re-create them when the Scene camera or active Scene changes; release
-   all proxy meshes and handlers on hide/dispose/reset; never leave
-   invisible pickable objects.
-5. **HUD:** `GizmoHudOverlay.diagnosticState.renderMode` reports `dom`,
-   `texture` or `none`. Seeing a bottom bar alone does **not** prove
-   that DOM mounting worked, because the textured renderer is a fallback.
+`GizmoHandleRenderer` draws in the Scene camera's GeometryRenderer (3D)
+or Gizmos2D Graphics (2D); HUD is a separate DOM surface when available
+and textured fallback otherwise. Shared world/viewport geometry drives
+the hit-test so visible shapes and picking use consistent coordinates.
+
+**Trade-off:** switching to a controller-free SelectGizmo means an
+existing native mesh handle is no longer a raycast target; the adapter
+relies on Editor operation-level pointer callbacks even for a
+non-Gizmo hit. This is intentionally simpler and removes private
+BoxController state, but routing while other native gizmo tools are
+active and real Electron pointer capture needs verification in Creator
+3.8.8. If operation-level callbacks cannot reliably capture drags,
+introduce a small dedicated Editor input port rather than re-inherit
+BoxColliderComponentGizmo.
 
 ## What to verify in the real Editor before removing BoxController
 
@@ -91,16 +90,9 @@ Component declarations / Gizmos2D / Gizmos3D / Builder
 - Varying screen DPI and 2D Canvas transformations.
 - Packaging in versioned `Cocos-Gizmos-v<version>/` ZIP root.
 
-## Rollout
+## Release policy
 
-Do not replace `PositionHandles.ts`'s BoxCollider-based native bridge by
-guessing constructor paths. It is a private Editor implementation and the
-shipped `.ccc` code is not ordinary source JS. First implement the new
-`SelectGizmo` + controller adapter behind an explicit opt-in; run the
-Editor smoke matrix above; only then switch the default and remove
-BoxController shims and their tests. Draw code and command APIs need not
-carry compatibility wrappers on v3.
-
-This document stays in `docs/` (repository-only); the README remains a
-summary of capabilities and the CHANGELOG/release notes describe shipped
-changes.
+The controller-free architecture is enabled in v3 development builds.
+Run the manual Editor smoke matrix above, fix confirmed behavior
+regressions, and receive approval before creating a version tag or
+GitHub Release.
