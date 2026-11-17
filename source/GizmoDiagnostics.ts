@@ -97,6 +97,7 @@ export function buildGizmoSmokeReport(
             labelsSubmitted: hudState?.hudLabels ?? 0,
             ...(hudState?.overlay || {
                 drawn2D: 0, drawn3D: 0,
+                renderMode: 'none',
                 cameraMissing: 0, projectionFailed: 0,
                 lastPath: 'none',
             }),
