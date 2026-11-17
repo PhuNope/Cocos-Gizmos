@@ -302,10 +302,18 @@ function createSelectHandleGizmo(
                     GizmoCommands.move()
                         .initial(original).space(space).planeNormal(normal)
                         .constraints(entry.field).value(port).hooks(hooks).build();
-                if(ring ? !command.begin(ray,point):!command.begin(ray))return;
+                // Arm capture BEFORE begin(). Native onControlBegin can
+                // synchronously request a Gizmo visibility rebuild.
                 this.moveDrag={entry,command}; captured=this;
+                if(ring ? !command.begin(ray,point):!command.begin(ray)){
+                    this.moveDrag=null;
+                    if(captured===this)captured=null;
+                    return;
+                }
                 this.setHover(entry);
             } catch(error) {
+                // A failed begin cannot leave a phantom captured Gizmo.
+                this.finishHandle(true);
                 console.warn('[cocos-gizmos/handles] Begin failed:',error);
             }
         }
@@ -351,8 +359,10 @@ function createSelectHandleGizmo(
                         },
                     },
                 );
-                session.begin();
+                // begin() also calls native onControlBegin and can trigger
+                // an immediate Editor visibility refresh.
                 this.sliderDrag={entry,solver,session};captured=this;
+                session.begin();
                 if(onTrack){const next=solver.move(point.x);if(next!==null)session.apply(next);}
             }catch(error){
                 console.warn('[cocos-gizmos/hud] Slider begin failed:',error);
@@ -469,6 +479,7 @@ function createSelectHandleGizmo(
             } finally {
                 // Any user callback error must not leave a global capture.
                 if(captured===this)captured=null;
+                this.deferredHide=false;
             }
             return true;
         }
