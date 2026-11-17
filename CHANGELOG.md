@@ -5,6 +5,12 @@ All notable changes to Cocos-Gizmos are documented here.
 ## [Unreleased] — v3 development (not published)
 
 ### Fixed
+- Restore Move/Rotate hover highlight when Editor dispatches `onGizmoMouseMove` rather than `onNotGizmoMouseMove`, without stealing native transform-tool input.
+- Prevent HUD Button, Checkbox and Slider pointer events from propagating to the Scene picker. If Creator still issues a delayed `selection:unselect`, a short-lived gesture-specific selection lease restores only the original Node.
+- Do not call native property Undo hooks using synthetic HUD Button identifiers such as `hud:reset`; these are actions, not serialized Component properties.
+- Keep pending HUD Button clicks valid across layout refresh and temporary selection loss, using the captured control rectangle.
+
+
 - Keep Move/Rotate and HUD Slider sessions alive across transient `SelectGizmo.hide()/destroy()` calls triggered by Cocos Creator 3.8.8 during property/Inspector refresh. Only actual mouse-up, Escape, or explicit Scene teardown ends the gesture.
 - Arm native pointer capture before `onControlBegin()` so a synchronous Editor visibility rebuild cannot drop the first drag frame.
 - Commit pending HUD button/checkbox clicks by stable control ID even when the Editor regenerates HUD descriptor objects between mouse-down and mouse-up.
