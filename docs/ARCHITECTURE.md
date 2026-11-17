@@ -1,69 +1,99 @@
-# Cocos-Gizmos v3 – kiến trúc Editor
+# Cocos-Gizmos v3 — kiến trúc Editor (nhánh phát triển)
 
-## Mục tiêu
+## Các tầng đang sử dụng
 
-Ưu tiên **dễ khai báo**, **ít trạng thái ẩn**, **bảo toàn thao tác kéo/Undo**. Không cần giữ API dư thừa chỉ vì tương thích với bản phát triển cũ. Tuy nhiên, không phá những API vẽ Gizmos 2D/3D đang hữu ích cho game.
+```text
+Component descriptors / Gizmos2D & Gizmos3D / HUD size+style
+                             |
+              GizmoPresentationService / GizmoHudLayout
+                 |                  |                 |
+     GizmoHandleRenderer      SceneHudElement      GizmoHudOverlay
+          |                  (WebView DOM)         (texture fallback)
+          +-------------+---------------------------+
+                        |
+           GizmoViewportGeometry (camera projection)
+                        |
+               GizmoHitTest (screen math)
+                        |
+      EditorHandleAdapterV3 (SelectGizmo events/selection)
+                        |
+          GizmoMoveCommand / GizmoRotateCommand
+                        |
+               GizmoEditSession / value port
+```
 
-### Public API (Facade)
+- **Domain:** `GizmoHandlePresets`, `PlaneHandleGeometry`,
+  `AxisHandleGeometry`, `MoveHitGeometry`,
+  `RotationHandleGeometry`, `PositionDragSolver` and
+  `RotationDragSolver` do not depend on the Editor or render layer.
+- **Application:** `GizmoMoveCommand`/`GizmoRotateCommand` accept a
+  value port and lifecycle hooks; `GizmoEditSession` owns begin/update,
+  rollback and end.
+- **Editor geometry adapter:** `GizmoViewportGeometry` resolves the Scene
+  camera, transforms component values into world space and projects the
+  same axis, plane, point, box and ring for presentation and picking.
+- **Rendering:** `GizmoHandleRenderer` uses `Gizmos2D` (`Graphics`)
+  on Canvas nodes, and `Gizmos3D` (`GeometryRenderer`) on 3D nodes.
+  Rendering creates no `BoxCollider` or native Controller.
+- **Picking:** `GizmoHitTest` tests screen-space shape descriptors, HUD
+  rectangles and ring strokes without any mesh or Controller reference.
+- **Editor input adapter:** `EditorHandleAdapterV3` creates a
+  `SelectGizmo` subclass from the registered Editor prototype chain.
+  It consumes `GizmoOperation` callbacks (`onGizmoMouse*`,
+  `onNotGizmoMouse*`, `onKeyDown`), owns the single captured gesture,
+  invokes commands, and forwards edits to the Inspector/Undo hooks.
+  It does **not** inherit `BoxColliderComponentGizmo`, read its
+  `_cubeNode` / `_editHandlesShape` internals, or spawn a physics
+  collider.
+- **HUD:** `SceneHudElement` mounts an optional non-intercepting DOM
+  element into the engine WebView. `GizmoHudOverlay` retains a compact
+  textured UI fallback if the DOM is inaccessible. Both renderers share
+  the HUD grid and native pointer geometry.
 
-Trong Cocos Component chỉ cần khai báo:
+## Public API
+
+No new mandatory Component API. Existing declarations remain simple:
 
 ```ts
 onGizmoHandles(): GizmoHandleList {
     return [
-        ...Gizmos3D.move('moveObject', {
-            snap: 0.25, pickSize: 28, showPositionLabel: true,
-        }),
+        ...Gizmos3D.move('position', { snap: .25, pickSize: 28 }),
+        ...Gizmos3D.rotate('euler', { space: 'local' }),
     ];
 }
-```
-
-Với node UI 2D:
-
-```ts
-onGizmoHandles(): GizmoHandleList {
+onGizmoHudControls(): GizmoHudControlList {
     return [
-        Gizmos2D.point('point', { snap: 5 }),
-        ...Gizmos2D.points('waypoints', this.waypoints.length, {
-            color: '#00ffff',
-        }),
+        { id:'radius', type:'slider', text:'Radius',
+          property:'radius', min:0, max:100,
+          size:'small', style:{color:'#dce7ef'} },
     ];
 }
 ```
 
-Không cần tự ghép 6 descriptor cho move gizmo hoặc lặp `index` cho từng waypoint. Hàm trả về mô tả thuần, không tạo controller/đối tượng Scene mỗi lần gọi.
+The render and input infrastructure is Editor-only. Game builds continue
+to remove Editor Gizmo drawing callbacks.
 
-### Các lớp và ranh giới
+## Build and tests
 
-| Lớp | File | Trách nhiệm |
-| --- | --- | --- |
-| Domain / Descriptor | `GizmoHandlePresets.ts` | Tạo và kiểm tra mô tả point, points, move; không phụ thuộc Cocos |
-| Domain / Geometry | `PositionDragSolver.ts`, `AxisHandleGeometry.ts`, `PlaneHandleGeometry.ts` | Ray, chuyển đổi tọa độ, snap, khóa trục/mặt phẳng |
-| Application / Command | `GizmoMoveCommand.ts` | Đơn vị thao tác Begin → Update → End/Cancel, không biết Scene |
-| Application / Transaction | `GizmoEditSession.ts` | Snapshot trước khi kéo, loại bỏ no-op, rollback nếu Cancel |
-| Editor Adapter | `PositionHandles.ts` | BoxController, event routing, hover, hit proxy và nối command vào Inspector |
-| Scene Lifecycle | `ExecuteGizmos.ts`, `SceneUpdateScheduler.ts` | Quét component, đồng bộ node đang chọn, reset khi chuyển Scene |
-| Presentation | `Gizmos2D.ts`, `Gizmos3D.ts`, `GizmoHud*.*` | Hình vẽ, label, HUD (không quyết định cách ghi serialized data) |
+`scene.js` loads `EditorHandleAdapterV3.js`.
+`scripts/build.mjs` emits only the new geometry/render/picking adapters
+into `editor-runtime/`; `scripts/pack.mjs` whitelists these files and
+**excludes** the legacy `PositionHandles.js` from the installed ZIP.
 
-## Command Pattern / SOLID
+Legacy `source/PositionHandles.ts` is still in the repository solely as
+a regression reference until manual Editor validation completes. It is
+not loaded or shipped in the development extension.
 
-- **S** (Single Responsibility): `PositionDragSolver` không ghi component. `GizmoMoveCommand` không tự raycast Cocos. `PositionHandles` không trực tiếp quản lý state machine Undo.
-- **O/D** (Open-closed, Dependency inversion): `GizmoMoveCommand` nhận `GizmoValuePort` (đọc/ghi) và hooks, có thể đổi nguồn dữ liệu Vec3 mà không chỉnh command.
-- **L/I** (Interface segregation, Liskov): `GizmoCommand` nhỏ với 4 thao tác; không bắt layer geometry implement callback Editor.
-- **Undo/Redo:** một gesture tạo một phiên giao dịch, Escape gọi Cancel để khôi phục snapshot; thả chuột commit, không lưu trữ từng frame thành một transaction riêng.
+Tests include `tests/editor-handle-adapter-v3.mjs` for standalone
+SelectGizmo and command lifecycle, `tests/command-architecture.mjs`,
+`tests/hud-layout.mjs` and `tests/packaged-selection.mjs`.
+The old PositionHandles tests remain to catch semantic regressions in
+geometry and gesture behavior while the replacement is being tested.
 
-Native controller và HUD vẫn được giải phóng theo vòng đời Scene, kể cả controller bị ẩn sau đổi selection. Chuột giữa/phải không mở lệnh drag.
-
-### Định hướng mở rộng
-
-Khi thêm Rotate hoặc Scale, tạo command mới dùng lại pattern `GizmoEditSession` và adapter riêng. Không thêm các nhánh `if (shape === 'rotate')` vào `PositionHandles`. Không viết lớp factory/hệ thống sự kiện tổng quát nếu chỉ có một loại command.
-
-## Kiểm thử
-
-- `tests/command-architecture.mjs`: factory thuần, validate, command begin/update/commit/cancel, Undo rollback, snap/axis
-- `tests/position-adapter.mjs`: native Cocos mock, chọn trục/plane, hover, drag và undo callbacks
-- `tests/scene-discovery.mjs`: thay scene chưa lưu và phục hồi updater
-- `tests/renderer-3d.mjs` / `draw-commands-2d.mjs`: render và 3D/2D API mới
-- `npm run pack`: kiểm tra ZIP cài đặt và sự phân tách runtime Editor–game
-
-CI không thể thay thế test bằng chuột trực tiếp trong Cocos Creator 3.8.8. Nên chạy đủ 2D → 3D, pan bằng nút giữa, scene chưa lưu, hover, kéo plane và Reset Gizmos trước khi chốt release.
+**Validation needed on Creator 3.8.8:** Scene 2D/3D, perspective and
+orthographic cameras, gizmo vs non-gizmo event routing, overlapping
+handles, selection transitions, HUD slider dragging and button release,
+middle pan/right orbit, Escape, Undo/Redo, prefab overrides and Scene
+tab switching. The automated suite exercises simulated Editor events,
+not real Electron mouse input. Do not tag or release until testing is
+approved.
