@@ -13,6 +13,8 @@ All notable changes to Cocos-Gizmos are documented here.
 - Shared validation and size-aware hit rectangles for native Scene interaction.
 
 ### Changed
+- GitHub Actions development artifacts extract directly to `Cocos-Gizmos-v<version>/` with no nested plugin ZIP. The independent release ZIP is still generated only for explicit tagged releases.
+- Native transform-tool raycast hits remain owned by the Editor; the new SelectGizmo adapter only starts custom pointer gestures from its own handles or non-Gizmo Scene events.
 - Editor ZIP now uses the new screen-space picking adapter and omits the old `PositionHandles.js` module; the legacy implementation remains as a test-only source reference pending live Creator 3.8.8 validation.
 - Compact slate/teal Scene HUD dock replaces the original full-width blue bar in both DOM and textured fallback.
 - Reduced HUD demo labels and styled the 3D/2D examples for clearer Scene View editing.
