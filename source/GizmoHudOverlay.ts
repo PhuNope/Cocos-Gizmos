@@ -241,7 +241,7 @@ class ScreenHudMesh {
             return false;
         }
         const grid = hudGrid(viewport, totalRows);
-        const width = Math.ceil(viewport.width);
+        const width = Math.ceil(grid.width);
         const height = Math.ceil(grid.height);
         const scale = 2;
         const signature = JSON.stringify([width, height, rows, totalRows]);
@@ -253,9 +253,10 @@ class ScreenHudMesh {
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return false;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#151e2d';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#78b8f0';
+                // Compact dock is opaque only in the space it actually uses.
+                hudRoundedRect(ctx, 0, 0, canvas.width, canvas.height,
+                    10 * scale, '#111720');
+                ctx.fillStyle = '#32444e';
                 ctx.fillRect(0, 0, canvas.width, scale);
                 ctx.textBaseline = 'middle';
                 const columnTextWidth = Math.max(70, grid.columnWidth - 30);
@@ -265,21 +266,36 @@ class ScreenHudMesh {
                     const x = screen.x;
                     const y = height - screen.y;
                     const font = row.isControl ?
-                        hudTextPixels(row.fontSize, 10, 18) :
-                        hudTextPixels(row.fontSize, row.minSize, row.maxSize);
-                    // All visual sizes fit inside the shared 22px picking row.
-                    const visualScale = row.size === 'small' ? 0.78 :
-                        row.size === 'large' ? 1.12 : 1;
+                        hudTextPixels(row.style?.fontSize ?? row.fontSize, 10, 18) :
+                        hudTextPixels(row.style?.fontSize ?? row.fontSize, row.minSize, row.maxSize);
+                    const visualScale = row.size === 'small' ? 0.85 :
+                        row.size === 'large' ? 1.08 : 1;
+                    ctx.globalAlpha = row.style?.opacity ?? 1;
                     if (row.isControl) {
-                        const hit = hudControlScreenRect(viewport, row.index, totalRows);
+                        const hit = hudControlScreenRect(viewport, row.index,
+                            totalRows, row.size);
                         hudRoundedRect(ctx, hit.left * scale,
                             (height - hit.top + 1) * scale,
                             hit.width * scale, Math.max(1, hit.height - 2) * scale,
-                            5 * scale, '#273950');
+                            (row.style?.borderRadius ?? 6) * scale,
+                            row.style?.backgroundColor || '#27343f');
+                    } else if (row.style?.backgroundColor) {
+                        const rowWidth = typeof row.size === 'object' ?
+                            Math.min(grid.columnWidth - 14, row.size.width || grid.columnWidth - 14) :
+                            grid.columnWidth - 14;
+                        hudRoundedRect(ctx, x * scale, (y - 11) * scale,
+                            rowWidth * scale, 22 * scale,
+                            (row.style.borderRadius ?? 5) * scale,
+                            row.style.backgroundColor);
                     }
-                    ctx.font = font * scale + 'px sans-serif';
-                    ctx.fillStyle = /^#[a-fA-F0-9]{6,8}$/.test(row.color) ?
-                        row.color : '#ffffff';
+                    const weight = row.style?.fontWeight || (row.index === 0 ? 600 : 400);
+                    ctx.font = String(weight === 'bold' ? 700 :
+                        weight === 'semibold' ? 600 : weight === 'medium' ? 500 :
+                        weight === 'normal' ? 400 : weight) + ' ' +
+                        font * scale + 'px sans-serif';
+                    ctx.fillStyle = row.style?.color ||
+                        (/^#[a-fA-F0-9]{6,8}$/.test(row.color) ?
+                            row.color : '#dce7ef');
                     if (row.kind === 'slider') {
                         const value = typeof row.value === 'number' ? row.value : row.min || 0;
                         const progress = Number.isFinite(value) &&
@@ -295,31 +311,31 @@ class ScreenHudMesh {
                             grid.columnWidth * 0.32 * scale);
                         hudRoundedRect(ctx, trackX * scale, (y - 3) * scale,
                             trackWidth * scale, 6 * visualScale * scale,
-                            3 * visualScale * scale, '#54677e');
+                            3 * visualScale * scale, '#657487');
                         if (progress > 0)
                             hudRoundedRect(ctx, trackX * scale, (y - 3) * scale,
                                 trackWidth * progress * scale,
                                 6 * visualScale * scale, 3 * visualScale * scale,
-                                '#7bbaff');
+                                '#69b8ae');
                         hudDisc(ctx, (trackX + trackWidth * progress) * scale,
-                            y * scale, 5 * visualScale * scale, '#eef8ff');
-                        ctx.fillStyle = '#c4e4ff';
+                            y * scale, 5 * visualScale * scale, '#e0ebf2');
+                        ctx.fillStyle = '#a7b6c5';
                         ctx.fillText(String(Math.round(value * 1000) / 1000),
                             (trackX + trackWidth + 9) * scale, y * scale,
                             grid.columnWidth * 0.20 * scale);
                     } else if (row.kind === 'toggle') {
                         const enabled = row.value === true;
                         const pillX = x + grid.columnWidth - 77 * visualScale;
-                        ctx.fillStyle = '#e7f1ff';
+                        ctx.fillStyle = '#dce7ef';
                         ctx.fillText(row.text, x * scale, y * scale,
                             Math.max(35, grid.columnWidth - 95) * scale);
                         hudRoundedRect(ctx, pillX * scale, (y - 8) * scale,
                             37 * visualScale * scale, 16 * visualScale * scale,
                             8 * visualScale * scale,
-                            enabled ? '#3ad2a4' : '#55667e');
+                            enabled ? '#3e837c' : '#536476');
                         hudDisc(ctx, (pillX + (enabled ? 28 : 9) * visualScale) * scale,
                             y * scale, 6 * visualScale * scale, '#f6fbff');
-                        ctx.fillStyle = enabled ? '#98efcf' : '#b3c0d4';
+                        ctx.fillStyle = enabled ? '#83c6bb' : '#a7b6c5';
                         ctx.font = 10 * scale + 'px sans-serif';
                         ctx.fillText(enabled ? 'On' : 'Off',
                             (pillX + 42) * scale, y * scale, 30 * scale);
@@ -328,11 +344,11 @@ class ScreenHudMesh {
                         const left = (x + 2) * scale, top = (y - 7) * scale;
                         hudRoundedRect(ctx, left, top,
                             15 * visualScale * scale, 15 * visualScale * scale,
-                            3 * visualScale * scale, enabled ? '#69c9f1' : '#54667b');
+                            3 * visualScale * scale, enabled ? '#69b8ae' : '#4a5869');
                         if (enabled)
                             hudCheckboxTick(ctx, left + 2 * scale,
                                 top + 3 * scale, scale * visualScale);
-                        ctx.fillStyle = '#e7f1ff';
+                        ctx.fillStyle = '#dce7ef';
                         const textStart = 9 + 17 * visualScale;
                         ctx.fillText(row.text, (x + textStart) * scale, y * scale,
                             Math.max(35, columnTextWidth - textStart) * scale);
@@ -343,9 +359,9 @@ class ScreenHudMesh {
                         hudRoundedRect(ctx, x * scale,
                             (y - 9 * visualScale) * scale,
                             width * scale, 18 * visualScale * scale,
-                            6 * visualScale * scale, '#397eb8');
+                            6 * visualScale * scale, '#2c666f');
                         ctx.font = '600 ' + Math.max(12, font - 1) * scale + 'px sans-serif';
-                        ctx.fillStyle = '#f5faff';
+                        ctx.fillStyle = '#f1fcfa';
                         ctx.fillText(row.text, (x + 12) * scale, y * scale,
                             Math.max(30, width - 18) * scale);
                     } else {
@@ -353,6 +369,7 @@ class ScreenHudMesh {
                             columnTextWidth * scale);
                     }
                 }
+                ctx.globalAlpha = 1;
                 const image = new ImageAsset(canvas);
                 const texture = new Texture2D();
                 texture.image = image;
