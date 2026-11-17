@@ -242,5 +242,13 @@ for (const event of ['reset-gizmos', 'open-doc', 'selection:select', 'selection:
     throw new Error('[pack] Missing required Scene selection event in release ZIP: ' + event);
   }
 }
-writeFileSync(outFile, toZip(entries));
-console.log(`[pack] wrote ${path.relative(ROOT, outFile)}: ${entries.map(([p]) => p).join(', ')}`);
+// An extracted extension must have a single, versioned directory at its root.
+// Keep entries above relative to the plugin root for dependency/module checks,
+// then prefix only the paths written into the installable archive.
+const pluginFolder = `Cocos-Gizmos-v${pkg.version}`;
+const packagedEntries = [
+  [`${pluginFolder}/`, Buffer.alloc(0)],
+  ...entries.map(([name, data]) => [`${pluginFolder}/${name}`, data]),
+];
+writeFileSync(outFile, toZip(packagedEntries));
+console.log(`[pack] wrote ${path.relative(ROOT, outFile)} with root ${pluginFolder}/ (${entries.length} files)`);
