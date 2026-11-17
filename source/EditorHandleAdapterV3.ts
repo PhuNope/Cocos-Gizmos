@@ -4,8 +4,7 @@ import {
     writeField, handleWorldOrigin, markerSize, axisPlacement,
     rotationPlacement, rotationFrame, isCanvas2D, rotationScreenFallback,
 } from './GizmoViewportGeometry';
-import { drawSelectedPositionMarkers, setSelectedHandleHover,
-    lastSelectedCanvasPaint } from './GizmoHandleRenderer';
+import { drawSelectedPositionMarkers, setSelectedHandleHover } from './GizmoHandleRenderer';
 import { hitTestHandle, hitTestHud, HandleHitTarget, HudHitTarget } from './GizmoHitTest';
 import { handlePlaneNormal } from './PositionDragSolver';
 import { axisDragNormal } from './AxisHandleGeometry';
@@ -317,48 +316,60 @@ function createSelectHandleGizmo(
         }
 
         private finishHud(cancelled:boolean,event?:any):void {
-            const clicked=this.buttonDown;
-            this.buttonDown=null;
-            const component=this.component();
-            if(clicked && !cancelled && component){
-                if(event && this.pickHud(event)!==clicked)cancelled=true;
-                if(!cancelled){
-                    const control=clicked.control;
-                    if(control.type==='button'){
-                        this.beginEdit(clicked.key);
-                        try{
-                            component.onGizmoHudAction?.(control.id);
-                            this.changed(clicked.key);
-                        }finally{this.endEdit(clicked.key,false);}
-                    }else if(control.type==='toggle'||control.type==='checkbox'){
-                        const property=control.property;
-                        const original=(component as any)[property];
-                        if(typeof original==='boolean'){
-                            const session=new GizmoEditSession<boolean>(
-                                ()=>(component as any)[property],
-                                v=>{(component as any)[property]=v;},
-                                {
-                                    begin:(v)=>{this.beginEdit(property);
-                                        component.onGizmoHudChanged?.(property,'begin',v);},
-                                    update:(v)=>{component.onGizmoHudChanged?.(
-                                        property,'update',v);this.changed(property);},
-                                    rollback:()=>this.changed(property),
-                                    end:(v,cancelled,changed)=>{
-                                        try{component.onGizmoHudChanged?.(property,
-                                            cancelled?'cancel':'end',v);}
-                                        finally{this.endEdit(property,cancelled||!changed);}
-                                    },
-                                });
-                            session.begin();
-                            try{session.apply(!original);session.finish();}
-                            catch(error){session.finish(true);throw error;}
-                        }
+            const click=this.buttonDown, drag=this.sliderDrag;
+            this.buttonDown=null;this.sliderDrag=null;
+            // Reset capture even if a user Component callback throws. A failed
+            // button should never block all subsequent Scene interactions.
+            try {
+                if(drag)drag.session.finish(cancelled);
+                if(!click || cancelled)return;
+                const component=this.component();
+                if(!component || event && this.pickHud(event)!==click)return;
+                const control=click.control;
+                if(control.type==='button') {
+                    this.beginEdit(click.key);
+                    try {
+                        component.onGizmoHudAction?.(control.id);
+                        this.changed(click.key);
+                    } finally {
+                        this.endEdit(click.key,false);
                     }
+                    return;
                 }
+                if(control.type!=='toggle' && control.type!=='checkbox')return;
+                const property=control.property;
+                const original=(component as any)[property];
+                if(typeof original!=='boolean')return;
+                const session=new GizmoEditSession<boolean>(
+                    ()=>(component as any)[property],
+                    value=>{(component as any)[property]=value;},
+                    {
+                        begin:(value)=>{
+                            this.beginEdit(property);
+                            try{component.onGizmoHudChanged?.(property,'begin',value);}
+                            catch(error){this.endEdit(property,true);throw error;}
+                        },
+                        update:(value)=>{
+                            component.onGizmoHudChanged?.(property,'update',value);
+                            this.changed(property);
+                        },
+                        rollback:()=>this.changed(property),
+                        end:(value,wasCancelled,changed)=>{
+                            try{component.onGizmoHudChanged?.(property,
+                                wasCancelled?'cancel':'end',value);}
+                            finally{this.endEdit(property,wasCancelled||!changed);}
+                        },
+                    },
+                );
+                session.begin();
+                try {session.apply(!original);session.finish();}
+                catch(error) {
+                    session.finish(true);
+                    throw error;
+                }
+            } finally {
+                if(captured===this)captured=null;
             }
-            const drag=this.sliderDrag;this.sliderDrag=null;
-            if(drag)drag.session.finish(cancelled);
-            if(captured===this)captured=null;
         }
 
         private pointerDown(event:any):void {
