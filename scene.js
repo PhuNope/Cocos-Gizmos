@@ -15,8 +15,8 @@ exports.load = function load() {
     const { GizmoPresentationService } = require('./editor-runtime/GizmoPresentationService.js');
     presentation = new GizmoPresentationService();
     updater.setPresentationAdapter(presentation);
-    const { createPositionHandleAdapter } = require('./editor-runtime/PositionHandles.js');
-    handles = createPositionHandleAdapter((component) =>
+    const { createV3HandleAdapter } = require('./editor-runtime/EditorHandleAdapterV3.js');
+    handles = createV3HandleAdapter((component) =>
         presentation.evaluate(component, true).hud, presentation.getLayout());
     updater.setPositionHandleAdapter(handles);
     const status = updater.start();
@@ -50,8 +50,8 @@ function gizmosReset(selected = []) {
     const savedSettings = presentation?.getSettings?.() ||
         { display: 'always', hud: 'selected' };
     try {
-        // Dispose old Scene objects before asking the editor to rebuild
-        // any native BoxController +Y raycast faces.
+        // Dispose all selected SelectGizmo input handlers before rebuilding
+        // the Scene adapter; render resources belong to their own layers.
         updater.stop();
         updater.setPositionHandleAdapter(null);
         updater.setPresentationAdapter(null);
@@ -62,11 +62,11 @@ function gizmosReset(selected = []) {
 
         const { GizmoPresentationService } =
             require('./editor-runtime/GizmoPresentationService.js');
-        const { createPositionHandleAdapter } =
-            require('./editor-runtime/PositionHandles.js');
+        const { createV3HandleAdapter } =
+            require('./editor-runtime/EditorHandleAdapterV3.js');
         presentation = new GizmoPresentationService();
         presentation.configure(savedSettings);
-        handles = createPositionHandleAdapter((component) =>
+        handles = createV3HandleAdapter((component) =>
             presentation.evaluate(component, true).hud,
             presentation.getLayout());
         updater.setPresentationAdapter(presentation);
