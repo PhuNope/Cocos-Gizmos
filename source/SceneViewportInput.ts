@@ -19,7 +19,11 @@ type DomLike = {
     getElementById(id: string): any;
     addEventListener(type: string, handler: (event: any) => void, capture?: boolean): void;
     removeEventListener(type: string, handler: (event: any) => void, capture?: boolean): void;
-    defaultView?: { PointerEvent?: any };
+    defaultView?: {
+        PointerEvent?: any;
+        addEventListener?: (type: string, handler: (event: any) => void, capture?: boolean) => void;
+        removeEventListener?: (type: string, handler: (event: any) => void, capture?: boolean) => void;
+    };
 };
 
 /**
@@ -71,8 +75,9 @@ export class SceneViewportInput {
         // canvas or Editor gizmo-picking listeners in the DOM event path.
         // Installing on document after Creator's own capture listener would
         // be too late to keep the Scene from unselecting a clicked HUD Node.
-        this.eventRoot = doc.defaultView?.addEventListener ?
-            doc.defaultView as DomLike : doc;
+        this.eventRoot = doc.defaultView?.addEventListener &&
+            doc.defaultView?.removeEventListener ?
+            doc.defaultView as unknown as DomLike : doc;
         // Electron's WebView supports PointerEvent; older Scene backends
         // still use mouse events. Install exactly one family, not both.
         this.enabled = typeof doc.defaultView?.PointerEvent === 'function';
