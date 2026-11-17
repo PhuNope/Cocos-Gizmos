@@ -123,23 +123,31 @@ export default class Gizmos3DApiTest extends Component {
 
     public onGizmoHud(): GizmoHudItem[] {
         return [
-            { id: 'title', text: 'Gizmos3D API Test', order: 0, color: '#ffff88' },
-            { id: 'size', text: 'Size: ' + this.size.toFixed(2), order: 1 },
-            { id: 'move-plane', text: 'Drag X/Y/Z arrows or XY/XZ/YZ plane squares',
-                order: 1 },
-            { id: 'depth', text: 'Depth test: ' + this.depthTest, order: 2 },
-            { id: 'event', text: 'Last event: ' + this.lastEvent, order: 3, fontSize: 12 },
+            { id: 'title', text: '3D · Gizmos', order: 0,
+                size: 'normal',
+                style: { color: '#93ddd3', fontWeight: 600 } },
+            { id: 'move', text: 'Move: XYZ axes / XY·XZ·YZ planes', order: 1,
+                size: 'small', style: { color: '#bac8d6' } },
+            { id: 'event', text: 'Last: ' + this.lastEvent, order: 2,
+                size: 'small', style: { color: '#a7b6c5', fontSize: 11 } },
         ];
     }
 
     public onGizmoHudControls(): GizmoHudControlList {
         return [
             { type: 'slider', id: 'size', text: 'Shape size',
-                property: 'size', min: 0.5, max: 3, step: 0.25 },
-            { type: 'toggle', id: 'wire', text: 'Wireframe', property: 'wireframe' },
-            { type: 'checkbox', id: 'depth', text: 'Depth test', property: 'depthTest' },
-            { type: 'checkbox', id: 'labels', text: 'Labels', property: 'showLabels' },
-            { type: 'button', id: 'reset', text: 'Reset 3D values' },
+                property: 'size', min: 0.5, max: 3, step: 0.25,
+                size: 'normal', style: { color: '#cfe2e8' } },
+            { type: 'toggle', id: 'wire', text: 'Wireframe', property: 'wireframe',
+                size: 'small' },
+            { type: 'checkbox', id: 'depth', text: 'Depth test', property: 'depthTest',
+                size: 'small' },
+            { type: 'checkbox', id: 'labels', text: 'Labels', property: 'showLabels',
+                size: 'small' },
+            { type: 'button', id: 'reset', text: 'Reset 3D',
+                size: { width: 126, height: 22 },
+                style: { backgroundColor: '#28656a', borderRadius: 7,
+                    color: '#e9fffc', fontWeight: 600 } },
         ];
     }
 
