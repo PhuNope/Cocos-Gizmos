@@ -95,13 +95,54 @@ kéo tương đối cũ. `onGizmoHudChanged` nhận `begin → update → end`
 ngay cả khi click mà không kéo. Nhấn Escape trong lúc giữ chuột để
 `cancel` và khôi phục giá trị ban đầu.
 
-**Size/layout của HUD:** Các control hỗ trợ `order`, `fontSize` (10–18px)
-và `size: 'small' | 'normal' | 'large'`. Slider/button thêm `width` (px);
-riêng slider, `width` là độ dài track, đồng bộ với click-to-set/drag.
-`order` sắp thứ tự các control sau các dòng text, giữ nguyên thứ tự
-mảng nếu giá trị order bằng nhau. Kích thước hình được giới hạn trong
-row 22px để không trùng vùng picking. HUD hiện vẫn dock ở đáy Scene
-và tự chia cột; chưa có API tự đặt anchor / row height.
+**HUD style dạng DOM (v3):** Trả descriptor từ `onGizmoHud()` và
+`onGizmoHudControls()`; mỗi row nhận `size` và `style` giống
+`HTMLElement.style` theo dạng camelCase. Không cần tạo DOM thủ công:
+
+```ts
+onGizmoHud(): GizmoHudItem[] {
+    return [
+        { id: 'title', text: 'Scene Tools',
+          size: { width: 210, height: 20 },
+          style: { color: '#93ddd3', fontWeight: 600,
+              backgroundColor: '#183139', borderRadius: 7, padding: 5 } },
+        { id: 'status', text: 'Ready',
+          size: 'small', style: { color: '#bac8d6', fontSize: 12 } },
+    ];
+}
+
+onGizmoHudControls(): GizmoHudControlList {
+    return [
+        { type: 'slider', id: 'radius', text: 'Radius',
+          property: 'radius', min: 5, max: 100, width: 120,
+          size: 'normal', style: { color: '#dce7ef' } },
+        { type: 'button', id: 'reset', text: 'Reset',
+          size: { width: 128, height: 20 },
+          style: { backgroundColor: '#28656a',
+              color: '#e9fffc', borderRadius: 8, fontWeight: 600 } },
+    ];
+}
+```
+
+`size` chấp nhận `'small' | 'normal' | 'large'` hoặc
+`{ width?: number, height?: number }`, đơn vị pixel của Scene View.
+Chiều cao được giới hạn **16–22px** để không lệch với vùng chọn native
+Gizmo; chiều rộng tự giới hạn theo cột và viewport. Đối với slider,
+thuộc tính `width` riêng vẫn chỉnh **độ dài thanh trượt**, được kẹp
+trong vùng control, không phải chiều rộng của hàng.
+
+`style` nhận **một tập con an toàn của CSS**: `color`,
+`backgroundColor`, `borderColor`, `borderWidth`, `borderRadius`,
+`fontSize`, `fontWeight`, `opacity`, `padding`,
+`letterSpacing`, `textAlign`. Màu dùng HEX (ví dụ `#28656a`).
+Các thuộc tính `position`, `transform`, `pointerEvents`, `zIndex`,
+HTML và CSS tuỳ ý đều không được áp dụng vì chúng có thể làm lệch
+hit-testing, phá layout hoặc chặn chuột của Scene.
+
+HUD mặc định là dock màu slate với điểm nhấn teal, tự chia cột gọn theo
+viewport. DOM renderer và texture fallback dùng cùng quy tắc size,
+hình học picking và bảng màu. `order` vẫn sắp control theo thứ tự,
+text ở trước control và không cần thay đổi API callback.
 
 Nút bấm không dùng `onGizmoHudChanged()`; phải khai báo
 `onGizmoHudAction()` để nhận `id`.
