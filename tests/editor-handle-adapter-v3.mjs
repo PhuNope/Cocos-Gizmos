@@ -259,7 +259,11 @@ assert.ok(events.some(e=>e[0]==='button'&&e[1]==='reset'),
 assert.equal(events.filter(e=>e[0]==='begin').length,beginsBeforeButton,
     'Button IDs are actions, not serialized Component Undo properties');
 assert.equal(adapter.protectedSelection()?.nodeUuid,'v3-target');
-
+adapter.refresh([component],new Set(),400);
+assert.equal(adapter.protectedSelection()?.nodeUuid,'v3-target',
+    'Delayed Scene selection refresh must not erase HUD gesture protection');
+adapter.refresh([component],new Set(['v3-target']),650);
+assert.equal(adapter.status().active,1);
 
 const originalHudChanged=component.onGizmoHudChanged;
 component.onGizmoHudChanged=(property,phase)=>{
