@@ -8,6 +8,8 @@ const js=ts.transpileModule(source,{compilerOptions:{
     target:ts.ScriptTarget.ES2017,module:ts.ModuleKind.CommonJS,
 }}).outputText;
 const events=[],paints=[];
+let editorRebuildsOnUpdate=false;
+let editorRebuildsOnBegin=false;
 const component={
     node:{uuid:'v3-target',isValid:true,activeInHierarchy:true},
     isValid:true,enabled:true, __classname__:'MyV3Component',
@@ -22,9 +24,16 @@ class SelectGizmo {
     constructor(target){this.target=target;}
     show(){this.onShow?.();}
     hide(){this.onHide?.();}
+    destroy(){this.onDestroy?.();}
     getCompPropPath(name){return 'serialized.'+name;}
-    onControlBegin(name){events.push(['begin',name]);}
-    onControlUpdate(name){events.push(['update',name]);}
+    onControlBegin(name){
+        events.push(['begin',name]);
+        if(editorRebuildsOnBegin){this.hide();this.destroy();}
+    }
+    onControlUpdate(name){
+        events.push(['update',name]);
+        if(editorRebuildsOnUpdate){this.hide();this.destroy();}
+    }
     onControlEnd(name){events.push(['end',name]);}
     onComponentChanged(node){events.push(['node',node.uuid]);}
 }
@@ -205,7 +214,39 @@ assert.equal(adapter.status().draggingPosition,1,
     'An exception in HUD input must never leave Scene pointer captured');
 component.gizmo.onNotGizmoMouseUp({x:80,y:80});
 
-adapter.refresh([component],new Set(),400);
+// Reproduction: Creator may invoke hide()/destroy() in the SAME frame
+// that onControlUpdate updates the Inspector (while mouse button is held).
+// The command must survive until a real mouse-up or Escape.
+editorRebuildsOnUpdate=true;
+editorRebuildsOnBegin=true;
+const cancelsBefore=events.filter(e=>e[0]==='handle'&&e[2]==='cancel').length;
+component.gizmo.onNotGizmoMouseDown({x:80,y:80});
+assert.equal(adapter.status().draggingPosition,1,
+    'Synchronous hide/destroy during onControlBegin does not terminate capture');
+component.gizmo.onNotGizmoMouseMove({x:105,y:80});
+assert.equal(adapter.status().draggingPosition,1,
+    'An Editor visibility refresh during onControlUpdate cannot cancel a drag');
+const refreshed=adapter.status();
+assert.ok(refreshed.active>=1);
+assert.ok(component.gizmo.diagnosticState().suppressedLifecycleCancels>=2,
+    'Transient Editor lifecycle callbacks are suppressed while dragging');
+adapter.refresh([component],new Set(),700);
+assert.equal(adapter.status().draggingPosition,1,
+    'One empty selection snapshot must not cancel the captured gesture');
+component.gizmo.onNotGizmoMouseMove({x:130,y:80});
+assert.equal(component.position.x,130,
+    'The second pointer frame must update the SAME edit session');
+assert.equal(events.filter(e=>e[0]==='handle'&&e[2]==='cancel').length,
+    cancelsBefore,'No false cancel before mouse-up');
+component.gizmo.onNotGizmoMouseUp({x:130,y:80});
+assert.equal(adapter.status().draggingPosition,0);
+assert.equal(component.position.x,130,'Mouse-up commits final multi-frame value');
+assert.equal(events.filter(e=>e[0]==='handle'&&e[2]==='cancel').length,
+    cancelsBefore,'Commit must not be converted into cancel');
+editorRebuildsOnUpdate=false;
+editorRebuildsOnBegin=false;
+
+adapter.refresh([component],new Set(),850);
 assert.equal(adapter.status().active,0);
 assert.equal(component.gizmo.isHandleVisible(),false);
 adapter.clear();
