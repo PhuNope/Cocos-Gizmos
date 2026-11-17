@@ -391,4 +391,24 @@ adapter.dispose();
 assert.equal(typeDefs.MyV3Component,undefined,'Disposed adapter unregisters its class');
 assert.equal(typeDefs['cc.Camera'],BuiltInCameraGizmo);
 assert.equal(adapter.status().reason,'disposed');
+// Real Creator 3.8.8's manager.createGizmo() may be absent or may not
+// expose the instance through Component.gizmo. The pointer bridge still
+// needs a real SelectGizmo object to host the command lifecycle.
+const previousCreate=manager.createGizmo;
+const previousShow=manager.showComponentGizmo;
+manager.createGizmo=()=>null;
+manager.showComponentGizmo=()=>{};
+const standalone=createV3HandleAdapter(()=>true,layout);
+standalone.refresh([component],new Set(['v3-target']),2000);
+assert.equal(standalone.status().active,1,
+    'Standalone SelectGizmo fallback must activate without Editor pool factory');
+assert.ok(standalone.status().positionHandles>0);
+assert.equal(bridgePort.down({x:80,y:80,button:0,buttons:1}),true,
+    'Direct input bridge must still pick a handle with no Component.gizmo');
+bridgePort.move({x:175,y:80,button:0,buttons:1});
+bridgePort.up({x:175,y:80,button:0,buttons:0});
+assert.equal(component.position.x,175);
+standalone.dispose();
+manager.createGizmo=previousCreate;
+manager.showComponentGizmo=previousShow;
 console.log('[editor-handle-adapter-v3] SelectGizmo discovery, command gestures, HUD, cancel, hide and cleanup OK');
