@@ -24,7 +24,9 @@ const component={
             property:'visible',color:'#ffffff',size:'normal'},
         {id:'radius',type:'slider',text:'Radius',property:'radius',
             min:0,max:100,step:1,color:'#ffffff',size:'normal'},
+        {id:'reset',type:'button',text:'Reset',color:'#ffffff',size:'normal'},
     ];},
+    onGizmoHudAction(id){events.push(['button',id]);},
     onGizmoChanged(...args){events.push(['handle',...args]);},
     onGizmoHudChanged(...args){events.push(['hud',...args]);},
 };
@@ -88,6 +90,7 @@ const scope={
                 return point.x>=50&&point.x<200 ? items[0]||null:null;
             },
             hitTestHud(p,viewport,place,items){
+                if(p.x>=700&&p.x<=850)return items[2]||null;
                 if(p.x>=420&&p.x<=600)return items[1]||null;
                 return p.x>=200&&p.x<=400?items[0]||null:null;
             },
@@ -141,7 +144,7 @@ const scope={
         }};
         if(name==='./GizmoHudControls')return {
             hudControlScreenRect(_viewport,index,_count,size) {
-                const left=index===0?200:420;
+                const left=index===0?200:index===1?420:700;
                 return {left,right:left+190,top:92,bottom:68,width:190,height:24};
             },
             normalizeHudControls(){return component.onGizmoHudControls();},
@@ -186,7 +189,7 @@ assert.equal(typeDefs['cc.Object'],undefined);
 
 assert.equal(adapter.status().reason,'ready-select-gizmo');
 assert.equal(adapter.status().positionHandles,1);
-assert.equal(adapter.status().hudControls,2);
+assert.equal(adapter.status().hudControls,3);
 assert.ok(paints.includes(component),'2D/3D rendering is a separate port');
 // Native Gizmo rays may win when hovering over a Move handle. They must
 // still update our presentation highlight, without consuming Editor input.
@@ -239,6 +242,20 @@ component.gizmo.onNotGizmoMouseUp({x:240,y:80});
 assert.equal(component.visible,false,'HUD checkbox uses the same undo-capable session');
 assert.equal(adapter.protectedSelection()?.nodeUuid,'v3-target',
     'Selection lease survives until native async selection broadcast');
+
+// A button callback must run without surrendering Node selection to the
+// underlying native Scene raycaster, even if HUD items refresh meanwhile.
+const buttonDown={x:740,y:80,
+    stopImmediatePropagation(){events.push(['button-stop']);},
+    preventDefault(){events.push(['button-prevent']);}};
+assert.equal(component.gizmo.onNotGizmoMouseDown(buttonDown),false);
+assert.ok(events.some(e=>e[0]==='button-stop'),
+    'HUD Button owns its pointer down event, not Scene object selection');
+component.gizmo.refreshHandles();
+assert.equal(component.gizmo.onNotGizmoMouseUp({x:740,y:80}),false);
+assert.ok(events.some(e=>e[0]==='button'&&e[1]==='reset'),
+    'HUD Button action must fire after an intermediate Scene frame');
+assert.equal(adapter.protectedSelection()?.nodeUuid,'v3-target');
 
 
 const originalHudChanged=component.onGizmoHudChanged;
