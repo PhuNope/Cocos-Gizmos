@@ -40,7 +40,7 @@ assert.deepEqual(Array.from(controls, (control) => control.type),
     ['button', 'slider', 'toggle', 'checkbox', 'button']);
 assert.equal(controls[2].property, 'visible');
 assert.equal(controls[2].color, '#22aa88');
-assert.equal(controls[3].color, '#ffffff');
+assert.equal(controls[3].color, '#dce7ef');
 const layout = hudControlLayoutSignature(controls);
 const relabeled = controls.map(control => ({ ...control, text: control.text + ' updated' }));
 assert.equal(hudControlLayoutSignature(relabeled), layout,
@@ -48,7 +48,7 @@ assert.equal(hudControlLayoutSignature(relabeled), layout,
 assert.notEqual(hudControlLayoutSignature(controls.slice(0, 3)), layout,
     'Changing the control list must invalidate the picking layout');
 const recolored = controls.map(control => ({ ...control }));
-recolored[2].color = '#ffffff';
+recolored[2].color = '#dce7ef';
 assert.notEqual(hudControlLayoutSignature(recolored), layout,
     'Changing control marker color must update its controller');
 assert.equal(formatHudControl(controls[0]), 'Reset');
