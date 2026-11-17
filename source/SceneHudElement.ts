@@ -166,7 +166,6 @@ export class SceneHudElement {
         Object.assign(label.style, {
             overflow: 'hidden', textOverflow: 'ellipsis',
             flexShrink: '1', maxWidth: '66%',
-            color: PALETTE.foreground,
         });
         if (row.kind === 'slider') {
             label.style.maxWidth = '32%';
@@ -249,7 +248,7 @@ export class SceneHudElement {
             });
             label.style.maxWidth = '100%';
             label.style.fontWeight = '600';
-            label.style.color = '#f1fcfa';
+            label.style.color = normalizeHudStyle(row.style).color || '#f1fcfa';
             box.appendChild(label);
         } else box.appendChild(label);
     }
