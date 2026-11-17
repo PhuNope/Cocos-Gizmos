@@ -717,6 +717,7 @@ export function createV3HandleAdapter(
     const viewportInput=new SceneViewportInput(pointerPorts);
     const engineInput=new SceneEngineInput(pointerPorts);
     let manager:any=null, typeDefs:any=null, ctor:any=null;
+    let nativeBaseAvailable=false;
     let latestScan=-Infinity,reason='not-initialized';
     let lastSelected=new Set<string>();
 
@@ -726,14 +727,15 @@ export function createV3HandleAdapter(
         typeDefs=manager?._gizmoPool?._getPool?.('component')?.typeDefs || null;
         if(!ctor){
             const base=typeDefs ? resolveSelectGizmo(typeDefs) : null;
+            nativeBaseAvailable=!!base;
             ctor=createSelectHandleGizmo(base || StandaloneGestureHost,
                 input,allowHud,hudLayout,selectionLease);
             if(!base)console.warn(
                 '[cocos-gizmos/v3] Native SelectGizmo unavailable: ' +
                 'using direct mouse input without native Undo hooks');
         }
-        reason=ctor && typeDefs && resolveSelectGizmo(typeDefs) ?
-            'ready-select-gizmo' : 'ready-direct-input-no-native-undo';
+        reason=nativeBaseAvailable ? 'ready-select-gizmo' :
+            'ready-direct-input-no-native-undo';
         return true;
     };
 
