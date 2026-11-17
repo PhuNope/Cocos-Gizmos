@@ -95,6 +95,27 @@ assert.equal(styled[2].fontSize, 18);
 assert.equal(styled[1].fontSize, 10);
 assert.equal(styled[1].size, 'normal');
 const { hudSliderScreenTrack } = scope.exports;
+
+const custom = normalizeHudControls([{
+    type: 'button', id: 'themed', text: 'Themed',
+    size: { width: 154, height: 18 },
+    style: { backgroundColor: '#123456', borderRadius: 9,
+        fontWeight: 600, opacity: 10, position: 'fixed' },
+}])[0];
+assert.equal(custom.size.width, 154);
+assert.equal(custom.size.height, 18);
+assert.equal(custom.style.backgroundColor, '#123456');
+assert.equal(custom.style.borderRadius, 9);
+assert.equal(custom.style.opacity, 1);
+assert.equal(custom.style.position, undefined);
+const rect = scope.exports.hudControlScreenRect(
+    { width: 900, height: 540 }, 0, 1, custom.size);
+assert.equal(rect.width, 154);
+assert.equal(rect.height, 18);
+assert.notEqual(hudControlLayoutSignature([custom]),
+    hudControlLayoutSignature([{ ...custom, size: { width: 90, height: 18 } }]),
+    'Size changes must invalidate native picker geometry');
+
 const defaultTrack = hudSliderScreenTrack({ width: 960, height: 560 }, 0, 4);
 const customTrack = hudSliderScreenTrack({ width: 960, height: 560 }, 0, 4, 230);
 assert.ok(customTrack.width > 0 && customTrack.width <= 230,
