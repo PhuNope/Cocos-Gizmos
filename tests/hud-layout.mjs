@@ -22,8 +22,9 @@ function load(name, imports = {}) {
     vm.runInNewContext(code, scope, { filename: name + '.js' });
     return scope.exports;
 }
-const controls = load('GizmoHudControls');
-const presentation = load('GizmoPresentation');
+const appearance = load('GizmoHudStyle');
+const controls = load('GizmoHudControls', { './GizmoHudStyle': appearance });
+const presentation = load('GizmoPresentation', { './GizmoHudStyle': appearance });
 const { GizmoHudLayout } = load('GizmoHudLayout', {
     './GizmoHudControls': controls,
     './GizmoPresentation': presentation,
