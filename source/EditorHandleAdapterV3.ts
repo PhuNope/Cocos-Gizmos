@@ -178,22 +178,34 @@ function createSelectHandleGizmo(
                     hudLayout?.totalRows||0):null;
         }
 
+        private editorPropertyPath(property: string): string {
+            // Creator's SelectGizmo receives a serialized Component path,
+            // not necessarily the raw TS field name. Resolve it at the
+            // boundary; the command/value ports remain Editor-independent.
+            try {
+                const value=this.getCompPropPath?.(property);
+                if(typeof value==='string' && value.length>0)return value;
+            } catch { /* A detached Scene may no longer know this Component */ }
+            return property;
+        }
+
         private changed(property: string): void {
             const component=this.component();
             if (!component) return;
-            this.onControlUpdate?.(property);
+            this.onControlUpdate?.(this.editorPropertyPath(property));
             this.onComponentChanged?.(component.node);
             requestSceneRepaint();
         }
 
         private beginEdit(property: string): void {
-            this.onControlBegin?.(property);
+            this.onControlBegin?.(this.editorPropertyPath(property));
         }
 
         private endEdit(property: string, cancelled: boolean): void {
+            const path=this.editorPropertyPath(property);
             if(cancelled && typeof this.onControlCancel==='function')
-                this.onControlCancel(property);
-            else this.onControlEnd?.(property);
+                this.onControlCancel(path);
+            else this.onControlEnd?.(path);
         }
 
         private startHandle(entry: HandleHitTarget, event: any): void {
