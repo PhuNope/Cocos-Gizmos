@@ -2,6 +2,17 @@
 
 All notable changes to Cocos-Gizmos are documented here.
 
+## [Unreleased] — v3 development (not published)
+
+### Added
+- Declarative `size` presets or `{ width, height }` and CSS-like `style` properties on Scene HUD labels, buttons, sliders, toggles and checkboxes.
+- Shared validation and size-aware hit rectangles for native Scene interaction.
+
+### Changed
+- Compact slate/teal Scene HUD dock replaces the original full-width blue bar in both DOM and textured fallback.
+- Reduced HUD demo labels and styled the 3D/2D examples for clearer Scene View editing.
+
+
 ## [3.0.1] - 2026-11-15
 
 ### Added
