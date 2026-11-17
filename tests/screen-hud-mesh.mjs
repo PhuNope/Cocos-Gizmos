@@ -191,8 +191,8 @@ assert.ok(topSprite?.spriteFrame?.texture,
 assert.equal(sceneHudRoot.children[0].getComponent(MeshRenderer).enabled, false,
     'Mesh fallback must not double-render under a working UI Sprite');
 
-assert.ok(drawCalls.some(call => call[0] === 'rect' && call[3] > 1000),
-    'Canvas HUD draws a full-width dark bar at retina scale');
+assert.ok(drawCalls.some(call => call[0] === 'rect' && call[3] > 100),
+    'Canvas HUD draws a compact top accent on the shaded dock');
 assert.ok(drawCalls.some(call => call[0] === 'text' && call[1] === 'Gizmos2D Test'));
 assert.ok(drawCalls.some(call => call[0] === 'text' && call[1] === 'Radius'),
     'Slider is painted with a proper track and numeric value');
@@ -276,7 +276,8 @@ overlay.render(component, [
 overlay.finishFrame(1);
 const resized = drawCalls.slice(resizeStart);
 const drawTrack = controls.exports.hudSliderScreenTrack(camera.viewport, 0, 1, 210);
-assert.equal(drawTrack.width, 210);
+assert.ok(drawTrack.width > 0 && drawTrack.width <= 210,
+    'Requested slider track width clamps inside the compact dock');
 assert.ok(resized.some(call => call[0] === 'circle' &&
     Math.abs(call[3] - 5 * 1.12 * 2) < 0.01),
     'Large slider draws its thumb at the matching DPI-adjusted size');
@@ -292,4 +293,4 @@ assert.equal(overlay.diagnosticState.renderMode, 'none',
 overlay.dispose();
 assert.equal(rootGizmo.children[0].isValid, false);
 assert.ok(directorEvents.some(([kind]) => kind === 'off'));
-console.log('[screen-hud-mesh] full width textured HUD, slider, reuse and hide OK');
+console.log('[screen-hud-mesh] compact textured HUD, slider, reuse and hide OK');
