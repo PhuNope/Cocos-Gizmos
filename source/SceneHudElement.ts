@@ -45,7 +45,10 @@ function applyAppearance(element: HTMLElement, style?: HudDomStyle): void {
     if (value.color) element.style.color = value.color;
     if (value.backgroundColor) element.style.backgroundColor = value.backgroundColor;
     if (value.borderColor) element.style.borderColor = value.borderColor;
-    if (value.borderWidth !== undefined) element.style.borderWidth = value.borderWidth + 'px';
+    if (value.borderWidth !== undefined) {
+        element.style.borderStyle = 'solid';
+        element.style.borderWidth = value.borderWidth + 'px';
+    }
     if (value.borderRadius !== undefined) element.style.borderRadius = value.borderRadius + 'px';
     if (value.fontSize !== undefined) element.style.fontSize = value.fontSize + 'px';
     if (value.fontWeight !== undefined) {
