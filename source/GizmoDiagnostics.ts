@@ -20,7 +20,7 @@ export interface GizmoSmokeReport {
     };
     bridge: {
         componentPoolAccessible: boolean;
-        colliderControllerAvailable: boolean;
+        selectGizmoAvailable: boolean;
         hasCreateGizmo: boolean;
         hasShowComponentGizmo: boolean;
         cameraWorldToScreen: boolean;
@@ -52,8 +52,25 @@ export function buildGizmoSmokeReport(
     const selection = safely<unknown>(() => editor?.Selection?.getSelected?.('node'), null);
     const selectionCount = Array.isArray(selection) ? selection.length : null;
     const pool = safely<any>(() => cce?.Gizmo?._gizmoPool?._getPool?.('component'), null);
-    const ctor = pool?.typeDefs?.['cc.BoxCollider'];
-    const controller = ctor?.prototype;
+    // Editor 3.8.8's Component Gizmos inherit SelectGizmo. Inspect the
+    // registered constructor chain instead of requiring a physics collider.
+    let selectGizmo: any = null;
+    for (const ctor of Object.values(pool?.typeDefs || {})) {
+        if (typeof ctor !== 'function') continue;
+        let parent: any = Object.getPrototypeOf(ctor);
+        for (let depth = 0; depth < 5 && typeof parent === 'function'; depth++) {
+            if (typeof parent.prototype?.show === 'function' &&
+                typeof parent.prototype?.hide === 'function' &&
+                typeof parent.prototype?.getCompPropPath === 'function' &&
+                typeof parent.prototype?.onControlBegin === 'function') {
+                selectGizmo = parent;
+                break;
+            }
+            parent = Object.getPrototypeOf(parent);
+        }
+        if (selectGizmo) break;
+    }
+    const controller = selectGizmo?.prototype;
     const resolution = resolveSceneCamera(cce);
     const cam = resolution.camera;
     const cameraSource = resolution.source === 'unavailable' ?
@@ -71,7 +88,7 @@ export function buildGizmoSmokeReport(
         },
         bridge: {
             componentPoolAccessible: !!pool?.typeDefs,
-            colliderControllerAvailable: typeof ctor === 'function',
+            selectGizmoAvailable: !!selectGizmo,
             hasCreateGizmo: typeof cce?.Gizmo?.createGizmo === 'function',
             hasShowComponentGizmo: typeof cce?.Gizmo?.showComponentGizmo === 'function',
             cameraWorldToScreen: typeof cam?.worldToScreen === 'function',
@@ -115,8 +132,8 @@ export function buildGizmoSmokeReport(
     if (!report.scene.updaterStarted) report.concerns.push('Scene updater is not running');
     if (!report.scene.name) report.concerns.push('No active Scene detected');
     if (!report.scene.selectionApi) report.concerns.push('Scene selection API is unavailable');
-    if (!report.bridge.componentPoolAccessible || !report.bridge.colliderControllerAvailable) {
-        report.concerns.push('Private component Gizmo bridge is unavailable on this Editor build');
+    if (!report.bridge.componentPoolAccessible || !report.bridge.selectGizmoAvailable) {
+        report.concerns.push('SelectGizmo base is unavailable on this Editor build');
     }
     if (!report.bridge.cameraWorldToScreen || !report.bridge.cameraScreenPointToRay) {
         report.concerns.push('Scene camera projection methods are unavailable');
@@ -134,7 +151,7 @@ export function buildGizmoSmokeReport(
     if ((report.handles.input?.missingPointer ?? 0) > 0) {
         report.concerns.push('Some handle events did not provide usable Scene pointer coordinates');
     }
-    if (report.handles.reason && report.handles.reason !== 'ready' &&
+    if (report.handles.reason && report.handles.reason !== 'ready-select-gizmo' &&
         report.handles.reason !== 'not-initialized') {
         report.concerns.push('Handle adapter: ' + report.handles.reason);
     }
