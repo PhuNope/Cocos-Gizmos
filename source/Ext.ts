@@ -131,6 +131,33 @@ declare global {
         hud?: 'selected' | 'always' | 'off';
     }
 
+    /** Visual dimensions within the shared 22px Scene picking row.
+     * Values are bounded; width is capped by the available HUD column.
+     * The separate slider width option refers to its TRACK, not its row.
+     */
+    type GizmoHudSize = 'small' | 'normal' | 'large' | {
+        width?: number;
+        height?: number;
+    };
+
+    /** Supported CSS-like camelCase visual styling. This is deliberately
+     * smaller than CSSStyleDeclaration so layout and input routing stay in
+     * sync. No HTML, position, transform or pointerEvents overrides.
+     */
+    interface GizmoHudDomStyle {
+        color?: string;
+        backgroundColor?: string;
+        borderColor?: string;
+        borderWidth?: number;
+        borderRadius?: number;
+        fontSize?: number;
+        fontWeight?: 'normal' | 'medium' | 'semibold' | 'bold' | 400 | 500 | 600 | 700;
+        opacity?: number;
+        padding?: number;
+        letterSpacing?: number;
+        textAlign?: 'left' | 'center' | 'right';
+    }
+
     /** Screen-space text attached to a component in the Scene View. */
     interface GizmoHudItem {
         /** Stable identifier for reusing the label across Scene frames. */
@@ -147,6 +174,8 @@ declare global {
         maxSize?: number;
         /** RGBA hexadecimal color for the text. */
         color?: string;
+        size?: GizmoHudSize;
+        style?: GizmoHudDomStyle;
     }
 
     /** Shared visual sizing and ordering for Scene HUD controls. Controls
@@ -157,8 +186,10 @@ declare global {
         order?: number;
         /** Font height in on-screen pixels, clamped to 10–18 (default 14). */
         fontSize?: number;
-        /** Control visual scale within its 22px row. */
-        size?: 'small' | 'normal' | 'large';
+        /** Compactness preset or width/height in Scene pixels. */
+        size?: GizmoHudSize;
+        /** DOM-style visual overrides (camelCase CSS-like properties). */
+        style?: GizmoHudDomStyle;
     }
 
     /** A clickable Scene View HUD button. */
@@ -237,8 +268,8 @@ declare module 'cc' {
         onGizmoSettings?(): GizmoViewSettings;
 
         /**
-         * Returns informational text labels anchored near this node in Scene View.
-         * Entries with stable IDs reuse the same Label components across frames.
+         * Returns informational HUD rows. size/style allow compact CSS-like
+         * visual customization; stable IDs avoid unnecessary DOM updates.
          */
         onGizmoHud?(): GizmoHudItem[];
 
