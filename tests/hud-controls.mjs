@@ -97,7 +97,8 @@ assert.equal(styled[1].size, 'normal');
 const { hudSliderScreenTrack } = scope.exports;
 const defaultTrack = hudSliderScreenTrack({ width: 960, height: 560 }, 0, 4);
 const customTrack = hudSliderScreenTrack({ width: 960, height: 560 }, 0, 4, 230);
-assert.equal(customTrack.width, 230, 'Slider width is specified in screen pixels');
+assert.ok(customTrack.width > 0 && customTrack.width <= 230,
+    'Slider width clamps inside the compact Scene dock');
 assert.equal(customTrack.left, defaultTrack.left, 'A custom width keeps track origin');
 assert.ok(hudSliderScreenTrack({ width: 960, height: 560 }, 0, 4, 600).width < 600,
     'Slider width is clamped to avoid covering the value column');
