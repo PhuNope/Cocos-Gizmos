@@ -104,6 +104,8 @@ export class GizmoHudLayout {
                     order: items.length,
                     fontSize: control.fontSize,
                     color: control.color,
+                    size: control.size,
+                    style: control.style,
                 });
             }
             const last = nodeRows.get(node) || 0;
