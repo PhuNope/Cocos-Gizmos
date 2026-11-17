@@ -64,6 +64,12 @@ assert.notEqual(pa.namespace, pc.namespace);
 assert.deepEqual(Array.from(pa.items, item => item.id), ['text:title', 'control:value']);
 assert.deepEqual(Array.from(pb.items, item => item.id), ['text:title', 'control:value']);
 assert.match(pa.items[1].text, /10/);
+
+assert.equal(pa.items[1].size, 'normal',
+    'Control appearance is preserved in the scene presentation plan');
+assert.ok(pa.items[1].style &&
+    typeof pa.items[1].style === 'object');
+
 assert.match(pb.items[1].text, /20/);
 assert.equal(reads.a, 2, 'Each HUD callback runs once per component per frame');
 assert.equal(reads.b, 1);
