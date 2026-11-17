@@ -208,6 +208,7 @@ component.gizmo.onNotGizmoMouseMove({x:120,y:80});
 component.gizmo.onKeyDown({key:'Escape'});
 assert.equal(component.position.x,90,'Escape rolls back the edit command');
 component.gizmo.onNotGizmoMouseDown({x:240,y:80});
+component.gizmo.refreshHandles(); // New row objects from the next HUD frame.
 component.gizmo.onNotGizmoMouseUp({x:240,y:80});
 assert.equal(component.visible,false,'HUD checkbox uses the same undo-capable session');
 
