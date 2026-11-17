@@ -8,6 +8,7 @@ import { drawSelectedPositionMarkers, setSelectedHandleHover } from './GizmoHand
 import { hitTestHandle, hitTestHud, HandleHitTarget, HudHitTarget } from './GizmoHitTest';
 import { handlePlaneNormal } from './PositionDragSolver';
 import { axisDragNormal } from './AxisHandleGeometry';
+import { GizmoCommands } from './GizmoCommandBuilder';
 import { GizmoMoveCommand } from './GizmoMoveCommand';
 import { GizmoRotateCommand } from './GizmoRotateCommand';
 import { RotateAxis } from './RotationHandleGeometry';
@@ -230,13 +231,21 @@ function createSelectHandleGizmo(
                 },
             };
             try {
-                const command=ring ? new GizmoRotateCommand(
-                    original,ring.center,ring.normal,rotationFrame(component),
-                    {axis:entry.field.axis as RotateAxis,
-                     space:entry.field.space==='world'?'world':'local',
-                     snap:entry.field.snap,twoD:isCanvas2D(component.node)},
-                    port,hooks,rotationScreenFallback(ring,view)
-                ) : new GizmoMoveCommand(original,space,normal,entry.field,port,hooks);
+                const command=ring ?
+                    GizmoCommands.rotate()
+                        .initial(original).pivot(ring.center).axisNormal(ring.normal)
+                        .frame(rotationFrame(component))
+                        .constraints({
+                            axis:entry.field.axis as RotateAxis,
+                            space:entry.field.space==='world'?'world':'local',
+                            snap:entry.field.snap,twoD:isCanvas2D(component.node),
+                        })
+                        .value(port).hooks(hooks)
+                        .screenFallback(rotationScreenFallback(ring,view))
+                        .build() :
+                    GizmoCommands.move()
+                        .initial(original).space(space).planeNormal(normal)
+                        .constraints(entry.field).value(port).hooks(hooks).build();
                 if(ring ? !command.begin(ray,point):!command.begin(ray))return;
                 this.moveDrag={entry,command}; captured=this;
                 this.setHover(entry);
