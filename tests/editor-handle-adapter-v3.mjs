@@ -152,6 +152,9 @@ assert.ok(component.gizmo instanceof SelectGizmo);
 assert.ok(!(component.gizmo instanceof BuiltInCameraGizmo),
     'Standalone adapter derives from SelectGizmo, not a built-in component');
 assert.equal(typeof typeDefs.MyV3Component,'function');
+assert.equal(typeDefs.Object,undefined,'Generic Object must never own the native Gizmo pool');
+assert.equal(typeDefs['cc.Object'],undefined);
+
 assert.equal(adapter.status().reason,'ready-select-gizmo');
 assert.equal(adapter.status().positionHandles,1);
 assert.equal(adapter.status().hudControls,1);
