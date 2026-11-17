@@ -183,7 +183,8 @@ export class SceneHudElement {
             const rail = doc.createElement('span');
             Object.assign(rail.style, {
                 position: 'absolute', left: (track.left - left) + 'px',
-                top: '9px', width: track.width + 'px', height: '4px',
+                top: (dimensions.height / 2 - 2) + 'px',
+                width: track.width + 'px', height: '4px',
                 borderRadius: '4px', background: PALETTE.slider,
             });
             const fill = doc.createElement('span');
