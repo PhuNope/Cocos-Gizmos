@@ -207,7 +207,8 @@ const rotationCommands = evaluate('GizmoRotateCommand', {
     './RotationDragSolver': rotationSolver,
     './GizmoMoveCommand': commands,
 });
-const controls = evaluate('GizmoHudControls');
+const appearance = evaluate('GizmoHudStyle');
+const controls = evaluate('GizmoHudControls', { './GizmoHudStyle': appearance });
 const presentation = { normalizeHudItems(value) { return value; } };
 const layoutModule = evaluate('GizmoHudLayout', {
     './GizmoHudControls': controls, './GizmoPresentation': presentation,
