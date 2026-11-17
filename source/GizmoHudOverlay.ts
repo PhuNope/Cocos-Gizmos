@@ -12,6 +12,7 @@ import { hudGrid, hudRowScreenPosition, hudControlScreenRect,
 import { createSceneHudProjection, SceneHudCamera } from './GizmoHudProjection';
 import type { GizmoHudPlacement } from './GizmoHudLayout';
 import { resolveSceneCamera } from './SceneCameraBridge';
+import { SceneHudElement } from './SceneHudElement';
 
 function isUnder2DRenderRoot(node: any): boolean {
     for (let current = node; current; current = current.parent) {
@@ -510,6 +511,7 @@ export class GizmoHudOverlay {
     private cameraMissing = 0;
     private projectionFailed = 0;
     private lastPath: '2d' | '3d' | 'none' = 'none';
+    private readonly domScreen = new SceneHudElement();
     private readonly screen = new ScreenHudMesh();
     private readonly screenRows: ScreenRow[] = [];
     private frameActive = false;
@@ -527,8 +529,21 @@ export class GizmoHudOverlay {
     public finishFrame(totalRows: number): void {
         const camera = sceneCamera();
         if (this.screenRows.length && camera?.viewport) {
-            this.screenActive = this.screen.render(camera, this.screenRows, totalRows);
+            // Prefer a real Scene WebView element. The existing native Gizmo
+            // picking adapter stays responsible for mouse events.
+            const renderedInDom = this.domScreen.render(
+                camera.viewport, this.screenRows, totalRows,
+            );
+            if (renderedInDom) {
+                this.screen.hide();
+                this.screenActive = true;
+            } else {
+                // Some Creator builds expose no DOM from the Scene runtime.
+                // Keep the previous texture renderer as a safe fallback.
+                this.screenActive = this.screen.render(camera, this.screenRows, totalRows);
+            }
         } else {
+            this.domScreen.hide();
             this.screen.hide();
             this.screenActive = false;
         }
@@ -540,6 +555,7 @@ export class GizmoHudOverlay {
         this.frameActive = false;
         this.screenRows.length = 0;
         this.screenActive = false;
+        this.domScreen.hide();
         this.screen.hide();
     }
 
@@ -680,6 +696,7 @@ export class GizmoHudOverlay {
     public get totalDrawn(): number { return this.drawn; }
 
     public dispose(): void {
+        this.domScreen.dispose();
         this.screen.dispose();
         this.colors.clear();
         this.drawn = 0;
