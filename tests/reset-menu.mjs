@@ -39,7 +39,7 @@ class GizmoPresentationService {
     evaluate() { return { hud: true }; }
     dispose() { this.disposed = true; }
 }
-function createPositionHandleAdapter() {
+function createV3HandleAdapter() {
     const item = {
         disposed: false,
         dispose() { this.disposed = true; },
@@ -59,7 +59,7 @@ const runtime = { exports: {}, console: { info() {}, error() {} },
         if (spec === './editor-runtime/GizmoPresentationService.js') return {
             GizmoPresentationService,
         };
-        if (spec === './editor-runtime/PositionHandles.js') return { createPositionHandleAdapter };
+        if (spec === './editor-runtime/EditorHandleAdapterV3.js') return { createV3HandleAdapter };
         throw Error('Unexpected Scene import: ' + spec);
     },
 };
@@ -103,7 +103,7 @@ try {
     assert.equal(starts, 2);
     assert.equal(stops, 1);
     assert.equal(initialService.disposed, true, 'Reset frees the old HUD overlay');
-    assert.equal(initialHandles.disposed, true, 'Reset frees native BoxController handles');
+    assert.equal(initialHandles.disposed, true, 'Reset disposes selected native input handlers');
     assert.notEqual(services.at(-1), initialService);
     assert.notEqual(handles.at(-1), initialHandles);
     assert.ok(positionAdapter && presentationAdapter);
