@@ -140,6 +140,11 @@ const sandbox = {
         if (name === './GizmoHudControls') return controls.exports;
         if (name === './GizmoHudProjection') return {};
         if (name === './GizmoPresentation') return {};
+        if (name === './SceneHudElement') return { SceneHudElement: class {
+            render() { return false; }
+            hide() {}
+            dispose() {}
+        } };
         if (name === './SceneCameraBridge') return {
             resolveSceneCamera() { return { camera }; },
         };
