@@ -78,6 +78,26 @@ const scope={
             return {x:0,y:0,z:1};}};
         if(name==='./AxisHandleGeometry')return {axisDragNormal(){
             return {x:0,y:0,z:1};}};
+        if(name==='./GizmoCommandBuilder')return {GizmoCommands:{
+            move() {
+                const args={};
+                return {
+                    initial(v){args.initial=v;return this;},
+                    space(v){args.space=v;return this;},
+                    planeNormal(v){args.normal=v;return this;},
+                    constraints(v){args.options=v;return this;},
+                    value(v){args.port=v;return this;},
+                    hooks(v){args.hooks=v;return this;},
+                    build(){
+                        events.push(['builder','move']);
+                        const Type=scope.require('./GizmoMoveCommand').GizmoMoveCommand;
+                        return new Type(args.initial,args.space,args.normal,
+                            args.options,args.port,args.hooks);
+                    },
+                };
+            },
+            rotate(){throw new Error('rotation stub not expected for point handle');},
+        }};
         if(name==='./GizmoMoveCommand')return {GizmoMoveCommand:class {
             constructor(value,space,normal,options,port,hooks){
                 this.start={...value};this.port=port;this.hooks=hooks;
@@ -142,6 +162,8 @@ assert.equal(component.position.x,90);
 component.gizmo.onNotGizmoMouseUp({x:90,y:80});
 assert.equal(adapter.status().draggingPosition,0);
 assert.ok(events.some(e=>e[0]==='handle'&&e[2]==='end'));
+assert.ok(events.some(e=>e[0]==='builder'&&e[1]==='move'),
+    'The v3 adapter constructs domain commands through the fluent Builder');
 component.gizmo.onNotGizmoMouseDown({x:90,y:80});
 component.gizmo.onNotGizmoMouseMove({x:120,y:80});
 component.gizmo.onKeyDown({key:'Escape'});
