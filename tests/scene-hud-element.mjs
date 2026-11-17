@@ -60,6 +60,7 @@ const scope = {
     exports: {},
     require(id) {
         if (id === './GizmoHudControls') return controls.exports;
+        if (id === './GizmoHudStyle') return appearance.exports;
         throw Error(id);
     },
 };
