@@ -11,7 +11,16 @@ const code = ts.transpileModule(readFileSync(file, 'utf8'), {
     fileName: file,
     compilerOptions: { target: ts.ScriptTarget.ES2017, module: ts.ModuleKind.CommonJS },
 }).outputText;
-const scope = { exports: {} };
+const appearanceCode = ts.transpileModule(
+    readFileSync(path.join(root, 'source/GizmoHudStyle.ts'), 'utf8'), {
+        compilerOptions: { target: ts.ScriptTarget.ES2017, module: ts.ModuleKind.CommonJS },
+    }).outputText;
+const appearance = { exports: {} };
+vm.runInNewContext(appearanceCode, appearance);
+const scope = { exports: {}, require(id) {
+    if (id === './GizmoHudStyle') return appearance.exports;
+    throw Error(id);
+} };
 vm.runInNewContext(code, scope, { filename: 'GizmoHudControls.js' });
 const { normalizeHudControls, formatHudControl, HudSliderDrag, hudRowScreenPosition,
     hudControlLayoutSignature } = scope.exports;
