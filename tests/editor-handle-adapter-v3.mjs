@@ -246,7 +246,7 @@ assert.equal(events.filter(e=>e[0]==='handle'&&e[2]==='cancel').length,
 editorRebuildsOnUpdate=false;
 editorRebuildsOnBegin=false;
 
-adapter.refresh([component],new Set(),850);
+adapter.refresh([component],new Set(),1100);
 assert.equal(adapter.status().active,0);
 assert.equal(component.gizmo.isHandleVisible(),false);
 adapter.clear();
