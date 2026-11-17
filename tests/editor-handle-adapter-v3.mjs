@@ -245,6 +245,7 @@ assert.equal(adapter.protectedSelection()?.nodeUuid,'v3-target',
 
 // A button callback must run without surrendering Node selection to the
 // underlying native Scene raycaster, even if HUD items refresh meanwhile.
+const beginsBeforeButton=events.filter(e=>e[0]==='begin').length;
 const buttonDown={x:740,y:80,
     stopImmediatePropagation(){events.push(['button-stop']);},
     preventDefault(){events.push(['button-prevent']);}};
@@ -255,6 +256,8 @@ component.gizmo.refreshHandles();
 assert.equal(component.gizmo.onNotGizmoMouseUp({x:740,y:80}),false);
 assert.ok(events.some(e=>e[0]==='button'&&e[1]==='reset'),
     'HUD Button action must fire after an intermediate Scene frame');
+assert.equal(events.filter(e=>e[0]==='begin').length,beginsBeforeButton,
+    'Button IDs are actions, not serialized Component Undo properties');
 assert.equal(adapter.protectedSelection()?.nodeUuid,'v3-target');
 
 
