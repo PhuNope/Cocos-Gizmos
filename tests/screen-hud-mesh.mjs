@@ -11,7 +11,12 @@ const compile = name => ts.transpileModule(
     { compilerOptions: { target: ts.ScriptTarget.ES2017,
         module: ts.ModuleKind.CommonJS } },
 ).outputText;
-const controls = { exports: {} };
+const appearance = { exports: {} };
+vm.runInNewContext(compile('GizmoHudStyle'), appearance);
+const controls = { exports: {}, require(id) {
+    if (id === './GizmoHudStyle') return appearance.exports;
+    throw Error(id);
+} };
 vm.runInNewContext(compile('GizmoHudControls'), controls);
 
 class Vec3 {
