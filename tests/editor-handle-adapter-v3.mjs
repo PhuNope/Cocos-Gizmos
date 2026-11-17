@@ -4,9 +4,13 @@ import ts from 'typescript';
 import vm from 'node:vm';
 
 const source=readFileSync(new URL('../source/EditorHandleAdapterV3.ts',import.meta.url),'utf8');
-const js=ts.transpileModule(source,{compilerOptions:{
-    target:ts.ScriptTarget.ES2017,module:ts.ModuleKind.CommonJS,
-}}).outputText;
+const compilerOptions={target:ts.ScriptTarget.ES2017,module:ts.ModuleKind.CommonJS};
+const js=ts.transpileModule(source,{compilerOptions}).outputText;
+const leaseJs=ts.transpileModule(readFileSync(
+    new URL('../source/SceneSelectionLease.ts',import.meta.url),'utf8'),
+    {compilerOptions}).outputText;
+const leaseScope={exports:{}};
+vm.runInNewContext(leaseJs,leaseScope);
 const events=[],paints=[];
 let editorRebuildsOnUpdate=false;
 let editorRebuildsOnBegin=false;
@@ -136,6 +140,10 @@ const scope={
             }
         }};
         if(name==='./GizmoHudControls')return {
+            hudControlScreenRect(_viewport,index,_count,size) {
+                const left=index===0?200:420;
+                return {left,right:left+190,top:92,bottom:68,width:190,height:24};
+            },
             normalizeHudControls(){return component.onGizmoHudControls();},
             hudSliderScreenTrack(){return {left:400,width:100};},
             HudSliderDrag:class {
@@ -155,6 +163,7 @@ const scope={
             isPrimaryScenePointer(e){return e?.button===undefined||e.button===0;},
             readSceneHandleName(e){return e?.handleName||null;},
         };
+        if(name==='./SceneSelectionLease')return leaseScope.exports;
         if(name==='./ExecuteGizmos')return {tickOnce(){paints.push('tick');}};
         throw Error(name);
     },
@@ -179,6 +188,17 @@ assert.equal(adapter.status().reason,'ready-select-gizmo');
 assert.equal(adapter.status().positionHandles,1);
 assert.equal(adapter.status().hudControls,2);
 assert.ok(paints.includes(component),'2D/3D rendering is a separate port');
+// Native Gizmo rays may win when hovering over a Move handle. They must
+// still update our presentation highlight, without consuming Editor input.
+const hoverBefore=events.filter(e=>e[0]==='hover').length;
+assert.equal(component.gizmo.onGizmoMouseMove({x:80,y:80}),undefined);
+assert.ok(events.slice(hoverBefore).some(e=>e[0]==='hover'&&
+    e[1]==='position:position:single'),
+    'Move hover is updated on the native gizmo-move route');
+assert.equal(component.gizmo.onGizmoMouseMove({x:650,y:250}),undefined);
+assert.equal(events.at(-1)[0],'hover');
+assert.equal(events.at(-1)[1],null,'Hover clears when leaving the handle');
+
 assert.equal(component.gizmo.onGizmoMouseDown(
     {x:80,y:80,handleName:'transform:move:x'}),undefined,
     'Other native transform hit is never consumed');
@@ -207,10 +227,19 @@ component.gizmo.onNotGizmoMouseDown({x:90,y:80});
 component.gizmo.onNotGizmoMouseMove({x:120,y:80});
 component.gizmo.onKeyDown({key:'Escape'});
 assert.equal(component.position.x,90,'Escape rolls back the edit command');
-component.gizmo.onNotGizmoMouseDown({x:240,y:80});
+const hudDown={x:240,y:80,
+    stopPropagation(){events.push(['stop','hud-down']);},
+    preventDefault(){events.push(['prevent','hud-down']);}};
+component.gizmo.onNotGizmoMouseDown(hudDown);
+assert.ok(events.some(e=>e[0]==='stop'&&e[1]==='hud-down'),
+    'A HUD-owned mouse-down must stop native Scene selection propagation');
+assert.equal(adapter.protectedSelection()?.nodeUuid,'v3-target');
 component.gizmo.refreshHandles(); // New row objects from the next HUD frame.
 component.gizmo.onNotGizmoMouseUp({x:240,y:80});
 assert.equal(component.visible,false,'HUD checkbox uses the same undo-capable session');
+assert.equal(adapter.protectedSelection()?.nodeUuid,'v3-target',
+    'Selection lease survives until native async selection broadcast');
+
 
 const originalHudChanged=component.onGizmoHudChanged;
 component.onGizmoHudChanged=(property,phase)=>{
