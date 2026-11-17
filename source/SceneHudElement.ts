@@ -50,7 +50,8 @@ function applyAppearance(element: HTMLElement, style?: HudDomStyle): void {
         element.style.borderWidth = value.borderWidth + 'px';
     }
     if (value.borderRadius !== undefined) element.style.borderRadius = value.borderRadius + 'px';
-    if (value.fontSize !== undefined) element.style.fontSize = value.fontSize + 'px';
+    // fontSize is applied by the caller with the row's 10–18/12–24px
+    // bounds so a large CSS value cannot escape the native picking height.
     if (value.fontWeight !== undefined) {
         const weight = { medium: '500', semibold: '600', bold: '700', normal: '400' } as const;
         element.style.fontWeight = typeof value.fontWeight === 'number' ?
