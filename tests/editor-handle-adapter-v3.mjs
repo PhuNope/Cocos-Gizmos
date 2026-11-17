@@ -159,18 +159,23 @@ assert.equal(adapter.status().reason,'ready-select-gizmo');
 assert.equal(adapter.status().positionHandles,1);
 assert.equal(adapter.status().hudControls,1);
 assert.ok(paints.includes(component),'2D/3D rendering is a separate port');
-component.gizmo.onGizmoMouseDown({x:80,y:80,handleName:'transform:move:x'});
+assert.equal(component.gizmo.onGizmoMouseDown(
+    {x:80,y:80,handleName:'transform:move:x'}),undefined,
+    'Other native transform hit is never consumed');
 assert.equal(adapter.status().draggingPosition,0,
     'Native transform gizmo must retain ownership of its own pointer-down');
 component.gizmo.onGizmoMouseDown({x:80,y:80});
 assert.equal(adapter.status().draggingPosition,0,
     'Unnamed native raycast event must not hijack Creator selection');
-component.gizmo.onNotGizmoMouseDown({x:80,y:80});
+assert.equal(component.gizmo.onNotGizmoMouseDown({x:80,y:80}),false,
+    'Native Scene selection should be informed when a custom handle owns the gesture');
 assert.equal(adapter.status().draggingPosition,1);
-component.gizmo.onNotGizmoMouseMove({x:90,y:80});
+assert.equal(component.gizmo.onNotGizmoMouseMove({x:90,y:80}),false);
 assert.equal(component.position.x,90);
-component.gizmo.onNotGizmoMouseUp({x:90,y:80});
+assert.equal(component.gizmo.onNotGizmoMouseUp({x:90,y:80}),false);
 assert.equal(adapter.status().draggingPosition,0);
+assert.equal(component.gizmo.onNotGizmoMouseDown({x:600,y:250}),undefined,
+    'Ordinary Scene clicks must remain available for Node selection');
 assert.ok(events.some(e=>e[0]==='handle'&&e[2]==='end'));
 assert.ok(events.some(e=>e[0]==='builder'&&e[1]==='move'),
     'The v3 adapter constructs domain commands through the fluent Builder');
