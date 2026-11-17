@@ -149,6 +149,21 @@ assert.equal(component.position.x,90,'Escape rolls back the edit command');
 component.gizmo.onNotGizmoMouseDown({x:240,y:80});
 component.gizmo.onNotGizmoMouseUp({x:240,y:80});
 assert.equal(component.visible,false,'HUD checkbox uses the same undo-capable session');
+
+const originalHudChanged=component.onGizmoHudChanged;
+component.onGizmoHudChanged=(property,phase)=>{
+    if(phase==='update')throw new Error('injected HUD failure');
+};
+component.gizmo.onNotGizmoMouseDown({x:240,y:80});
+assert.throws(()=>component.gizmo.onNotGizmoMouseUp({x:240,y:80}),
+    /injected HUD failure/);
+assert.equal(component.visible,false,'Failed HUD callback rolls back changed property');
+component.onGizmoHudChanged=originalHudChanged;
+component.gizmo.onNotGizmoMouseDown({x:80,y:80});
+assert.equal(adapter.status().draggingPosition,1,
+    'An exception in HUD input must never leave Scene pointer captured');
+component.gizmo.onNotGizmoMouseUp({x:80,y:80});
+
 adapter.refresh([component],new Set(),400);
 assert.equal(adapter.status().active,0);
 assert.equal(component.gizmo.isHandleVisible(),false);
