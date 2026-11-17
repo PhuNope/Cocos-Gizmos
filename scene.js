@@ -107,6 +107,7 @@ exports.methods = {
     gizmosTick() { return updater ? updater.tickOnce() : { started: false }; },
     gizmosSelectionChanged(selected, revision) { return updater ? updater.syncSelection(selected, revision) : { started: false }; },
     gizmosHandleStatus() { return handles ? handles.status() : { registered: 0, active: 0, reason: 'not-loaded' }; },
+    gizmosProtectedSelection() { return handles?.protectedSelection?.() || null; },
     gizmosGetViewSettings() { return presentation ? presentation.getSettings() : { display: 'always', hud: 'selected' }; },
     gizmosSetViewSettings(value) { return presentation ? presentation.configure(value) : { display: 'always', hud: 'selected' }; },
     gizmosHudStatus() { return presentation ? presentation.getStats() : { hudLabels: 0, defaults: null }; },
