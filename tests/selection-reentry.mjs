@@ -8,14 +8,21 @@ assert.ok(manifest.contributions.messages['selection:select']);
 assert.ok(manifest.contributions.messages['selection:unselect']);
 const calls = [];
 let selected = ['node-2d'];
+let protectedNode = null;
+const reselected = [];
 globalThis.Editor = {
     Selection: { getSelected(type) {
         assert.equal(type, 'node');
         return [...selected];
+    }, select(type, uuid) {
+        assert.equal(type, 'node');
+        selected = [uuid];
+        reselected.push(uuid);
     } },
     Message: { async request(channel, method, message) {
         assert.equal(channel, 'scene');
         assert.equal(method, 'execute-scene-script');
+        if(message.method==='gizmosProtectedSelection')return protectedNode;
         assert.equal(message.method, 'gizmosSelectionChanged');
         calls.push(message.args);
     } },
@@ -57,5 +64,19 @@ selected = ['first-from-array'];
 await extension.methods.onSelectionUnselect('node', ['first-from-array']);
 assert.deepEqual(calls.at(-1)[0], [],
     'Array unselect events clear all handles on the first deselection');
+// Native Scene input may still produce selection:unselect after a HUD
+// button executes. A short-lived Scene input lease must restore ONLY the
+// node whose own Gizmo handled the click, not override ordinary selection.
+protectedNode = {nodeUuid:'first-from-array',active:false};
+selected = [];
+await extension.methods.onSelectionUnselect('node','first-from-array');
+assert.deepEqual(reselected,['first-from-array']);
+assert.deepEqual(calls.at(-1)[0],['first-from-array']);
+protectedNode = {nodeUuid:'some-other-node',active:true};
+selected = [];
+await extension.methods.onSelectionUnselect('node','first-from-array');
+assert.equal(reselected.length,1,'Unrelated leases cannot suppress unselect');
+assert.deepEqual(calls.at(-1)[0],[]);
+protectedNode = null;
 delete globalThis.Editor;
-console.log('[selection-reentry] native select/unselect + same-node reactivation OK');
+console.log('[selection-reentry] normal unselect, bounded HUD selection lease, and reselect OK');
