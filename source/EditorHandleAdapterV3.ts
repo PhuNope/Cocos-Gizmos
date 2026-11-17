@@ -21,6 +21,8 @@ import {
     readSceneHandleName, isPrimaryScenePointer,
 } from './SceneGizmoInput';
 import { tickOnce as repaintWholeScene } from './ExecuteGizmos';
+import { SceneSelectionLease, consumeOwnedSceneEvent } from './SceneSelectionLease';
+import { hudControlScreenRect } from './GizmoHudControls';
 
 type Drag = { entry: HandleHitTarget; command: GizmoMoveCommand | GizmoRotateCommand };
 type SliderDrag = { entry: HudHitTarget; solver: HudSliderDrag; session: GizmoEditSession<number> };
@@ -93,6 +95,7 @@ function createSelectHandleGizmo(
     base: any, input: GizmoInputDiagnostics,
     allowHud: (component: Component) => boolean,
     hudLayout?: GizmoHudLayout,
+    selectionLease?: SceneSelectionLease,
 ): any {
     return class CocosGizmosSelectHandles extends base {
         private shown=false;
@@ -102,6 +105,7 @@ function createSelectHandleGizmo(
         private moveDrag: Drag | null=null;
         private sliderDrag: SliderDrag | null=null;
         private buttonDown: HudHitTarget | null=null;
+        private hudDownRect: {left:number;right:number;bottom:number;top:number} | null=null;
         private hover: string | null=null;
         private lastPaint=0;
         private deferredHide=false;
@@ -117,6 +121,7 @@ function createSelectHandleGizmo(
         }
 
         public cancelGestureForTeardown(): void {
+            selectionLease?.clear();
             this.deferredHide=false;
             try { this.finishHandle(true); }
             finally { this.finishHud(true); }
@@ -305,9 +310,11 @@ function createSelectHandleGizmo(
                 // Arm capture BEFORE begin(). Native onControlBegin can
                 // synchronously request a Gizmo visibility rebuild.
                 this.moveDrag={entry,command}; captured=this;
+                selectionLease?.begin(component.node.uuid);
                 if(ring ? !command.begin(ray,point):!command.begin(ray)){
                     this.moveDrag=null;
                     if(captured===this)captured=null;
+                    selectionLease?.clear();
                     return;
                 }
                 this.setHover(entry);
@@ -323,9 +330,17 @@ function createSelectHandleGizmo(
             const component=this.component();
             if(!component)return;
             const control=entry.control;
-            if(control.type!=='slider'){this.buttonDown=entry;captured=this;return;}
             const point=readScenePointer(event), view=camera();
             const placement=this.placement();
+            if(!point || !view?.viewport || !placement)return;
+            if(control.type!=='slider'){
+                const row=placement.startRow+placement.textCount+entry.index;
+                this.hudDownRect=hudControlScreenRect(view.viewport,row,
+                    hudLayout?.totalRows||0,control.size);
+                this.buttonDown=entry;captured=this;
+                selectionLease?.begin(component.node.uuid);
+                return;
+            }
             const value=(component as any)[control.property];
             if(!point||!Number.isFinite(value))return;
             const track=view?.viewport&&placement ?
@@ -362,6 +377,7 @@ function createSelectHandleGizmo(
                 // begin() also calls native onControlBegin and can trigger
                 // an immediate Editor visibility refresh.
                 this.sliderDrag={entry,solver,session};captured=this;
+                selectionLease?.begin(component.node.uuid);
                 session.begin();
                 if(onTrack){const next=solver.move(point.x);if(next!==null)session.apply(next);}
             }catch(error){
@@ -404,7 +420,8 @@ function createSelectHandleGizmo(
 
         private finishHud(cancelled:boolean,event?:any):void {
             const click=this.buttonDown, drag=this.sliderDrag;
-            this.buttonDown=null;this.sliderDrag=null;
+            const downRect=this.hudDownRect;
+            this.buttonDown=null;this.sliderDrag=null;this.hudDownRect=null;
             // Reset capture even if a user Component callback throws. A failed
             // button should never block all subsequent Scene interactions.
             try {
@@ -414,7 +431,12 @@ function createSelectHandleGizmo(
                 // HUD descriptors are re-created on each Scene frame. Do not
                 // compare object identity across pointer-down and pointer-up.
                 const released=event ? this.pickHud(event) : click;
-                if(!component || !released || released.key!==click.key)return;
+                const point=event ? readScenePointer(event) : null;
+                const insideDownRect=!!(point && downRect &&
+                    point.x>=downRect.left && point.x<=downRect.right &&
+                    point.y>=downRect.bottom && point.y<=downRect.top);
+                if(!component || !insideDownRect && (!released || released.key!==click.key))
+                    return;
                 const control=click.control;
                 if(control.type==='button') {
                     this.beginEdit(click.key);
@@ -465,22 +487,31 @@ function createSelectHandleGizmo(
         private pointerDown(event:any):boolean {
             if(!this.shown || this.disposed || !isPrimaryScenePointer(event)||
                 captured)return false;
+            // Any next ordinary click ends the prior HUD selection lease.
+            selectionLease?.clear();
             const hud=this.pickHud(event);
             if(hud)this.startHud(hud,event);
             else {
                 const hit=this.pick(event);
                 if(hit)this.startHandle(hit,event);
             }
-            return captured===this;
+            if(captured===this){
+                consumeOwnedSceneEvent(event);
+                return true;
+            }
+            return false;
         }
 
         private pointerUp(event:any):boolean {
             if(!isPrimaryScenePointer(event)||captured!==this)return false;
+            consumeOwnedSceneEvent(event);
             try {
                 this.finishHandle(false);
                 this.finishHud(false,event);
             } finally {
-                // Any user callback error must not leave a global capture.
+                // Keep the lease for a short time after the HUD callback,
+                // since Creator may dispatch selection:unselect asynchronously.
+                selectionLease?.release();
                 if(captured===this)captured=null;
                 this.deferredHide=false;
             }
@@ -493,6 +524,7 @@ function createSelectHandleGizmo(
         }
         public onNotGizmoMouseMove(event:any):boolean|void {
             const active=captured===this;
+            if(active)consumeOwnedSceneEvent(event);
             this.moveInput(event);
             if(active)return false;
         }
@@ -513,8 +545,15 @@ function createSelectHandleGizmo(
         public onGizmoMouseMove(event:any):boolean|void {
             input.record('gizmoMove');
             const active=captured===this;
-            if(active)this.moveInput(event);
-            if(active)return false;
+            if(active){
+                consumeOwnedSceneEvent(event);
+                this.moveInput(event);
+                return false;
+            }
+            // A visible Move/Rotate handle can be under a native Gizmo
+            // raycast surface even before mouse-down. Update OUR visual
+            // hover from shared screen geometry without taking the event.
+            if(!captured && this.shown)this.setHover(this.pick(event));
         }
         public onGizmoMouseUp(event:any):boolean|void {
             input.record('gizmoUp');
@@ -523,7 +562,7 @@ function createSelectHandleGizmo(
         public onKeyDown(event:any):boolean|void {
             if(captured===this&&(event?.key==='Escape'||event?.keyCode===27)){
                 try {this.finishHandle(true);this.finishHud(true);}
-                finally {this.deferredHide=false;}
+                finally {selectionLease?.clear();this.deferredHide=false;}
                 return true;
             }
         }
@@ -573,6 +612,7 @@ function createSelectHandleGizmo(
 
 export interface V3HandleAdapter {
     refresh(components: readonly Component[],selected: ReadonlySet<string>,now:number):void;
+    protectedSelection(): {nodeUuid:string;active:boolean}|null;
     clear():void;
     dispose():void;
     status():{
@@ -596,6 +636,7 @@ export function createV3HandleAdapter(
     const active=new Map<Component,any>();
     const owned=new Map<Component,any>();
     const input=new GizmoInputDiagnostics();
+    const selectionLease=new SceneSelectionLease();
     let manager:any=null, typeDefs:any=null, ctor:any=null;
     let latestScan=-Infinity,reason='not-initialized';
     let lastSelected=new Set<string>();
@@ -608,7 +649,7 @@ export function createV3HandleAdapter(
         if(!ctor){
             const base=resolveSelectGizmo(typeDefs);
             if(!base){reason='select-gizmo-base-unavailable';return false;}
-            ctor=createSelectHandleGizmo(base,input,allowHud,hudLayout);
+            ctor=createSelectHandleGizmo(base,input,allowHud,hudLayout,selectionLease);
         }
         reason='ready-select-gizmo';
         return true;
@@ -632,6 +673,7 @@ export function createV3HandleAdapter(
         for(const [component,gizmo] of owned)release(component,gizmo);
         owned.clear();active.clear();lastSelected.clear();latestScan=-Infinity;
         captured=null;
+        selectionLease.clear();
     }
     function show(component:Component):any {
         let gizmo:any=(component as any).gizmo;
@@ -730,6 +772,7 @@ export function createV3HandleAdapter(
             registered.clear();manager=null;typeDefs=null;
             reason='disposed';
         },
+        protectedSelection() { return selectionLease.inspect(); },
         status() {
             const counts={positionHandles:0,hudControls:0,
                 draggingPosition:0,draggingSlider:0,pendingClicks:0,
