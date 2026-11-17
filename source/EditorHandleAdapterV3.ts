@@ -23,6 +23,7 @@ import {
 import { tickOnce as repaintWholeScene } from './ExecuteGizmos';
 import { SceneSelectionLease, consumeOwnedSceneEvent } from './SceneSelectionLease';
 import { hudControlScreenRect } from './GizmoHudControls';
+import { SceneViewportInput, ViewportPointer } from './SceneViewportInput';
 
 type Drag = { entry: HandleHitTarget; command: GizmoMoveCommand | GizmoRotateCommand };
 type SliderDrag = { entry: HudHitTarget; solver: HudSliderDrag; session: GizmoEditSession<number> };
@@ -607,6 +608,22 @@ function createSelectHandleGizmo(
         public onTargetUpdate():void {this.refreshHandles();}
         public onNodeChanged():void {this.refreshHandles();}
         public updateControllerTransform():void {this.refreshHandles();}
+        public onViewportHover(event: ViewportPointer): void {
+            if(this.shown && !this.disposed && !captured)
+                this.setHover(this.pick(event));
+        }
+        public onViewportDown(event: ViewportPointer): boolean {
+            return this.pointerDown(event);
+        }
+        public onViewportMove(event: ViewportPointer): void {
+            if(captured===this)this.moveInput(event);
+        }
+        public onViewportUp(event: ViewportPointer): void {
+            if(captured===this)this.pointerUp(event);
+        }
+        public onViewportCancel(): void {
+            if(captured===this)this.cancelGestureForTeardown();
+        }
         public isHandleVisible():boolean {return this.shown;}
         public isHandleDisposed():boolean {return this.disposed;}
         public diagnosticState() {
@@ -632,6 +649,7 @@ export interface V3HandleAdapter {
         draggingPosition:number;draggingSlider:number;pendingClicks:number;
         suppressedLifecycleCancels:number; deferredVisibility:number;
         input:GizmoInputSnapshot;
+        viewportInput: ReturnType<SceneViewportInput['status']>;
     };
 }
 
@@ -648,6 +666,32 @@ export function createV3HandleAdapter(
     const owned=new Map<Component,any>();
     const input=new GizmoInputDiagnostics();
     const selectionLease=new SceneSelectionLease();
+    const viewportInput=new SceneViewportInput({
+        viewport() { return camera()?.viewport || null; },
+        down(event) {
+            // HUD is first in draw order, so it owns clicks over any
+            // overlapping 3D handle. Native Gizmos receive all misses.
+            for(const gizmo of active.values()){
+                if(gizmo.pickHud(event) && gizmo.onViewportDown(event))return true;
+            }
+            for(const gizmo of active.values()){
+                if(gizmo.onViewportDown(event))return true;
+            }
+            return false;
+        },
+        move(event) {
+            (captured as any)?.onViewportMove?.(event);
+        },
+        hover(event) {
+            for(const gizmo of active.values())gizmo.onViewportHover?.(event);
+        },
+        up(event) {
+            (captured as any)?.onViewportUp?.(event);
+        },
+        cancel() {
+            (captured as any)?.onViewportCancel?.();
+        },
+    });
     let manager:any=null, typeDefs:any=null, ctor:any=null;
     let latestScan=-Infinity,reason='not-initialized';
     let lastSelected=new Set<string>();
@@ -682,6 +726,7 @@ export function createV3HandleAdapter(
     }
     function clear():void {
         for(const [component,gizmo] of owned)release(component,gizmo);
+        viewportInput.detach();
         owned.clear();active.clear();lastSelected.clear();latestScan=-Infinity;
         captured=null;
         selectionLease.clear();
@@ -703,7 +748,20 @@ export function createV3HandleAdapter(
                 }catch {/* unregistered class alias */}
             }
         }
-        if(!(gizmo instanceof ctor))return null;
+        if(!(gizmo instanceof ctor)){
+            // createGizmo() is an Editor pool factory; it does NOT promise
+            // to attach its returned instance to component.gizmo. When an
+            // extension has no native controller mesh, use a standalone
+            // SelectGizmo instance for the DOM pointer port instead of
+            // silently losing every custom handle and HUD control.
+            try {
+                gizmo=new ctor(component);
+                gizmo.init?.();
+            } catch(error) {
+                console.warn('[cocos-gizmos/v3] Standalone input adapter:',error);
+                return null;
+            }
+        }
         const old=owned.get(component);
         if(old&&old!==gizmo)release(component,old);
         owned.set(component,gizmo);
@@ -714,6 +772,7 @@ export function createV3HandleAdapter(
     }
     return {
         refresh(components,selected,now) {
+            viewportInput.refresh();
             for(const component of components){
                 if(isSelectable(component)&&selected.has(component.node.uuid)){
                     try{drawSelectedPositionMarkers(component);}
@@ -753,7 +812,7 @@ export function createV3HandleAdapter(
                 }
                 if(!installed)continue;
                 const old=active.get(component);
-                if(old&&old===(component as any).gizmo&&old.isHandleVisible?.()!==false &&
+                if(old&&old.isHandleVisible?.()!==false &&
                     !old.isHandleDisposed?.())old.refreshHandles?.();
                 else{
                     const next=show(component);
@@ -800,7 +859,8 @@ export function createV3HandleAdapter(
                 if(stat.deferredHide)counts.deferredVisibility++;
             }
             return {registered:registered.size,active:active.size,
-                reason,...counts,input:input.snapshot()};
+                reason,...counts,input:input.snapshot(),
+                viewportInput:viewportInput.status()};
         },
     };
 }
