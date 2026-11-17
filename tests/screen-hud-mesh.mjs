@@ -279,7 +279,7 @@ const drawTrack = controls.exports.hudSliderScreenTrack(camera.viewport, 0, 1, 2
 assert.ok(drawTrack.width > 0 && drawTrack.width <= 210,
     'Requested slider track width clamps inside the compact dock');
 assert.ok(resized.some(call => call[0] === 'circle' &&
-    Math.abs(call[3] - 5 * 1.12 * 2) < 0.01),
+    Math.abs(call[3] - 5 * 1.08 * 2) < 0.01),
     'Large slider draws its thumb at the matching DPI-adjusted size');
 assert.ok(drawnWidgets.every(call => call[0] !== 'text' ||
     !/\[[ x]\]|\[Reset\]|\[ON\]/.test(call[1])),
