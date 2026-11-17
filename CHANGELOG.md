@@ -5,13 +5,21 @@ All notable changes to Cocos-Gizmos are documented here.
 ## [Unreleased] — v3 development (not published)
 
 ### Added
+- New `EditorHandleAdapterV3` based on the Editor's `SelectGizmo` base instead of `BoxColliderComponentGizmo`; it owns Scene pointer capture and command integration.
+- Split `GizmoViewportGeometry`, `GizmoHandleRenderer`, and `GizmoHitTest` into dedicated Editor geometry, rendering and picking ports for 2D and 3D.
+- Regression tests for command gestures, HUD interactions, selection lifecycle and package contents.
 - Declarative `size` presets or `{ width, height }` and CSS-like `style` properties on Scene HUD labels, buttons, sliders, toggles and checkboxes.
 - Shared validation and size-aware hit rectangles for native Scene interaction.
 
 ### Changed
+- Editor ZIP now uses the new screen-space picking adapter and omits the old `PositionHandles.js` module; the legacy implementation remains as a test-only source reference pending live Creator 3.8.8 validation.
 - Compact slate/teal Scene HUD dock replaces the original full-width blue bar in both DOM and textured fallback.
 - Reduced HUD demo labels and styled the 3D/2D examples for clearer Scene View editing.
 
+
+### Verification
+- Automated tests and ZIP packaging validate the v3 implementation.
+- Input routing, native Undo/Redo and overlapping-handle behavior must be tested manually in Cocos Creator 3.8.8 before tagging.
 
 ## [3.0.1] - 2026-11-15
 
