@@ -516,6 +516,7 @@ export class GizmoHudOverlay {
     private readonly screenRows: ScreenRow[] = [];
     private frameActive = false;
     private screenActive = false;
+    private renderMode: 'dom' | 'texture' | 'none' = 'none';
 
     public get isScreenHudActive(): boolean {
         return this.screenActive || (this.frameActive && this.screenRows.length > 0);
@@ -537,15 +538,18 @@ export class GizmoHudOverlay {
             if (renderedInDom) {
                 this.screen.hide();
                 this.screenActive = true;
+                this.renderMode = 'dom';
             } else {
                 // Some Creator builds expose no DOM from the Scene runtime.
                 // Keep the previous texture renderer as a safe fallback.
                 this.screenActive = this.screen.render(camera, this.screenRows, totalRows);
+                this.renderMode = this.screenActive ? 'texture' : 'none';
             }
         } else {
             this.domScreen.hide();
             this.screen.hide();
             this.screenActive = false;
+            this.renderMode = 'none';
         }
         this.frameActive = false;
         this.screenRows.length = 0;
@@ -555,17 +559,20 @@ export class GizmoHudOverlay {
         this.frameActive = false;
         this.screenRows.length = 0;
         this.screenActive = false;
+        this.renderMode = 'none';
         this.domScreen.hide();
         this.screen.hide();
     }
 
     public get diagnosticState(): {
         drawn2D: number; drawn3D: number;
+        renderMode: 'dom' | 'texture' | 'none';
         cameraMissing: number; projectionFailed: number;
         lastPath: '2d' | '3d' | 'none';
     } {
         return {
             drawn2D: this.drawn2D, drawn3D: this.drawn3D,
+            renderMode: this.renderMode,
             cameraMissing: this.cameraMissing,
             projectionFailed: this.projectionFailed,
             lastPath: this.lastPath,
@@ -698,6 +705,7 @@ export class GizmoHudOverlay {
     public dispose(): void {
         this.domScreen.dispose();
         this.screen.dispose();
+        this.renderMode = 'none';
         this.colors.clear();
         this.drawn = 0;
         this.drawn2D = 0;
