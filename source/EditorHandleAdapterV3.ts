@@ -28,6 +28,22 @@ type SliderDrag = { entry: HudHitTarget; solver: HudSliderDrag; session: GizmoEd
  * operation-level callbacks to all registered SelectGizmos.
  */
 let captured: object | null = null;
+let lastImmediateRepaint=0;
+
+function requestSceneRepaint(): void {
+    // Native camera redraw and full Scene updates have different costs.
+    // Coalesce synchronous full passes while a slider/handle is dragging.
+    const now=Date.now();
+    if(now-lastImmediateRepaint>=32){
+        lastImmediateRepaint=now;
+        try{repaintWholeScene();}
+        catch { /* Scene may close between events */ }
+    }
+    try{
+        const global=globalThis as any;
+        (global.cce||global.window?.cce)?.Engine?.repaintInEditMode?.();
+    }catch { /* Scene process detaching */ }
+}
 
 const selectedKeys = (component: Component): string[] => {
     const value: any=component;
@@ -105,10 +121,7 @@ function createSelectHandleGizmo(
             this.hover=name;
             const component=this.component();
             if(component) setSelectedHandleHover(component,name);
-            if(this.shown) {
-                try { repaintWholeScene(); }
-                catch { /* Scene may close between pointer and repaint */ }
-            }
+            if(this.shown) requestSceneRepaint();
         }
 
         public refreshHandles(): void {
@@ -160,8 +173,7 @@ function createSelectHandleGizmo(
             if (!component) return;
             this.onControlUpdate?.(property);
             this.onComponentChanged?.(component.node);
-            try { repaintWholeScene(); } catch { /* Scene temporarily unavailable */ }
-            (globalThis as any).cce?.Engine?.repaintInEditMode?.();
+            requestSceneRepaint();
         }
 
         private beginEdit(property: string): void {
