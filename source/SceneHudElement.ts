@@ -171,7 +171,7 @@ export class SceneHudElement {
         if (row.kind === 'slider') {
             label.style.maxWidth = '32%';
             box.appendChild(label);
-            const track = hudSliderScreenTrack(viewport, row.index, count, row.width);
+            const track = hudSliderScreenTrack(viewport, row.index, count, row.width, row.size);
             const progress = typeof row.value === 'number' && Number.isFinite(row.value) &&
                 Number.isFinite(row.min) && Number.isFinite(row.max) &&
                 (row.max as number) > (row.min as number) ?
