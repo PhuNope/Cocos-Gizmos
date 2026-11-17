@@ -42,6 +42,13 @@ Component descriptors / Gizmos2D & Gizmos3D / HUD size+style
 - **Command Builder:** `GizmoCommands.move()` and `GizmoCommands.rotate()`
   build domain commands from typed values, constraints, value ports and
   hooks. The Editor adapter no longer calls the command constructors directly.
+- **Scene input ports:** `SceneViewportInput` captures pointer events in the
+  WebView's window capture phase before browser-to-Scene selection routing.
+  It converts CSS client coordinates to bottom-left Scene viewport pixels.
+  If the WebView DOM is inaccessible, `SceneEngineInput` subscribes to
+  Cocos `input` mouse events as a fallback. Both use the same picking,
+  gesture Commands, and ownership rules. Raw native GizmoOperation callbacks
+  remain a secondary fallback, not the only path to interaction.
 - **Editor input adapter:** `EditorHandleAdapterV3` creates a
   `SelectGizmo` subclass from the registered Editor prototype chain.
   It consumes `GizmoOperation` callbacks (`onGizmoMouse*`,
