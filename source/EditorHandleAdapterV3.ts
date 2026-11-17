@@ -402,43 +402,62 @@ function createSelectHandleGizmo(
             }
         }
 
-        private pointerDown(event:any):void {
+        private pointerDown(event:any):boolean {
             if(!this.shown || this.disposed || !isPrimaryScenePointer(event)||
-                captured)return;
+                captured)return false;
             const hud=this.pickHud(event);
-            if(hud){this.startHud(hud,event);return;}
-            const hit=this.pick(event);
-            if(hit)this.startHandle(hit,event);
+            if(hud)this.startHud(hud,event);
+            else {
+                const hit=this.pick(event);
+                if(hit)this.startHandle(hit,event);
+            }
+            return captured===this;
         }
 
-        private pointerUp(event:any):void {
-            if(!isPrimaryScenePointer(event)||captured!==this)return;
-            this.finishHandle(false);this.finishHud(false,event);
+        private pointerUp(event:any):boolean {
+            if(!isPrimaryScenePointer(event)||captured!==this)return false;
+            try {
+                this.finishHandle(false);
+                this.finishHud(false,event);
+            } finally {
+                // Any user callback error must not leave a global capture.
+                if(captured===this)captured=null;
+            }
+            return true;
         }
 
-        public onNotGizmoMouseDown(event:any):void {
-            input.record('outsideDown');this.pointerDown(event);
+        public onNotGizmoMouseDown(event:any):boolean|void {
+            input.record('outsideDown');
+            if(this.pointerDown(event))return false;
         }
-        public onNotGizmoMouseMove(event:any):void {this.moveInput(event);}
-        public onNotGizmoMouseUp(event:any):void {
-            input.record('outsideUp');this.pointerUp(event);
+        public onNotGizmoMouseMove(event:any):boolean|void {
+            const active=captured===this;
+            this.moveInput(event);
+            if(active)return false;
         }
-        public onGizmoMouseDown(event:any):void {
+        public onNotGizmoMouseUp(event:any):boolean|void {
+            input.record('outsideUp');
+            if(this.pointerUp(event))return false;
+        }
+        public onGizmoMouseDown(event:any):boolean|void {
             input.record('gizmoDown');
-            // Our v3 handles deliberately have no native raycast mesh.
-            // A GizmoOperation "gizmo" hit normally belongs to Creator's
-            // transform tool or another extension. Never steal its drag.
-            // A future native adapter may explicitly register our own names.
+            // No native raycast mesh is created for our v3 handles.
+            // A GizmoOperation hit usually belongs to Creator's transform
+            // tool. Never steal it unless it has our registered handle name.
             const name=readSceneHandleName(event);
             if(!name || !this.fields.some(e=>e.key===name) &&
                 !this.controls.some(e=>e.key===name))return;
-            this.pointerDown(event);
+            if(this.pointerDown(event))return false;
         }
-        public onGizmoMouseMove(event:any):void {
-            input.record('gizmoMove');this.moveInput(event);
+        public onGizmoMouseMove(event:any):boolean|void {
+            input.record('gizmoMove');
+            const active=captured===this;
+            if(active)this.moveInput(event);
+            if(active)return false;
         }
-        public onGizmoMouseUp(event:any):void {
-            input.record('gizmoUp');this.pointerUp(event);
+        public onGizmoMouseUp(event:any):boolean|void {
+            input.record('gizmoUp');
+            if(this.pointerUp(event))return false;
         }
         public onKeyDown(event:any):boolean|void {
             if(captured===this&&(event?.key==='Escape'||event?.keyCode===27)){
