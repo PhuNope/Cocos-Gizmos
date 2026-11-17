@@ -54,9 +54,17 @@ vm.runInNewContext(compile('GizmoRotateCommand'), {
         throw new Error('Unexpected rotation command import ' + id);
     },
 });
-const hud = { exports: {} };
+const appearance = { exports: {} };
+vm.runInNewContext(compile('GizmoHudStyle'), appearance);
+const hud = { exports: {}, require(id) {
+    if (id === './GizmoHudStyle') return appearance.exports;
+    throw new Error(id);
+} };
 vm.runInNewContext(compile('GizmoHudControls'), hud);
-const presentation = { exports: {} };
+const presentation = { exports: {}, require(id) {
+    if (id === './GizmoHudStyle') return appearance.exports;
+    throw new Error(id);
+} };
 vm.runInNewContext(compile('GizmoPresentation'), presentation);
 const hudLayout = { exports: {} };
 vm.runInNewContext(compile('GizmoHudLayout'), {
