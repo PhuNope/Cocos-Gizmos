@@ -90,6 +90,11 @@ const sandbox = {
         if (id === './GizmoPresentation') return {};
         if (id === './GizmoHudControls') return controls.exports;
         if (id === './GizmoHudProjection') return projection.exports;
+        if (id === './SceneHudElement') return { SceneHudElement: class {
+            render() { return false; }
+            hide() {}
+            dispose() {}
+        } };
         if (id === './SceneCameraBridge') return bridge.exports;
         throw new Error('unexpected module ' + id);
     },
