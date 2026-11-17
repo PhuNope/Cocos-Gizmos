@@ -173,17 +173,16 @@ export function hudControlScreenRect(
 export function hudSliderScreenTrack(
     viewport: { width: number; height: number }, index: number, totalRows: number,
     requestedWidth?: number,
+    rowSize?: HudSize,
 ): { left: number; width: number } {
-    const row = hudRowScreenPosition({ x: 0, y: 0 }, index, viewport, totalRows);
-    const grid = hudGrid(viewport, totalRows);
-    // The numeric value needs free space to the right of the rail.
-    const maxWidth = Math.max(24, grid.columnWidth * 0.70 - 54);
-    const preferred = Number.isFinite(requestedWidth) ?
-        requestedWidth! : Math.max(50, grid.columnWidth * 0.38);
-    return {
-        left: row.x + grid.columnWidth * 0.30,
-        width: Math.max(24, Math.min(maxWidth, preferred)),
-    };
+    const rect = hudControlScreenRect(viewport, index, totalRows, rowSize);
+    // Reserve label space at the start and numeric value space at the end.
+    // The geometry is identical for rendered rail and native click-to-set.
+    const left = rect.left + Math.max(38, Math.min(96, rect.width * 0.32));
+    const maxWidth = Math.max(16, rect.right - left - 36);
+    const preferred = Number.isFinite(requestedWidth) ? requestedWidth! :
+        Math.max(38, rect.width * 0.38);
+    return { left, width: Math.max(16, Math.min(maxWidth, preferred)) };
 }
 
 export function formatHudControl(control: HudControl, value: unknown): string {
