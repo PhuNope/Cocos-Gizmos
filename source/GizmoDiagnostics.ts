@@ -109,6 +109,8 @@ export function buildGizmoSmokeReport(
             draggingSlider: handleState.draggingSlider ?? 0,
             pendingClicks: handleState.pendingClicks ?? 0,
             input: handleState.input ?? null,
+            viewportInput: handleState.viewportInput ?? null,
+            engineInput: handleState.engineInput ?? null,
         } : { registered: 0, active: 0, reason: 'not-loaded', input: null },
         hud: {
             labelsSubmitted: hudState?.hudLabels ?? 0,
@@ -150,6 +152,16 @@ export function buildGizmoSmokeReport(
     }
     if ((report.handles.input?.missingPointer ?? 0) > 0) {
         report.concerns.push('Some handle events did not provide usable Scene pointer coordinates');
+    }
+    if (handleState?.viewportInput && handleState?.engineInput &&
+        !handleState.viewportInput.active && !handleState.engineInput.active) {
+        report.concerns.push(
+            'Neither WebView nor native engine mouse input is available; custom Gizmos will draw but cannot receive clicks'
+        );
+    }
+    if (report.scene.selectedNodeCount && handleState?.reason === 'ready-select-gizmo' &&
+        handleState.active === 0 && (handleState.positionHandles || handleState.hudControls)) {
+        report.concerns.push('Selected Gizmo descriptors exist but no input adapter is active');
     }
     if (report.handles.reason && report.handles.reason !== 'ready-select-gizmo' &&
         report.handles.reason !== 'not-initialized') {
