@@ -83,6 +83,10 @@ assert.match(entries.get('editor-runtime/GizmoHudOverlay.js') || '', /gizmoRootN
 assert.match(entries.get('editor-runtime/EditorHandleAdapterV3.js') || '', /isHandleDisposed/);
 assert.match(entries.get('editor-runtime/GizmoMoveCommand.js') || '',
     /GizmoMoveCommand/, 'Installer includes application command');
+assert.match(entries.get('editor-runtime/GizmoCommandBuilder.js') || '',
+    /GizmoCommands/, 'Installer ships the Builder used by the v3 adapter');
+assert.match(entries.get('editor-runtime/EditorHandleAdapterV3.js') || '',
+    /GizmoCommandBuilder/, 'Editor adapter must import the Command Builder');
 assert.match(entries.get('editor-runtime/GizmoHandlePresets.js') || '',
     /makeMoveGizmo/, 'Editor includes reusable descriptor factories');
 assert.match(entries.get('dist/GizmoHandlePresets.js') || '',
