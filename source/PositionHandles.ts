@@ -1667,7 +1667,7 @@ function createEditorGizmo(
                     hudControlScreenRect(projection.viewport,
                         startRow + textCount + entry.index,
                         hudLayout?.totalRows || startRow + textCount +
-                            this.hudEntries.length) : null;
+                            this.hudEntries.length, entry.control.size) : null;
                 const hitWidth = rect ? rect.width : 14;
                 const centerX = rect ? (rect.left + rect.right) * 0.5 : row.x - 14;
                 const centerY = rect ? (rect.bottom + rect.top) * 0.5 : row.y;
@@ -2115,7 +2115,7 @@ function createEditorGizmo(
             for (const entry of this.hudEntries) {
                 const rect = hudControlScreenRect(viewport,
                     placement.startRow + placement.textCount + entry.index,
-                    hudLayout?.totalRows || 0);
+                    hudLayout?.totalRows || 0, entry.control.size);
                 if (point.x >= rect.left && point.x <= rect.right &&
                     point.y >= rect.bottom && point.y <= rect.top) {
                     return entry;
