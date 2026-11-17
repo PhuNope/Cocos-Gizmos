@@ -7,7 +7,7 @@ import { inflateRawSync } from 'node:zlib';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 const zip = readFileSync(path.join(root, 'release', `Cocos-Gizmos-v${pkg.version}.zip`));
-const entries = new Map();
+const archiveEntries = new Map();
 let offset = 0;
 while (offset + 30 <= zip.length && zip.readUInt32LE(offset) === 0x04034b50) {
     const method = zip.readUInt16LE(offset + 8);
@@ -17,10 +17,24 @@ while (offset + 30 <= zip.length && zip.readUInt32LE(offset) === 0x04034b50) {
     const name = zip.subarray(offset + 30, offset + 30 + nameLen).toString('utf8');
     const begin = offset + 30 + nameLen + extraLen;
     const bytes = zip.subarray(begin, begin + compressed);
-    entries.set(name, (method === 8 ? inflateRawSync(bytes) : bytes).toString('utf8'));
+    archiveEntries.set(name, (method === 8 ? inflateRawSync(bytes) : bytes).toString('utf8'));
     offset = begin + compressed;
 }
+// An installation ZIP must unpack into a single versioned plugin folder.
+// Strip the prefix only for the assertions about files *inside* the plugin.
+const pluginRoot = `Cocos-Gizmos-v${pkg.version}/`;
+assert.ok(archiveEntries.has(pluginRoot), 'ZIP must include an explicit root folder');
+assert.ok([...archiveEntries.keys()].every(name => name.startsWith(pluginRoot)),
+    'Every entry must live under the versioned plugin folder');
+assert.ok(!archiveEntries.has('package.json'), 'No plugin files at ZIP root');
+const entries = new Map([...archiveEntries.entries()]
+    .filter(([name]) => name !== pluginRoot)
+    .map(([name, body]) => [name.slice(pluginRoot.length), body]));
+assert.ok(entries.size > 0);
+assert.ok([...entries.keys()].every(name => name.length > 0 && !name.startsWith('/')),
+    'All plugin-relative entries have valid paths');
 const installed = JSON.parse(entries.get('package.json') || '{}');
+assert.equal(installed.version, pkg.version);
 assert.equal(installed.name, 'cocos-gizmos');
 assert.ok(installed.contributions.menu.some(item =>
     item.path === 'Gizmos' && item.label === 'Reset Gizmos' &&
@@ -116,4 +130,4 @@ assert.match(entries.get('editor-assets/Examples/CocosGizmosDecoratorDemo.ts') |
 assert.match(entries.get('examples/GizmosDecoratorTest.ts') || '',
     /@registerGizmos\(CustomDrawer\)/);
 assert.ok(!installed.contributions.messages['selection:select'].methods.includes('onSelectionUnselect'));
-console.log('[packaged-selection] extracted ZIP manifest, Scene event bridge, fullscreen HUD & native reentry OK');
+console.log('[packaged-selection] versioned ZIP root, manifest, Scene event bridge, fullscreen HUD & native reentry OK');
