@@ -8,6 +8,7 @@ All notable changes to Cocos-Gizmos are documented here.
 - Added `SceneViewportInput` to intercept mouse/pointer events at the Scene engine WebView's window capture phase, project coordinates into the Scene camera, and drive both 2D/3D handle Commands and HUD controls directly; native Scene selection still receives clicks outside plugin shapes.
 - Added `SceneEngineInput` using Cocos `input` as a fallback when Scene Script has no WebView DOM access.
 - Standalone `SelectGizmo` instance fallback now activates when the Editor Gizmo factory does not expose a mounted instance on a Component.
+- When the Editor's private component Gizmo pool is absent, a standalone gesture host still supports Move/Rotate/HUD interactions via the input ports; diagnostics explicitly report `ready-direct-input-no-native-undo` because native Undo hooks are unavailable.
 - Diagnostics include `handles.viewportInput` and `handles.engineInput` with active status and input counters to distinguish dispatch failures from picking failures.
 - Automated tests cover WebView pointer and mouse capture, fallback engine mouse, native selection passthrough, hover, drag and HUD clicks.
 
