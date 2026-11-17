@@ -1,3 +1,5 @@
+import { HudDomStyle, HudSize, normalizeHudSize, normalizeHudStyle } from './GizmoHudStyle';
+
 /** Scene View display preferences and stable HUD entry filtering. */
 export interface GizmoViewConfig {
     display: 'always' | 'selected' | 'off';
@@ -14,6 +16,10 @@ export interface GizmoHudText {
     /** Maximum rendered font height in screen pixels (default 24). */
     maxSize?: number;
     color: string;
+    /** Width/height (bounded to the shared row) or a compactness preset. */
+    size: HudSize;
+    /** Safe DOM-style appearance options, without event/layout overrides. */
+    style: HudDomStyle;
 }
 
 export const DEFAULT_VIEW_CONFIG: Readonly<GizmoViewConfig> = Object.freeze({
@@ -61,7 +67,9 @@ export function normalizeHudItems(value: unknown, maxItems = 24): GizmoHudText[]
             maxSize: typeof item.maxSize === 'number' && Number.isFinite(item.maxSize)
                 ? Math.max(8, Math.min(64, item.maxSize)) : 24,
             color: typeof item.color === 'string' && COLOR_PATTERN.test(item.color)
-                ? item.color : '#ffffff',
+                ? item.color : '#dce7ef',
+            size: normalizeHudSize(item.size),
+            style: normalizeHudStyle(item.style),
         });
     }
     for (const item of result) {
