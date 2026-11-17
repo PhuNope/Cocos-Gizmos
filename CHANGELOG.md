@@ -4,6 +4,14 @@ All notable changes to Cocos-Gizmos are documented here.
 
 ## [Unreleased] — v3 development (not published)
 
+### Input bridge rework (testing)
+- Added `SceneViewportInput` to intercept mouse/pointer events at the Scene engine WebView's window capture phase, project coordinates into the Scene camera, and drive both 2D/3D handle Commands and HUD controls directly; native Scene selection still receives clicks outside plugin shapes.
+- Added `SceneEngineInput` using Cocos `input` as a fallback when Scene Script has no WebView DOM access.
+- Standalone `SelectGizmo` instance fallback now activates when the Editor Gizmo factory does not expose a mounted instance on a Component.
+- Diagnostics include `handles.viewportInput` and `handles.engineInput` with active status and input counters to distinguish dispatch failures from picking failures.
+- Automated tests cover WebView pointer and mouse capture, fallback engine mouse, native selection passthrough, hover, drag and HUD clicks.
+
+
 ### Fixed
 - Restore Move/Rotate hover highlight when Editor dispatches `onGizmoMouseMove` rather than `onNotGizmoMouseMove`, without stealing native transform-tool input.
 - Prevent HUD Button, Checkbox and Slider pointer events from propagating to the Scene picker. If Creator still issues a delayed `selection:unselect`, a short-lived gesture-specific selection lease restores only the original Node.
