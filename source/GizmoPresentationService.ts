@@ -95,8 +95,10 @@ export class GizmoPresentationService {
                     id: 'control:' + control.id,
                     text: formatHudControl(control, value),
                     order: entries.length,
-                    fontSize: 14,
+                    fontSize: control.fontSize,
                     color: control.color,
+                    size: control.size,
+                    style: control.style,
                 });
             }
         }
