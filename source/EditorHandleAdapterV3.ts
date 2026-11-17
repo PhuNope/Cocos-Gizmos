@@ -104,6 +104,41 @@ function createSelectHandleGizmo(
         private buttonDown: HudHitTarget | null=null;
         private hover: string | null=null;
         private lastPaint=0;
+        private deferredHide=false;
+        private suppressedLifecycleCancels=0;
+
+        /** Editor 3.8.8 may re-evaluate SelectGizmo visibility synchronously
+         * from onControlUpdate/onComponentChanged while the pointer is DOWN.
+         * Visibility callbacks must not end an application edit session.
+         * Only mouse-up, Escape, or explicit Scene teardown may do so.
+         */
+        public hasActiveGesture(): boolean {
+            return captured===this && !!(this.moveDrag||this.sliderDrag||this.buttonDown);
+        }
+
+        public cancelGestureForTeardown(): void {
+            this.deferredHide=false;
+            try { this.finishHandle(true); }
+            finally { this.finishHud(true); }
+        }
+
+        public hide(): void {
+            if(this.hasActiveGesture() && isSelectable(this.target as Component)){
+                this.deferredHide=true;
+                this.suppressedLifecycleCancels++;
+                return;
+            }
+            super.hide();
+        }
+
+        public destroy(): void {
+            if(this.hasActiveGesture() && isSelectable(this.target as Component)){
+                this.deferredHide=true;
+                this.suppressedLifecycleCancels++;
+                return;
+            }
+            super.destroy();
+        }
 
         constructor(...args: any[]) {
             super(...args);
@@ -478,16 +513,29 @@ function createSelectHandleGizmo(
         }
 
         public onShow():void {
-            this.shown=true;this.disposed=false;this.refreshHandles();
+            this.shown=true;this.disposed=false;
+            this.deferredHide=false;
+            this.refreshHandles();
         }
         public onHide():void {
+            if(this.hasActiveGesture() && isSelectable(this.target as Component)){
+                // Also guard Editor code paths that invoke onHide directly.
+                this.deferredHide=true;
+                this.suppressedLifecycleCancels++;
+                return;
+            }
             this.shown=false;
-            this.finishHandle(true);this.finishHud(true);
+            this.cancelGestureForTeardown();
             const comp=this.target as Component;
             if(comp)setSelectedHandleHover(comp,null);
             this.hover=null;
         }
         public onDestroy():void {
+            if(this.hasActiveGesture() && isSelectable(this.target as Component)){
+                this.deferredHide=true;
+                this.suppressedLifecycleCancels++;
+                return;
+            }
             this.onHide();this.disposed=true;this.fields=[];this.controls=[];
         }
         public onTargetUpdate():void {this.refreshHandles();}
@@ -500,6 +548,8 @@ function createSelectHandleGizmo(
                 positionHandles:this.fields.length,hudControls:this.controls.length,
                 draggingPosition:!!this.moveDrag,draggingSlider:!!this.sliderDrag,
                 pendingClick:!!this.buttonDown,
+                deferredHide:this.deferredHide,
+                suppressedLifecycleCancels:this.suppressedLifecycleCancels,
             };
         }
     };
@@ -549,6 +599,11 @@ export function createV3HandleAdapter(
 
     function release(component:Component,gizmo:any):void {
         if(!gizmo)return;
+        // Teardown is authoritative (Scene switch, disabled/destroyed Node,
+        // plugin unload). Unlike Editor's transient visibility refresh, this
+        // must roll back an in-flight gesture and free the global capture.
+        try {gizmo.cancelGestureForTeardown?.();}
+        catch(error){console.warn('[cocos-gizmos/v3] Cancel:',error);}
         try {gizmo.hide?.();}
         catch(error){console.warn('[cocos-gizmos/v3] Hide:',error);}
         try {gizmo.onDestroy?.();}
@@ -602,11 +657,18 @@ export function createV3HandleAdapter(
             if(!initialize())return;
             const present=new Set(components);
             for(const [comp,gizmo] of owned){
-                if(!present.has(comp)||!isSelectable(comp)){
+                // The Editor can briefly drop a Component from the registry
+                // while serializing its changed property. Do not terminate
+                // the in-flight gesture merely because one scan missed it.
+                if(!isSelectable(comp)||(!present.has(comp)&&!gizmo.hasActiveGesture?.())){
                     release(comp,gizmo);owned.delete(comp);active.delete(comp);
                 }
             }
             const wanted=new Set<Component>();
+            for(const [component,gizmo] of active) {
+                if(gizmo.hasActiveGesture?.() && isSelectable(component))
+                    wanted.add(component);
+            }
             for(const component of components){
                 if(!isSelectable(component)||!selected.has(component.node.uuid)||
                     (typeof component.onGizmoHandles!=='function' &&
@@ -631,6 +693,12 @@ export function createV3HandleAdapter(
             }
             for(const [comp,gizmo] of active){
                 if(!wanted.has(comp)){
+                    if(gizmo.hasActiveGesture?.() && isSelectable(comp)){
+                        // Selection snapshots can momentarily be empty during
+                        // Inspector updates. Retain the live gesture until a
+                        // genuine mouse-up/Escape or explicit Scene teardown.
+                        continue;
+                    }
                     try{gizmo.hide?.();}
                     catch(error){console.warn('[cocos-gizmos/v3] Deselect:',error);}
                     active.delete(comp);
