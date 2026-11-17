@@ -586,7 +586,12 @@ function createSelectHandleGizmo(
                 return;
             }
             this.shown=false;
-            this.cancelGestureForTeardown();
+            // A normal Editor hide may be caused by its own delayed
+            // selection:unselect dispatch after a HUD click. Do not clear
+            // the short-lived selection lease here: the main process still
+            // needs to recognize and restore the protected Node.
+            this.finishHandle(true);
+            this.finishHud(true);
             const comp=this.target as Component;
             if(comp)setSelectedHandleHover(comp,null);
             this.hover=null;
