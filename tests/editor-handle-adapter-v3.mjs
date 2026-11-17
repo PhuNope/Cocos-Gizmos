@@ -12,6 +12,8 @@ const leaseJs=ts.transpileModule(readFileSync(
 const leaseScope={exports:{}};
 vm.runInNewContext(leaseJs,leaseScope);
 const events=[],paints=[];
+let bridgePort=null;
+let bridgeMounts=0;
 let editorRebuildsOnUpdate=false;
 let editorRebuildsOnBegin=false;
 const component={
@@ -167,6 +169,13 @@ const scope={
             readSceneHandleName(e){return e?.handleName||null;},
         };
         if(name==='./SceneSelectionLease')return leaseScope.exports;
+        if(name==='./SceneViewportInput')return {SceneViewportInput:class {
+            constructor(ports){this.ports=ports;bridgePort=ports;}
+            refresh(){bridgeMounts++;}
+            detach(){}
+            status(){return {active:true,reason:'mock-pointer-capture',captured:false,
+                observed:0,intercepted:0,hover:0,cancelled:0};}
+        }};
         if(name==='./ExecuteGizmos')return {tickOnce(){paints.push('tick');}};
         throw Error(name);
     },
@@ -188,9 +197,33 @@ assert.equal(typeDefs.Object,undefined,'Generic Object must never own the native
 assert.equal(typeDefs['cc.Object'],undefined);
 
 assert.equal(adapter.status().reason,'ready-select-gizmo');
+assert.ok(bridgePort && bridgeMounts>0,'Scene WebView bridge must be installed');
+assert.equal(adapter.status().viewportInput.active,true);
 assert.equal(adapter.status().positionHandles,1);
 assert.equal(adapter.status().hudControls,3);
 assert.ok(paints.includes(component),'2D/3D rendering is a separate port');
+const domHoverBefore=events.length;
+bridgePort.hover({x:80,y:80,button:0,buttons:0});
+assert.ok(events.slice(domHoverBefore).some(e=>e[0]==='hover'&&
+    e[1]==='position:position:single'),
+    'Direct Scene viewport hover must work with no native raycast handle');
+bridgePort.hover({x:650,y:80,button:0,buttons:0});
+assert.equal(events.at(-1)[0],'hover');
+assert.equal(events.at(-1)[1],null,'Direct Scene hover clears outside the handle');
+assert.equal(bridgePort.down({x:80,y:80,button:0,buttons:1}),true);
+bridgePort.move({x:95,y:80,button:0,buttons:1});
+assert.equal(component.position.x,95,
+    'Viewport capture must drive the same MoveCommand as native callbacks');
+bridgePort.up({x:95,y:80,button:0,buttons:0});
+assert.equal(adapter.status().draggingPosition,0);
+assert.equal(bridgePort.down({x:650,y:250,button:0,buttons:1}),false,
+    'Unrelated Scene clicks remain native selection events');
+const domHudButtonCount=events.filter(e=>e[0]==='button').length;
+assert.equal(bridgePort.down({x:740,y:80,button:0,buttons:1}),true,
+    'HUD Buttons must be captured without BoxController raycast meshes');
+bridgePort.up({x:740,y:80,button:0,buttons:0});
+assert.equal(events.filter(e=>e[0]==='button').length,domHudButtonCount+1);
+
 // Native Gizmo rays may win when hovering over a Move handle. They must
 // still update our presentation highlight, without consuming Editor input.
 const hoverBefore=events.filter(e=>e[0]==='hover').length;
