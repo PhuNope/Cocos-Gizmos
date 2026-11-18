@@ -111,6 +111,8 @@ const owner={
 };
 const hud=()=>GizmoHUD.createHud('shape')
     .width(320).gap(10).padding(12)
+    .style({backgroundColor:'#203040'})
+    .wrap(false).shrink(0).basis(320)
     .text('title','3D gizmos')
     .row('settings',row=>row.gap(12)
         .slider('size','Shape Size',GizmoHUD.bind('size'),{
@@ -134,6 +136,9 @@ const panel=root.children[0];
 assert.equal(panel.style.flexDirection,'column');
 assert.equal(panel.style.pointerEvents,'none');
 assert.equal(panel.style.width,'320px');
+assert.equal(panel.style.flexBasis,'320px');
+assert.equal(panel.style.flexShrink,'0');
+assert.equal(panel.style.backgroundColor,'#203040');
 const row=panel.find(x=>x.attributes['data-gizmo-hud-id']==='shape/shape/settings');
 assert.equal(row.style.flexDirection,'row');
 assert.equal(row.style.gap,'12px');
