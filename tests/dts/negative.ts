@@ -21,6 +21,13 @@ const invalid2DMove: GizmosMove2DHandleOptions = { boxSize: 0.5 };
 // @ts-expect-error — 2D Move has no Z-specific axis selection
 Gizmos2D.move('position', { axis: 'z' });
 
+// @ts-expect-error — DOM actions cannot substitute for property commands
+GizmoHUD.createHud().slider('s','Size',GizmoHUD.action(()=>{}),{min:0,max:1});
+// @ts-expect-error — invalid row callback type
+GizmoHUD.createHud().row('r',42);
+// @ts-expect-error — allowed justify values are constrained
+GizmoHUD.createHud().justify('start-space');
+
 // @ts-expect-error — toggle needs a boolean component property name
 const invalidToggle: GizmoHudToggle = { type: 'toggle', id: 'x', text: 'Toggle' };
 // @ts-expect-error — checkbox is distinct from slider
