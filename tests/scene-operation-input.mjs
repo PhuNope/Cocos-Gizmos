@@ -139,6 +139,12 @@ assert.equal(op.emit('mousemove',{...point,x:900,y:999}),false);
 assert.equal(op.emit('mouseup',{...point,x:900,y:999}),false);
 assert.equal(input.status().hudOwned,false);
 delete leaseScope.document;
+// Editor may swallow DOM mouseup: the next unrelated down must recover.
+assert.equal(op.emit('mousedown',{...point,target:domHudHit}),false);
+assert.equal(input.status().hudOwned,true);
+op.emit('mousemove',{...point,buttons:0});
+assert.equal(input.status().hudOwned,false,
+    'HUD ownership must expire when native mouseup did not arrive');
 assert.equal(op.emit('mousedown',{...point}),false);
 assert.equal(nativeSelection,0,'HUD/handle click blocks native Node selection');
 assert.equal(nativeCamera,0);
