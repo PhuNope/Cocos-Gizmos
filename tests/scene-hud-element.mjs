@@ -180,10 +180,10 @@ assert.equal(fakeWindow.listeners.get('pointermove').length,0,
 assert.equal(hud.render(viewport,nextRows,4),true);
 assert.equal(root.children.length,4);
 
-const button=root.children[3];
+const interactiveButton=root.children[3];
 const buttonHit=controls.exports.hudControlScreenRect(viewport,3,4);
 const buttonPress=event(buttonHit.left+10,buttonHit.bottom+10,2);
-button.emit('pointerdown',buttonPress);
+interactiveButton.emit('pointerdown',buttonPress);
 fakeWindow.emit('pointerup',buttonPress);
 assert.equal(inputEvents.at(-1)[0],'up');
 assert.equal(inputEvents.filter(x=>x[0]==='cancel').length,0);
