@@ -174,6 +174,12 @@ const scope={
             readSceneHandleName(e){return e?.handleName||null;},
         };
         if(name==='./SceneSelectionLease')return leaseScope.exports;
+        if(name==='./ScenePointerCoordinates')return {
+            sceneEventToViewport(event) {
+                const pointer=scope.require('./SceneGizmoInput').readScenePointer(event);
+                return {pointer,source:pointer?'editor-xy':'missing'};
+            },
+        };
         if(name==='./SceneViewportInput')return {SceneViewportInput:class {
             constructor(ports){
                 this.ports=ports;
