@@ -116,9 +116,21 @@ export class GizmoHudDomRenderer {
         this.renderedOwners=owners;
         const fragment=doc.createDocumentFragment();
         this.liveInputs.clear();
+        const offsets:Record<string,number>={};
         for(const item of items) {
             const panel=this.drawNode(doc,item,item.definition.root,
                 item.definition.id,true);
+            const corner=item.definition.position||'top-right';
+            const previous=offsets[corner]||0;
+            const top=corner.startsWith('top');
+            const left=corner.endsWith('left');
+            Object.assign(panel.style,{
+                position:'absolute',
+                [top?'top':'bottom']: (12+previous)+'px',
+                [left?'left':'right']: '12px',
+                pointerEvents:'none',
+            });
+            offsets[corner]=previous+(item.definition.root.height||150)+8;
             fragment.appendChild(panel);
         }
         this.root.replaceChildren(fragment);
@@ -340,6 +352,7 @@ export class GizmoHudDomRenderer {
         input.disabled=!!node.disabled;
         this.addControlEvents(input);
         this.liveInputs.set(scope+'/'+node.id,input);
+        if(node.visible===false)element.style.display='none';
         return element;
     }
 
@@ -410,10 +423,10 @@ export class GizmoHudDomRenderer {
             this.root.id='cocos-gizmos-builder-hud';
             Object.assign(this.root.style,{
                 position:'absolute',right:'12px',top:'12px',
-                display:'flex',flexDirection:'column',alignItems:'flex-end',
-                gap:'8px',zIndex:'2147483001',
+                display:'block',left:'0',right:'0',top:'0',bottom:'0',
+                zIndex:'2147483001',
                 pointerEvents:'none',
-                maxHeight:'75%',overflow:'visible',
+                overflow:'visible',
                 fontFamily:'system-ui, -apple-system, sans-serif',
             });
         }
