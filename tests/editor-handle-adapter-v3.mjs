@@ -6,6 +6,9 @@ import vm from 'node:vm';
 const source=readFileSync(new URL('../source/EditorHandleAdapterV3.ts',import.meta.url),'utf8');
 const compilerOptions={target:ts.ScriptTarget.ES2017,module:ts.ModuleKind.CommonJS};
 const js=ts.transpileModule(source,{compilerOptions}).outputText;
+const operationJs=ts.transpileModule(readFileSync(
+    new URL('../source/SceneOperationInput.ts',import.meta.url),'utf8'),
+    {compilerOptions}).outputText;
 const leaseJs=ts.transpileModule(readFileSync(
     new URL('../source/SceneSelectionLease.ts',import.meta.url),'utf8'),
     {compilerOptions}).outputText;
@@ -182,13 +185,14 @@ const scope={
             status(){return {active:false,reason:'webview-pointer-preferred',
                 captured:false,observed:0,intercepted:0,hover:0};}
         }};
-        if(name==='./SceneOperationInput')return {SceneOperationInput:class {
-            refresh(){}
-            detach(){}
-            status(){return {active:false,reason:'scene-operation-unavailable',
-                captured:false,observed:0,intercepted:0,hover:0,cancelled:0,
-                priority:100};}
-        }};
+        if(name==='./SceneOperationInput') {
+            const module={exports:{}};
+            vm.runInNewContext(operationJs,{
+                exports:module.exports,console,globalThis:scope.globalThis,
+                require(name){return scope.require(name);},
+            },{filename:'SceneOperationInput.js'});
+            return module.exports;
+        }
         if(name==='./ExecuteGizmos')return {tickOnce(){paints.push('tick');}};
         throw Error(name);
     },
