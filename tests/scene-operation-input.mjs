@@ -58,7 +58,11 @@ const point={x:120,y:80,button:0,buttons:1,
     stopPropagation(){this.stopped=true;},
     preventDefault(){this.prevented=true;}};
 let nativeSelection=0,nativeCamera=0;
-op.on('mousedown',()=>{
+op.on('mousedown',(event)=>{
+    // Native Canvas picking ignores HTML controls; our Operation adapter
+    // must not prevent the browser from dispatching those events.
+    if(event?.target?.closest?.('#cocos-gizmos-scene-hud, #cocos-gizmos-builder-hud'))
+        return;
     nativeSelection++;
     events.push(['native-selection']);
 },99);
@@ -103,12 +107,13 @@ const domHudHit={closest(selector){
     assert.equal(selector,'#cocos-gizmos-scene-hud, #cocos-gizmos-builder-hud');return {};
 }};
 const handledBeforeDom=ownDown;
-assert.equal(op.emit('mousedown',{...point,target:domHudHit}),false,
-    'Browser floating HUD events cannot reach the native Scene picker');
+assert.equal(op.emit('mousedown',{...point,target:domHudHit}),undefined,
+    'Native DOM button/input must receive its pointerdown');
 assert.equal(ownDown,handledBeforeDom,
     'Native Operation must not begin a duplicate DOM HUD command');
 assert.equal(input.status().hudOwned,true);
-assert.equal(op.emit('mouseup',{...point}),false);
+assert.equal(op.emit('mouseup',{...point}),undefined,
+    'Native DOM slider must receive pointerup');
 assert.equal(input.status().hudOwned,false);
 assert.equal(nativeSelection,0);
 // Creator 3D can strip event.target before dispatching Operation listeners.
@@ -135,12 +140,14 @@ assert.equal(op.emit('mousedown',{...point,
 assert.equal(input.status().hudOwned,true);
 assert.equal(nativeSelection,0,'3D HUD click never unselects the Node');
 assert.equal(ownDown,beforeGeometric,'3D HUD click cannot begin Gizmo drag');
-assert.equal(op.emit('mousemove',{...point,x:900,y:999}),false);
-assert.equal(op.emit('mouseup',{...point,x:900,y:999}),false);
+assert.equal(op.emit('mousemove',{...point,x:900,y:999}),undefined,
+    'HUD drag movement cannot terminate the browser event');
+assert.equal(op.emit('mouseup',{...point,x:900,y:999}),undefined,
+    'HUD release cannot terminate the browser event');
 assert.equal(input.status().hudOwned,false);
 delete leaseScope.document;
 // Editor may swallow DOM mouseup: the next unrelated down must recover.
-assert.equal(op.emit('mousedown',{...point,target:domHudHit}),false);
+assert.equal(op.emit('mousedown',{...point,target:domHudHit}),undefined);
 assert.equal(input.status().hudOwned,true);
 op.emit('mousemove',{...point,buttons:0});
 assert.equal(input.status().hudOwned,false,
