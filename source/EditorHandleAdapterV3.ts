@@ -811,8 +811,15 @@ export function createV3HandleAdapter(
             // from native Scene selection after a custom HUD/control click.
             operationInput.refresh();
             if(operationInput.status().active){
-                viewportInput.detach();
-                engineInput.refresh(false);
+                // Scene Operation may become available AFTER the first
+                // engine/WebView mouse-down. Never detach the fallback port
+                // while it owns a gesture: detach() must cancel its capture.
+                // The new Operation subscription stays passive until the
+                // old port has committed on mouse-up. Switch next frame.
+                if(!captured){
+                    viewportInput.detach();
+                    engineInput.refresh(false);
+                }
             } else {
                 viewportInput.refresh();
                 engineInput.refresh(!viewportInput.status().active);
