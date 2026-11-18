@@ -4,6 +4,13 @@ All notable changes to Cocos-Gizmos are documented here.
 
 ## [Unreleased] — v3 development (not published)
 
+### Fixed — Scene input dispatch
+- Route HUD controls and 2D/3D Move/Rotate through Creator 3.8.8 `cce.Operation` at priority 100, ahead of Editor Gizmo=99 and Camera=98. Returning `false` for a true plugin hit prevents the Editor's Scene-selection handler from canceling the gesture.
+- Keep DOM and Cocos engine input routes only as fallbacks, not simultaneous listeners, and clear all listeners on Scene teardown.
+- Continue registering screen-space controls even when another extension or an old Gizmo already occupies the Component's private Gizmo-pool key.
+- Add native-operation priority, multi-frame slider/handle, hover, Escape, passthrough-selection, and occupied-Gizmo-pool regression tests.
+
+
 ### Input bridge rework (testing)
 - Added `SceneViewportInput` to intercept mouse/pointer events at the Scene engine WebView's window capture phase, project coordinates into the Scene camera, and drive both 2D/3D handle Commands and HUD controls directly; native Scene selection still receives clicks outside plugin shapes.
 - Added `SceneEngineInput` using Cocos `input` as a fallback when Scene Script has no WebView DOM access.
