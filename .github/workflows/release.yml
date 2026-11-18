@@ -31,16 +31,16 @@ jobs:
       # upload-artifact already creates a downloadable ZIP. Upload extracted
       # plugin files, NOT release/Cocos-Gizmos-v<version>.zip, to avoid ZIP-in-ZIP.
       - name: Stage and verify versioned development folder
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/v3' }}
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/v3') }}
         run: |
           node scripts/stage-dev-artifact.mjs
           node tests/staged-artifact.mjs
 
       - name: Upload development extension artifact
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/v3' }}
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/v3') }}
         uses: actions/upload-artifact@v4
         with:
-          name: Cocos-Gizmos-v3-${{ github.sha }}
+          name: Cocos-Gizmos-v3-${{ github.event_name }}-${{ github.sha }}
           # The downloaded Actions ZIP extracts directly to Cocos-Gizmos-v3.0.1/
           path: release/dev-artifact/
           if-no-files-found: error
