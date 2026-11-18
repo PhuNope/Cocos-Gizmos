@@ -200,6 +200,30 @@ assert.equal(root.children.length,1);
 renderer.beginFrame();
 renderer.finishFrame();
 assert.equal(root.style.display,'none','Unselected Node hides its builder HUD');
+// Persistent mounts are rendered without a selected component callback.
+const unregister=GizmoHUD.commands.register({
+    id:'gizmo.persist',
+    execute:context=>{context.lastEvent='persistent';},
+});
+const persistent=GizmoHUD.createHud('persist')
+    .position('bottom-left')
+    .theme('light')
+    .button('Run',{command:'gizmo.persist'})
+    .mount(replacement);
+renderer.beginFrame();
+assert.equal(renderer.finishFrame(),true);
+const persistentButton=root.find(x=>x.tag==='button');
+persistentButton.emit('click');
+assert.equal(replacement.lastEvent,'persistent');
+assert.equal(root.children[0].style.bottom,'12px');
+persistent.hide();
+renderer.beginFrame();renderer.finishFrame();
+assert.equal(root.style.display,'none');
+persistent.show();
+renderer.beginFrame();renderer.finishFrame();
+assert.equal(root.style.display,'flex');
+persistent.destroy();
+unregister();
 renderer.dispose();
 assert.equal(host.children.length,0);
 assert.equal(host.style.position,'');
