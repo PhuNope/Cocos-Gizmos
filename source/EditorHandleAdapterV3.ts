@@ -218,8 +218,14 @@ function createSelectHandleGizmo(
                     (field.id?':'+field.id:''),
                 field,
             })) : [];
-            const controls=allowHud(component) ?
-                (this.placement()?.controls ||
+            const placement=this.placement();
+            // Builder HUD has its own DOM layout and pointer controls.
+            // Only the texture/headless fallback needs the old row picking.
+            const domBuilder=!!placement?.tree &&
+                !!((globalThis as any).document?.getElementById?.('GameDiv') ||
+                   (globalThis as any).document?.getElementById?.('GameCanvas'));
+            const controls=allowHud(component) && !domBuilder ?
+                (placement?.controls ||
                  normalizeHudControls(component.onGizmoHudControls?.())) : [];
             this.controls=controls.filter((control) =>
                 control.type==='button' ||
@@ -493,7 +499,9 @@ function createSelectHandleGizmo(
                     // makes Editor run an invalid property transaction and
                     // can drop the currently selected Node. Actions should
                     // update their own properties and notify Scene redraw.
-                    component.onGizmoHudAction?.(control.id);
+                    const command=this.placement()?.commands?.get(control.id);
+                    if(command?.kind==='action')command.execute(component);
+                    else component.onGizmoHudAction?.(control.id);
                     this.safeNativeHook('button:'+control.id,()=>
                         this.onComponentChanged?.(component.node));
                     requestSceneRepaint();
