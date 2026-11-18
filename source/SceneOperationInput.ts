@@ -78,6 +78,8 @@ export class SceneOperationInput {
     }
 
     private readonly onDown=(event:any):boolean|void=>{
+        if(event?.target?.closest?.('#cocos-gizmos-scene-hud') ||
+            event?.event?.target?.closest?.('#cocos-gizmos-scene-hud')) return;
         if(this.capturing || !isPrimaryScenePointer(event))return;
         const point=this.point(event);
         if(!point)return;
