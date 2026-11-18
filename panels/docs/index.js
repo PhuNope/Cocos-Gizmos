@@ -242,7 +242,7 @@ const examples = Object.freeze([
             '    }))',
             '    .build();',
             '}',
-        ].join('\\n'),
+        ].join('\n'),
         notes: [
             'Builder chỉ tạo immutable layout tree, không tạo Node/DOM trong Component.',
             'GizmoHUD.bind(property) dùng Command cho Slider/Checkbox/Toggle.',
