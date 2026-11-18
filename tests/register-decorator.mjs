@@ -28,6 +28,7 @@ class Drawer {
     constructor(component) { this.component = component; count++; }
     onDrawGizmos() { calls.push(['draw', this.component.id]); }
     onGizmoHandles() { return [{ property: 'point' }]; }
+    onGizmoHUD() { return { kind:'hud', id:'drawer-'+this.component.id }; }
     onGizmoChanged(...args) { calls.push(['changed', this.component.id, ...args]); }
     onGizmoHudChanged(...args) { calls.push(['hud', this.component.id, ...args]); }
     onGizmoHudAction(id) { calls.push(['action', this.component.id, id]); }
@@ -45,6 +46,8 @@ const a = new Example('a'), b = new Example('b');
 a.onDrawGizmos(); a.onDrawGizmos(); b.onDrawGizmos();
 assert.equal(count, 2, 'Each Component has one cached Gizmos drawer');
 assert.deepEqual(a.onGizmoHandles(), [{ property: 'point' }]);
+assert.deepEqual(a.onGizmoHUD(), { kind:'hud',id:'drawer-a' },
+    'Decorator forwards onGizmoHUD() to the cached drawer');
 a.onGizmoChanged('point', 'update', 2);
 a.onGizmoHudChanged('size', 'cancel', 1.5);
 b.onGizmoHudAction('reset');
@@ -74,4 +77,5 @@ const mounted = readFileSync(path.join(root,
 assert.match(editable, /@registerGizmos\(CustomDrawer\)/);
 assert.match(editable, /implements IDrawGizmos/);
 assert.match(mounted, /from '\.\.\/RegisterGizmos'/);
+assert.match(editable, /onGizmoHUD\(\)/);
 console.log('[register-decorator] cached Editor callbacks, HUD and game/Preview no-op OK');
