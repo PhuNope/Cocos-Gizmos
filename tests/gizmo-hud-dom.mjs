@@ -270,6 +270,8 @@ assert.equal(host.style.position,'');
 // pointer-events:none. No native DOM event is delivered to these inputs;
 // Editor Operation coordinates must drive the very same Commands.
 sceneIs3D=true;
+// Restore the original viewport rectangle after the resize test above.
+viewportRect={left:20,top:36,width:800,height:500};
 const opOwner={
     node:{uuid:'3d-operation'},size:1,wireframe:true,lastEvent:'idle',
     changes:[],
