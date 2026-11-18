@@ -46,6 +46,8 @@ export class GizmoHudDomRenderer {
     private gesture: ActiveGesture | null = null;
     private operationGesture: OperationGesture | null = null;
     private readonly operationControls: OperationControl[] = [];
+    private operationAttemptCount = 0;
+    private operationLastHit = 'not-checked';
     private operationDownCount = 0;
     private operationUpdateCount = 0;
     private operationCommitCount = 0;
@@ -99,6 +101,7 @@ export class GizmoHudDomRenderer {
     public operationStatus() {
         return {enabled:this.usesSceneOperationInput(),
             captured:!!this.operationGesture,
+            attempts:this.operationAttemptCount,lastHit:this.operationLastHit,
             down:this.operationDownCount,update:this.operationUpdateCount,
             commit:this.operationCommitCount,controls:this.operationControls.length};
     }
@@ -122,13 +125,25 @@ export class GizmoHudDomRenderer {
     /** Scene Operation priority 100: hit-test the *visible panel* first. */
     public operationDown(pointer:{x:number;y:number},
         viewport:{width:number;height:number}|null):boolean {
-        if(!this.usesSceneOperationInput() || this.operationGesture ||
-            this.gesture || this.root?.style.display==='none' ||
-            !this.root || !viewport)return false;
+        this.operationAttemptCount++;
+        if(!this.usesSceneOperationInput()){
+            this.operationLastHit='not-3d';return false;
+        }
+        if(this.operationGesture||this.gesture){
+            this.operationLastHit='already-captured';return false;
+        }
+        if(this.root?.style.display==='none'||!this.root){
+            this.operationLastHit='hidden';return false;
+        }
+        if(!viewport){
+            this.operationLastHit='missing-viewport';return false;
+        }
         const pt=this.operationPoint(pointer,viewport);
-        if(!pt)return false;
+        if(!pt){this.operationLastHit='missing-canvas-rect';return false;}
         const panels=Array.from(this.root.children) as HTMLElement[];
-        if(!panels.some(panel=>this.inside(panel,pt.x,pt.y)))return false;
+        if(!panels.some(panel=>this.inside(panel,pt.x,pt.y))){
+            this.operationLastHit='outside-panel';return false;
+        }
         // Panel padding and labels also belong to HUD and cannot unselect.
         const control=[...this.operationControls].reverse().find(item=>
             !item.node.disabled && (this.inside(item.element,pt.x,pt.y) ||
@@ -136,6 +151,7 @@ export class GizmoHudDomRenderer {
                 !!item.element.parentElement &&
                 this.inside(item.element.parentElement,pt.x,pt.y)))||null;
         this.operationGesture={control,lastX:pt.x,lastY:pt.y};
+        this.operationLastHit=control?control.node.kind:'panel-background';
         this.operationDownCount++;
         if(control?.node.kind==='slider' &&
             this.commands.begin(control.component,control.node)) {
