@@ -1,6 +1,6 @@
 import { isPrimaryScenePointer } from './SceneGizmoInput';
 import { sceneEventToViewport } from './ScenePointerCoordinates';
-import { consumeOwnedSceneEvent } from './SceneSelectionLease';
+import { consumeOwnedSceneEvent, isSceneHudPointerEvent } from './SceneSelectionLease';
 import type { SceneViewportInputPorts, ViewportPointer } from './SceneViewportInput';
 
 /** Creator 3.8.8 builtin/scene/@types/cce/public/operation/index.d.ts
@@ -21,6 +21,7 @@ interface OperationPort {
 export class SceneOperationInput {
     private operation: OperationPort | null = null;
     private capturing = false;
+    private hudOwned = false;
     private events = 0;
     private intercepted = 0;
     private hoverEvents = 0;
@@ -78,15 +79,14 @@ export class SceneOperationInput {
     }
 
     private readonly onDown=(event:any):boolean|void=>{
-        if(event?.target?.closest?.('#cocos-gizmos-scene-hud, #cocos-gizmos-builder-hud') ||
-            event?.event?.target?.closest?.('#cocos-gizmos-scene-hud, #cocos-gizmos-builder-hud')) {
-            // DOM floating controls own this gesture; consume only the
-            // Editor Operation dispatch so its native Scene picker does not
-            // run a second Node-selection mouse-down.
+        if(this.capturing || this.hudOwned || !isPrimaryScenePointer(event))return;
+        const point=this.point(event);
+        // Editor 3D Operation events may lose the native DOM target.
+        // A geometric HUD hit must block the native selection BEFORE it runs.
+        if(isSceneHudPointerEvent(event,point,this.ports.viewport())){
+            this.hudOwned=true;
             return false;
         }
-        if(this.capturing || !isPrimaryScenePointer(event))return;
-        const point=this.point(event);
         if(!point)return;
         this.events++;
         try {
@@ -107,6 +107,7 @@ export class SceneOperationInput {
     };
 
     private readonly onMove=(event:any):boolean|void=>{
+        if(this.hudOwned)return false;
         const point=this.point(event);
         if(!point)return;
         this.events++;
@@ -125,6 +126,10 @@ export class SceneOperationInput {
     };
 
     private readonly onUp=(event:any):boolean|void=>{
+        if(this.hudOwned){
+            this.hudOwned=false;
+            return false;
+        }
         if(!this.capturing)return;
         this.events++;
         consumeOwnedSceneEvent(event);
@@ -136,6 +141,10 @@ export class SceneOperationInput {
     };
 
     private readonly onKeyDown=(event:any):boolean|void=>{
+        if(this.hudOwned && (event?.key==='Escape' || event?.keyCode===27)){
+            this.hudOwned=false;
+            return;
+        }
         if(!this.capturing || event?.key!=='Escape' && event?.keyCode!==27)
             return;
         this.capturing=false;
@@ -157,6 +166,7 @@ export class SceneOperationInput {
             }
         }
         this.operation=null;
+        this.hudOwned=false;
         if(this.capturing){
             this.capturing=false;
             this.ports.cancel();
@@ -167,7 +177,7 @@ export class SceneOperationInput {
     public status() {
         return {
             active:!!this.operation,reason:this.reason,
-            captured:this.capturing,observed:this.events,
+            captured:this.capturing,hudOwned:this.hudOwned,observed:this.events,
             intercepted:this.intercepted,hover:this.hoverEvents,
             cancelled:this.cancellations,priority:SCENE_GIZMO_INPUT_PRIORITY,
             pointerSource:this.lastPointerSource,
