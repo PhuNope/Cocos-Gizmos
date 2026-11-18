@@ -13,6 +13,17 @@ import type { SceneViewportInputPorts, ViewportPointer } from './SceneViewportIn
  */
 export const SCENE_GIZMO_INPUT_PRIORITY = 100;
 
+export interface BuilderHudOperationPort {
+    usesSceneOperationInput(): boolean;
+    operationDown(pointer: ViewportPointer,
+        viewport:{width:number;height:number}|null):boolean;
+    operationMove(pointer: ViewportPointer,
+        viewport:{width:number;height:number}|null):boolean;
+    operationUp(pointer: ViewportPointer|null,
+        viewport:{width:number;height:number}|null):boolean;
+    operationCancel():void;
+}
+
 interface OperationPort {
     on(type: string, listener: (event: any) => boolean | void, priority?: number): unknown;
     removeListener?(type: string, listener: (event: any) => boolean | void): void;
@@ -23,6 +34,8 @@ export class SceneOperationInput {
     private operation: OperationPort | null = null;
     private capturing = false;
     private hudOwned = false;
+    private builderHudGesture = false;
+    private builderHudDown = 0;
     private events = 0;
     private intercepted = 0;
     private hoverEvents = 0;
@@ -35,13 +48,15 @@ export class SceneOperationInput {
         private readonly operationPort: () => OperationPort | null =
             () => (globalThis as any).cce?.Operation ||
                 (globalThis as any).window?.cce?.Operation || null,
+        private readonly builderHud: () => BuilderHudOperationPort | null =
+            () => null,
     ) {}
 
     public refresh(): void {
         const operation=this.operationPort();
         if(!operation || typeof operation.on!=='function' ||
             typeof (operation.removeListener || operation.off)!=='function') {
-            if(this.capturing){
+            if(this.capturing || this.builderHudGesture){
                 // A temporary Scene recreation must not force a rollback
                 // before the old dispatcher sends mouse-up. Teardown
                 // explicitly calls detach() and still cancels on purpose.
@@ -53,7 +68,7 @@ export class SceneOperationInput {
             return;
         }
         if(operation===this.operation)return;
-        if(this.capturing){
+        if(this.capturing || this.builderHudGesture){
             this.reason='operation-transition-deferred';
             return;
         }
@@ -85,6 +100,19 @@ export class SceneOperationInput {
         // a new gesture and must never inherit stale HUD ownership.
         this.hudOwned=false;
         const point=this.point(event);
+        const hud=this.builderHud();
+        // Cocos 3D Editor's parent Scene Panel has webview:pointer-events none;
+        // pointerdown cannot reach the rendered HTML even at maximal z-index.
+        // The Editor Operation therefore owns 3D HUD input and dispatches
+        // directly to the application-layer commands by control rectangles.
+        if(point && hud?.usesSceneOperationInput() &&
+            hud.operationDown(point,this.ports.viewport())){
+            this.builderHudGesture=true;
+            this.builderHudDown++;
+            this.hudOwned=true;
+            consumeOwnedSceneEvent(event);
+            return false; // Stop native Node picker, not an active DOM event.
+        }
         // A browser click over the DOM HUD must reach the actual HTML
         // control, even when Creator also reports a Scene Operation event.
         // Stop only geometry-only Scene picks: returning false for a real
@@ -114,6 +142,12 @@ export class SceneOperationInput {
     };
 
     private readonly onMove=(event:any):boolean|void=>{
+        if(this.builderHudGesture){
+            const point=this.point(event);
+            if(point)this.builderHud()?.operationMove(point,this.ports.viewport());
+            consumeOwnedSceneEvent(event);
+            return false;
+        }
         if(this.hudOwned){
             // The Scene Operation may not receive mouseup when a native DOM
             // control owns it. Release the guard once the mouse is up.
@@ -140,6 +174,16 @@ export class SceneOperationInput {
     };
 
     private readonly onUp=(event:any):boolean|void=>{
+        if(this.builderHudGesture){
+            this.builderHudGesture=false;
+            this.hudOwned=false;
+            const point=this.point(event);
+            try {this.builderHud()?.operationUp(point,this.ports.viewport());}
+            catch(error){this.builderHud()?.operationCancel();
+                console.warn('[cocos-gizmos/hud] Operation release:',error);}
+            consumeOwnedSceneEvent(event);
+            return false;
+        }
         if(this.hudOwned){
             this.hudOwned=false;
             return; // Never cancel native pointerup for a HUD slider.
@@ -155,6 +199,13 @@ export class SceneOperationInput {
     };
 
     private readonly onKeyDown=(event:any):boolean|void=>{
+        if(this.builderHudGesture &&
+            (event?.key==='Escape'||event?.keyCode===27)){
+            this.builderHudGesture=false;
+            this.hudOwned=false;
+            this.builderHud()?.operationCancel();
+            return false;
+        }
         if(this.hudOwned && (event?.key==='Escape' || event?.keyCode===27)){
             this.hudOwned=false;
             return;
@@ -181,6 +232,10 @@ export class SceneOperationInput {
         }
         this.operation=null;
         this.hudOwned=false;
+        if(this.builderHudGesture){
+            this.builderHudGesture=false;
+            this.builderHud()?.operationCancel();
+        }
         if(this.capturing){
             this.capturing=false;
             this.ports.cancel();
@@ -191,7 +246,9 @@ export class SceneOperationInput {
     public status() {
         return {
             active:!!this.operation,reason:this.reason,
-            captured:this.capturing,hudOwned:this.hudOwned,observed:this.events,
+            captured:this.capturing,hudOwned:this.hudOwned,
+            builderHudGesture:this.builderHudGesture,builderHudDown:this.builderHudDown,
+            observed:this.events,
             intercepted:this.intercepted,hover:this.hoverEvents,
             cancelled:this.cancellations,priority:SCENE_GIZMO_INPUT_PRIORITY,
             pointerSource:this.lastPointerSource,
