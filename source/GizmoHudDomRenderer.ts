@@ -144,7 +144,7 @@ export class GizmoHudDomRenderer {
                     node.gap,node.padding,node.align,node.justify,
                     node.style,node.shrink,node.basis,node.wrap,
                     (node.children || []).map(key)];
-            if(!('command' in node))return [node.kind,node.id,node.text,node.style,node.grow];
+            if(!('command' in node))return [node.kind,node.id,node.text,node.style,'grow' in node?node.grow:undefined];
             return [node.kind,node.id,node.text,node.style,node.grow,
                 node.min,node.max,node.step,
                 node.command.kind,
@@ -208,7 +208,7 @@ export class GizmoHudDomRenderer {
         if ('visible' in node && node.visible===false)element.style.display='none';
         Object.assign(element.style,{
             boxSizing:'border-box', minWidth:'0',
-            flexGrow: String(node.grow ?? 0),
+            flexGrow: String('grow' in node ? node.grow ?? 0 : 0),
             // Only container nodes currently expose shrink and basis; leaf
             // defaults use the browser's native flex sizing.
             ...('children' in node ? {
@@ -422,8 +422,8 @@ export class GizmoHudDomRenderer {
             this.root=doc.createElement('div');
             this.root.id='cocos-gizmos-builder-hud';
             Object.assign(this.root.style,{
-                position:'absolute',right:'12px',top:'12px',
-                display:'block',left:'0',right:'0',top:'0',bottom:'0',
+                position:'absolute',display:'block',
+                left:'0',right:'0',top:'0',bottom:'0',
                 zIndex:'2147483001',
                 pointerEvents:'none',
                 overflow:'visible',
