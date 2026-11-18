@@ -77,6 +77,32 @@ Component descriptors / Gizmos2D & Gizmos3D / HUD size+style
   cache flush clears obsolete strokes immediately; the normal 750ms
   idle-frame geometry grace remains unchanged for other drawing.
 
+## GizmoHUD v3 (Flexily-inspired builder)
+
+`GizmoHUD.createHud(id)` creates a fluent layout tree, not an Editor node
+or DOM element. `GizmoHUD.bind(property)` and `GizmoHUD.action(handler)`
+describe property and action Commands. `onGizmoHUD()` returns an immutable
+`GizmoHudDefinition`. See [HUD_BUILDER.md](./HUD_BUILDER.md).
+
+Architecture boundaries:
+
+- **Domain:** `GizmoHUD.ts` owns layout/command descriptors and snapshots.
+  It depends on neither `cc`, DOM, nor Editor APIs.
+- **Application:** `GizmoHUDController.ts` executes property/action Commands
+  and holds `GizmoEditSession` until commit or cancel.
+- **Scene adapters:** `GizmoHudDomRenderer.ts` renders actual native HTML
+  controls in a CSS Flexbox hierarchy. `GizmoHudLayout.ts` maps the same
+  builder to a sequential row-based texture fallback if Scene DOM is missing.
+- **Composition:** `GizmoPresentationService.ts` picks the adapter;
+  `ExecuteGizmos.ts` discovers Components implementing `onGizmoHUD()`.
+  The public runtime/asset compiler exports `GizmoHUD` along with 2D/3D.
+
+This separation follows the *layout-node composition* of Flexily; it does not
+bundle Flexily, which is unnecessary for a DOM-backed editor HUD.
+Native Creator Undo hooks are not guaranteed for the new DOM command port
+until verified in the actual Editor. Application session rollback and
+`onGizmoHudChanged` callbacks remain available independently.
+
 ## Public API
 
 No new mandatory Component API. Existing declarations remain simple:
