@@ -66,12 +66,15 @@ const presentation = { exports: {}, require(id) {
     throw new Error(id);
 } };
 vm.runInNewContext(compile('GizmoPresentation'), presentation);
+const hudBuilder={exports:{}};
+vm.runInNewContext(compile('GizmoHUD'),hudBuilder);
 const hudLayout = { exports: {} };
 vm.runInNewContext(compile('GizmoHudLayout'), {
     exports: hudLayout.exports,
     require(id) {
         if (id === './GizmoHudControls') return hud.exports;
         if (id === './GizmoPresentation') return presentation.exports;
+        if (id === './GizmoHUD') return hudBuilder.exports;
         throw new Error('Unknown HUD layout import ' + id);
     },
 });
