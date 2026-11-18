@@ -70,9 +70,19 @@ assert.equal(emitter.emit('mouse-up',{x:150}).stopped,true);
 assert.equal(bridge.status().captured,false);
 assert.deepEqual(events.at(-1),['up',150,80]);
 emitter.emit('mouse-down');
+const cancelCount=events.filter(e=>e[0]==='cancel').length;
 bridge.refresh(false);
-assert.equal(events.at(-1)[0],'cancel');
-assert.equal(bridge.status().reason,'webview-pointer-preferred');
+assert.equal(bridge.status().reason,'engine-transition-deferred');
+assert.equal(bridge.status().captured,true,
+    'Higher-priority input appearing mid-drag must not cancel engine capture');
+emitter.emit('mouse-move',{x:145});
+assert.deepEqual(events.at(-1),['move',145,80]);
+emitter.emit('mouse-up',{x:145});
+assert.equal(bridge.status().captured,false);
+assert.equal(events.filter(e=>e[0]==='cancel').length,cancelCount,
+    'Switching input ports must commit the held slider, not cancel it');
+bridge.refresh(false);
+assert.equal(bridge.status().reason,'higher-priority-scene-input');
 assert.equal(emitter.handlers.get('mouse-down').length,0);
 const previous=events.length;
 emitter.emit('mouse-down');
