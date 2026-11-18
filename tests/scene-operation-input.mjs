@@ -99,6 +99,15 @@ assert.deepEqual(events.at(-1),['hover',120,80],
 assert.equal(input.status().pointerSource,'canvas-client');
 delete pointerGlobal.document;
 
+const domHudHit={closest(selector){
+    assert.equal(selector,'#cocos-gizmos-scene-hud');return {};
+}};
+const handledBeforeDom=ownDown;
+assert.equal(op.emit('mousedown',{...point,target:domHudHit}),false,
+    'Browser floating HUD events cannot reach the native Scene picker');
+assert.equal(ownDown,handledBeforeDom,
+    'Native Operation must not begin a duplicate DOM HUD command');
+assert.equal(nativeSelection,0);
 assert.equal(op.emit('mousedown',{...point}),false);
 assert.equal(nativeSelection,0,'HUD/handle click blocks native Node selection');
 assert.equal(nativeCamera,0);
