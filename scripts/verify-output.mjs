@@ -27,7 +27,7 @@ for (const statement of ast.statements) {
         fail('Unexpected export form in public entry');
     }
 }
-if (JSON.stringify(exported.sort()) !== JSON.stringify(['Gizmos2D', 'Gizmos3D', 'GizmoHUD'])) {
+if (JSON.stringify(exported.sort()) !== JSON.stringify(['GizmoHUD', 'Gizmos2D', 'Gizmos3D'])) {
     fail('Only supported Gizmos2D/Gizmos3D/GizmoHUD may be publicly exported: ' + exported);
 }
 if (!publicEntry.includes('if (EDITOR_NOT_IN_PREVIEW) Object.assign(globalThis, { Gizmos2D, Gizmos3D, GizmoHUD })')) {
