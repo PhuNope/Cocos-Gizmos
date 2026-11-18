@@ -55,6 +55,9 @@ const runtime = { exports: {}, console: { info() {}, error() {} },
         if (spec === 'node:path') return require('node:path');
         if (spec === './editor-runtime/Gizmos2D.js') return { Gizmos2D: gizmos2D };
         if (spec === './editor-runtime/Gizmos3D.js') return { Gizmos3D: gizmos3D };
+        if (spec === './editor-runtime/GizmoHUD.js') return {
+            GizmoHUD: class GizmoHUD {},
+        };
         if (spec === './editor-runtime/ExecuteGizmos.js') return updater;
         if (spec === './editor-runtime/GizmoPresentationService.js') return {
             GizmoPresentationService,
