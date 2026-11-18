@@ -4,6 +4,15 @@ All notable changes to Cocos-Gizmos are documented here.
 
 ## [Unreleased] — v3 development (not published)
 
+### Added — Fluent HUD Builder and Commands (development API)
+- `GizmoHUD.createHud()`: declarative, immutable row/column flex-tree with `width`, `height`, `grow`, `gap`, `padding`, `align`, `justify`, `text`, `slider`, `checkbox`, `toggle`, and `button`.
+- `GizmoHUD.bind(property)` creates property Command descriptors; `GizmoHUD.action(handler)` creates Button actions. Component callback `onGizmoHUD()` returns the finished definition without touching DOM or Editor-only APIs.
+- `GizmoHudCommandController` uses the existing application EditSession for begin/update/commit/cancel with rollback, including isolated native Inspector hook failures.
+- `GizmoHudDomRenderer` turns the tree into a compact CSS Flexbox floating Scene HUD with real HTML inputs and stable DOM throughout held Slider gestures. No new runtime npm dependencies; Flexily's compositional node model inspired the builder, not the renderer implementation.
+- The old Scene HUD grid remains a headless/texture fallback (flattening builder controls); native Editor Ctrl+Z for new DOM-backed Command sessions still requires Creator-side verification.
+- Added 3D Builder demo, editor API documentation, public TypeScript completion and standalone builder/DOM/selection regression tests.
+
+
 ### Particle-style floating DOM HUD and 2D hover (development build)
 - HUD controls in the Scene WebView are now real pointer-interactive DOM rows with a separate Command input port. Non-control areas remain pointer-transparent; outside clicks and native Scene selection still pass through.
 - DOM Slider/button pointer events are captured directly by the control and forwarded to the existing Gizmo EditSession/Command layer. While a pointer is held, the HUD preserves its DOM nodes across Scene redraws and updates the slider readout/fill in place; browser pointerup and cancel explicitly finish the gesture.
