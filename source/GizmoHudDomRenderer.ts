@@ -28,6 +28,7 @@ export class GizmoHudDomRenderer {
     private host: HTMLElement | null = null;
     private priorPosition = '';
     private changedHostPosition = false;
+    private portal = false;
     private signature = '';
     // JSON signatures cannot tell two deserialized Component objects with
     // the same Node UUID apart. Rebind Commands when Editor replaces an owner.
@@ -429,28 +430,57 @@ export class GizmoHudDomRenderer {
         this.signature=''; // Reconcile dynamic values only after pointer-up.
     }
 
+    /**
+     * Mount in the Scene document's body, above the canvas stacking context.
+     * Appending to GameDiv/GameCanvas rendered the panel visually but the
+     * Editor's canvas layer could remain the pointer hit target in 3D.
+     * A fixed, pointer-transparent portal covers only GameDiv's rectangle;
+     * individual panels explicitly opt back into native pointer events.
+     */
     private attach(doc: Document, host: HTMLElement): void {
+        const bounds=host.getBoundingClientRect?.();
+        const portal=!!(doc.body?.appendChild && bounds &&
+            bounds.width>0 && bounds.height>0);
+        const parent=portal?doc.body!:host;
         if(this.root && this.host!==host)this.dispose();
         if(!this.root) {
             this.root=doc.createElement('div');
             this.root.id='cocos-gizmos-builder-hud';
             Object.assign(this.root.style,{
-                position:'absolute',display:'block',
-                left:'0',right:'0',top:'0',bottom:'0',
+                position:portal?'fixed':'absolute',display:'block',
                 zIndex:'2147483001',
                 pointerEvents:'none',
-                overflow:'visible',
+                overflow:'hidden',
                 fontFamily:'system-ui, -apple-system, sans-serif',
             });
         }
-        if(this.root.parentElement!==host)host.appendChild(this.root);
-        if(this.host!==host){
+        if(this.root.parentElement!==parent)parent.appendChild(this.root);
+        if(this.host!==host || this.portal!==portal) {
+            if(this.host && this.changedHostPosition)
+                this.host.style.position=this.priorPosition;
             this.host=host;
+            this.portal=portal;
             this.priorPosition=host.style.position;
-            this.changedHostPosition=!host.style.position||
-                host.style.position==='static';
+            this.changedHostPosition=!portal &&
+                (!host.style.position||host.style.position==='static');
             if(this.changedHostPosition)host.style.position='relative';
             this.signature='';
+        }
+        if(portal){
+            // Keep the HUD pinned to the actual Scene viewport even as
+            // Editor panes are resized or the viewport is moved.
+            Object.assign(this.root.style,{
+                position:'fixed',
+                left:bounds!.left+'px', top:bounds!.top+'px',
+                width:bounds!.width+'px',height:bounds!.height+'px',
+                right:'auto',bottom:'auto',
+            });
+        }else {
+            Object.assign(this.root.style,{
+                position:'absolute',
+                left:'0',top:'0',width:'100%',height:'100%',
+                right:'auto',bottom:'auto',
+            });
         }
     }
 
@@ -467,6 +497,7 @@ export class GizmoHudDomRenderer {
         this.root=null;
         this.host=null;
         this.changedHostPosition=false;
+        this.portal=false;
         this.signature='';
         this.renderedOwners=[];
         this.liveInputs.clear();
