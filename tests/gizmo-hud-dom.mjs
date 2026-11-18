@@ -93,10 +93,17 @@ class Element {
 }
 const host=new Element('div');
 host.style.position='';
+let viewportRect={left:20,top:36,width:800,height:500};
+host.getBoundingClientRect=()=>({
+    ...viewportRect,right:viewportRect.left+viewportRect.width,
+    bottom:viewportRect.top+viewportRect.height,
+});
+const body=new Element('body');
+body.appendChild(host);
 const fakeWindow=new Element('window');
 fakeWindow.PointerEvent=function PointerEvent(){};
 const doc={
-    defaultView:fakeWindow,
+    body,defaultView:fakeWindow,
     getElementById(id){return id==='GameDiv'?host:null;},
     createElement(name){return new Element(name);},
     createDocumentFragment(){return new Element('fragment');},
@@ -127,8 +134,16 @@ const renderer=new GizmoHudDomRenderer(()=>doc);
 renderer.beginFrame();
 assert.equal(renderer.queue(owner,hud()),5);
 assert.equal(renderer.finishFrame(),true);
-assert.equal(host.children.length,1);
-const root=host.children[0];
+assert.equal(host.children.length,0,
+    'HUD may not live beneath Canvas or its stacking context');
+assert.equal(body.children.length,2);
+const root=body.children[1];
+assert.equal(root.parentElement,body,'HUD must portal above GameDiv');
+assert.equal(root.style.position,'fixed');
+assert.equal(root.style.left,'20px');
+assert.equal(root.style.top,'36px');
+assert.equal(root.style.width,'800px');
+assert.equal(root.style.height,'500px');
 assert.equal(root.id,'cocos-gizmos-builder-hud');
 assert.equal(root.style.pointerEvents,'none',
     'Floating HUD background cannot steal Scene selection');
@@ -185,6 +200,13 @@ assert.equal(owner.lastEvent,'reset',
     'stopPropagation must not suppress same-target Button command click');
 assert.equal(owner.size,1);
 assert.equal(latestButton.emit('pointerdown').stopped,true);
+// Window resizing/repositioning must move the fixed portal with the viewport.
+viewportRect={left:100,top:75,width:960,height:540};
+renderer.beginFrame();renderer.queue(owner,hud());renderer.finishFrame();
+assert.equal(root.style.left,'100px');
+assert.equal(root.style.top,'75px');
+assert.equal(root.style.width,'960px');
+assert.equal(root.style.height,'540px');
 renderer.beginFrame();renderer.queue(owner,hud());renderer.finishFrame();
 const refreshedSlider=root.find(x=>x.tag==='input'&&x.type==='range');
 refreshedSlider.emit('pointerdown');
@@ -234,5 +256,7 @@ persistent.destroy();
 unregister();
 renderer.dispose();
 assert.equal(host.children.length,0);
+assert.equal(body.children.length,1,
+    'Disposal removes only the HUD portal, not the Scene canvas host');
 assert.equal(host.style.position,'');
 console.log('[gizmo-hud-dom] nested flex layout, command input, drag stability, Escape, select cleanup and DOM passthrough OK');
