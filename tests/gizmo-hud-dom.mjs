@@ -134,7 +134,10 @@ assert.equal(root.style.pointerEvents,'none',
     'Floating HUD background cannot steal Scene selection');
 const panel=root.children[0];
 assert.equal(panel.style.flexDirection,'column');
-assert.equal(panel.style.pointerEvents,'none');
+assert.equal(panel.style.pointerEvents,'auto',
+    'Inside the visible 3D HUD panel native Scene picking must be blocked');
+assert.equal(panel.emit('pointerdown').stopped,true,
+    'Clicking HUD padding does not reach Scene selection');
 assert.equal(panel.style.width,'320px');
 assert.equal(panel.style.flexBasis,'320px');
 assert.equal(panel.style.flexShrink,'0');
@@ -149,6 +152,8 @@ assert.equal(slider.value,'1');
 assert.equal(checkbox.checked,true);
 assert.equal(button.textContent,'Reset');
 assert.equal(slider.style.pointerEvents,'auto');
+assert.equal(row.style.pointerEvents,'none',
+    'Nested flex layout keeps individual controls interactive');
 slider.emit('pointerdown');
 assert.equal(renderer.editing,true);
 slider.value='1.75';
