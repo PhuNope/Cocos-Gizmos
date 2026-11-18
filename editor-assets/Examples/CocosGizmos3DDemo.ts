@@ -141,7 +141,7 @@ export default class CocosGizmos3DDemo extends Component {
             .row({ gap:12 }, row => {
                 row.checkbox('Labels', { property:'showLabels' })
                     .button('Reset 3D', {
-                        command:GizmoHUD.action((owner: Gizmos3DApiTest) => owner.resetHud()),
+                        command:GizmoHUD.action((owner: CocosGizmos3DDemo) => owner.resetHud()),
                         style:{ backgroundColor:'#28656a',color:'#e9fffc' },
                     });
             })
