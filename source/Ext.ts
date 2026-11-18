@@ -257,6 +257,15 @@ declare global {
         canExecute?(context: any): boolean;
         execute(context: any): void;
     }
+    interface GizmoHudMount {
+        readonly id: string;
+        show(): this;
+        hide(): this;
+        update(definition: GizmoHudDefinition): this;
+        get(id: string): GizmoHudElementHandle;
+        unmount(): void;
+        destroy(): void;
+    }
     interface GizmoHudElementHandle {
         setText(text: string): GizmoHudMount;
         setDisabled(disabled: boolean): GizmoHudMount;
