@@ -250,6 +250,14 @@ declare global {
         justify?: GizmoHudJustify;
         style?: GizmoHudDomStyle;
     }
+    interface GizmoHudCommandRegistry {
+        register(command: GizmoHudRegisteredCommand): () => void;
+        get(id: string): GizmoHudRegisteredCommand | undefined;
+        canExecute(id: string, context: any): boolean;
+        execute(id: string, context: any): boolean;
+        unregister(id: string): boolean;
+        clear(): void;
+    }
     interface GizmoHudRegisteredCommand {
         id: string;
         label?: string;
