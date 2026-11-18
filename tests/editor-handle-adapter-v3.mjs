@@ -435,4 +435,21 @@ assert.equal(component.position.x,145);
 unpooled.dispose();
 manager._gizmoPool=previousPool;
 
+// A preexisting gizmo registration must not block the independent screen
+// picking adapter for another extension's Component.
+class ForeignComponentGizmo extends SelectGizmo {}
+typeDefs.MyV3Component=ForeignComponentGizmo;
+component.gizmo=null;
+const occupied=createV3HandleAdapter(()=>true,layout);
+occupied.refresh([component],new Set(['v3-target']),3000);
+assert.equal(occupied.status().active,1,
+    'Occupied Gizmo pool class cannot disable our Scene/HUD input port');
+assert.equal(occupied.status().positionHandles,1);
+assert.equal(typeDefs.MyV3Component,ForeignComponentGizmo,
+    'Existing registered component Gizmo must never be overwritten');
+assert.equal(bridgePort.down({x:80,y:80,button:0,buttons:1}),true);
+bridgePort.up({x:80,y:80,button:0,buttons:0});
+occupied.dispose();
+delete typeDefs.MyV3Component;
+
 console.log('[editor-handle-adapter-v3] SelectGizmo discovery, command gestures, HUD, cancel, hide and cleanup OK');
