@@ -87,8 +87,13 @@ export class SceneOperationInput {
         // Editor 3D Operation events may lose the native DOM target.
         // A geometric HUD hit must block the native selection BEFORE it runs.
         if(isSceneHudPointerEvent(event,point,this.ports.viewport())){
+            // DOM controls must receive the original pointerdown. Returning
+            // false from this Operation listener can cause Creator's input
+            // dispatcher to terminate the browser event before it reaches
+            // the actual button/range input. The HUD panel's own DOM handlers
+            // prevent bubbling to Scene selection instead.
             this.hudOwned=true;
-            return false;
+            return;
         }
         if(!point)return;
         this.events++;
@@ -116,7 +121,7 @@ export class SceneOperationInput {
             const buttons=typeof event?.buttons==='number'?event.buttons:
                 typeof event?.event?.buttons==='number'?event.event.buttons:null;
             if(buttons===0)this.hudOwned=false;
-            else return false;
+            else return; // Let the DOM control receive native pointermove.
         }
         const point=this.point(event);
         if(!point)return;
@@ -138,7 +143,7 @@ export class SceneOperationInput {
     private readonly onUp=(event:any):boolean|void=>{
         if(this.hudOwned){
             this.hudOwned=false;
-            return false;
+            return; // Never cancel native pointerup for a HUD slider.
         }
         if(!this.capturing)return;
         this.events++;
