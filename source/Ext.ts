@@ -238,6 +238,93 @@ declare global {
     type GizmoHudControl = GizmoHudButton | GizmoHudSlider | GizmoHudToggle | GizmoHudCheckbox;
     type GizmoHudControlList = GizmoHudControl[];
 
+    /** Flex-like layout primitives for the GizmoHUD builder. */
+    type GizmoHudAlign = 'start' | 'center' | 'end' | 'stretch';
+    type GizmoHudJustify = 'start' | 'center' | 'end' | 'between' | 'around' | 'evenly';
+
+    /** Commands are domain data; a renderer never directly mutates a property. */
+    interface GizmoHudPropertyCommand {
+        readonly kind: 'property';
+        readonly property: string;
+    }
+    interface GizmoHudActionCommand {
+        readonly kind: 'action';
+        readonly execute: (component: any) => void;
+    }
+    type GizmoHudCommand = GizmoHudPropertyCommand | GizmoHudActionCommand;
+
+    interface GizmoHudItemOptions {
+        style?: GizmoHudDomStyle;
+        grow?: number;
+    }
+    interface GizmoHudSliderOptions extends GizmoHudItemOptions {
+        min: number;
+        max: number;
+        step?: number;
+    }
+    interface GizmoHudContainer {
+        readonly kind: 'row' | 'column';
+        readonly id: string;
+        readonly children: readonly GizmoHudNode[];
+        readonly gap?: number;
+        readonly padding?: number;
+        readonly width?: number;
+        readonly height?: number;
+        readonly grow?: number;
+        readonly align?: GizmoHudAlign;
+        readonly justify?: GizmoHudJustify;
+        readonly style?: GizmoHudDomStyle;
+    }
+    interface GizmoHudTextNode {
+        readonly kind: 'text';
+        readonly id: string;
+        readonly text: string;
+        readonly style?: GizmoHudDomStyle;
+        readonly grow?: number;
+    }
+    interface GizmoHudControlNode {
+        readonly kind: 'button' | 'slider' | 'checkbox' | 'toggle';
+        readonly id: string;
+        readonly text: string;
+        readonly command: GizmoHudCommand;
+        readonly style?: GizmoHudDomStyle;
+        readonly grow?: number;
+        readonly min?: number;
+        readonly max?: number;
+        readonly step?: number;
+    }
+    type GizmoHudNode = GizmoHudContainer | GizmoHudTextNode | GizmoHudControlNode;
+    interface GizmoHudDefinition {
+        readonly kind: 'hud';
+        readonly id: string;
+        readonly root: GizmoHudContainer;
+    }
+
+    /** Fluent, DOM-independent flex layout builder.
+     * build() returns a snapshot; no Editor DOM or Node is allocated.
+     */
+    interface GizmoHudBuilder {
+        width(value: number): this;
+        height(value: number): this;
+        grow(value?: number): this;
+        gap(value: number): this;
+        padding(value: number): this;
+        align(value: GizmoHudAlign): this;
+        justify(value: GizmoHudJustify): this;
+        row(id: string, build: (row: GizmoHudBuilder) => void): this;
+        column(id: string, build: (column: GizmoHudBuilder) => void): this;
+        text(id: string, text: string, options?: GizmoHudItemOptions): this;
+        button(id: string, text: string, command: GizmoHudActionCommand,
+            options?: GizmoHudItemOptions): this;
+        slider(id: string, text: string, command: GizmoHudPropertyCommand,
+            options: GizmoHudSliderOptions): this;
+        toggle(id: string, text: string, command: GizmoHudPropertyCommand,
+            options?: GizmoHudItemOptions): this;
+        checkbox(id: string, text: string, command: GizmoHudPropertyCommand,
+            options?: GizmoHudItemOptions): this;
+        build(): GizmoHudDefinition;
+    }
+
     /** A set of editable position handles returned by onGizmoHandles(). */
     type GizmoHandleList = GizmoHandleDescriptor[];
 }
@@ -272,6 +359,11 @@ declare module 'cc' {
          * visual customization; stable IDs avoid unnecessary DOM updates.
          */
         onGizmoHud?(): GizmoHudItem[];
+
+        /** Preferred v3 HUD API. Declarative layout and Command descriptors
+         * created by GizmoHUD.createHud(). Old row callbacks are separate.
+         */
+        onGizmoHUD?(): GizmoHudDefinition;
 
         /** Defines buttons, sliders, toggles and checkboxes in the Scene HUD. */
         onGizmoHudControls?(): GizmoHudControlList;
