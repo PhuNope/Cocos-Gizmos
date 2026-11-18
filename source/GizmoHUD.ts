@@ -43,6 +43,10 @@ class HudBuilderImpl implements GizmoHudBuilder {
     private widthValue?: number;
     private heightValue?: number;
     private growValue?: number;
+    private shrinkValue?: number;
+    private basisValue?: number;
+    private wrapValue = false;
+    private styleValue: GizmoHudDomStyle = {};
     private gapValue = 6;
     private paddingValue = 8;
     private alignValue: GizmoHudAlign = 'stretch';
@@ -56,6 +60,19 @@ class HudBuilderImpl implements GizmoHudBuilder {
     public width(value: number): this { this.widthValue = finite(value, 'width', 40, 1200); return this; }
     public height(value: number): this { this.heightValue = finite(value, 'height', 16, 1000); return this; }
     public grow(value = 1): this { this.growValue = finite(value, 'grow', 0, 100); return this; }
+    public shrink(value = 1): this { this.shrinkValue = finite(value, 'shrink', 0, 100); return this; }
+    public basis(value: number): this { this.basisValue = finite(value, 'basis', 0, 1200); return this; }
+    public wrap(value = true): this {
+        if (typeof value !== 'boolean') throw new Error('GizmoHUD: wrap must be boolean');
+        this.wrapValue = value;
+        return this;
+    }
+    public style(value: GizmoHudDomStyle): this {
+        if (!value || typeof value !== 'object' || Array.isArray(value))
+            throw new Error('GizmoHUD: style must be an object');
+        this.styleValue = { ...value };
+        return this;
+    }
     public gap(value: number): this { this.gapValue = finite(value, 'gap', 0, 64); return this; }
     public padding(value: number): this { this.paddingValue = finite(value, 'padding', 0, 64); return this; }
     public align(value: GizmoHudAlign): this {
@@ -147,6 +164,8 @@ class HudBuilderImpl implements GizmoHudBuilder {
         return {
             kind:this.kind, id:this.id,
             width:this.widthValue, height:this.heightValue, grow:this.growValue,
+            shrink:this.shrinkValue, basis:this.basisValue,
+            wrap:this.wrapValue, style:{...this.styleValue},
             gap:this.gapValue, padding:this.paddingValue,
             align:this.alignValue, justify:this.justifyValue,
             children:[...this.children],
