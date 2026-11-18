@@ -139,3 +139,66 @@ Legacy `onGizmoHud()` / `onGizmoHudControls()` can still be used on
 Components without `onGizmoHUD()`, but new code should use the Builder.
 No global action registry, no runtime Component allocation and no
 additional npm layout dependency are required.
+
+## Command registry and persistent mounting (v3 development)
+
+The existing `onGizmoHUD(): GizmoHudDefinition` / `.build()` workflow
+continues to work. A second, persistent workflow lets callers mount an
+independent HUD with explicit cleanup:
+
+```ts
+const unregister = GizmoHUD.commands.register({
+    id: 'gizmo.reset',
+    canExecute: owner => !!owner,
+    execute: owner => { owner.size = 1; },
+});
+
+const ui = GizmoHUD.createHud('transform-panel')
+    .title('Transform')
+    .position('top-right')
+    .theme('dark')
+    .size(280, 'auto')
+    .row({ gap: 6 }, row => {
+        row.button('Reset', { command: 'gizmo.reset' });
+    })
+    .slider('Opacity', {
+        property: 'opacity', min: 0, max: 1, step: 0.05,
+    })
+    .toggle('Wireframe', { property: 'wireframe' })
+    .mount(this);
+
+// Explicit cleanup when the owning component is destroyed:
+ui.destroy();
+unregister();
+```
+
+`mount(owner)` stores the immutable HUD description in a Scene-visible
+registry and returns a `GizmoHudMount` with `show()`, `hide()`,
+`update(definition)`, `get(id)`, `unmount()`, and `destroy()`.
+The command registry supports `register()`, `get()`, `canExecute()`,
+`execute()`, `unregister()`, and `clear()`. Both registries are shared
+across the public ESM runtime and Editor's Scene renderer in the same
+JavaScript global context. Registration is idempotent only via the returned
+unregister callback; duplicate IDs are rejected.
+
+Use `GizmoHUD.action(callback)` for one-off actions. Use named registry
+commands when several buttons refer to the same operation. The shortcut
+field is metadata; this API does **not** install a keyboard shortcut handler.
+
+Convenience controls also accept `{value, onChange}` instead of a bound
+component property. Callback-backed values participate in transaction
+cancellation but do not automatically serialize into the Inspector.
+`get(id).setText()`, `setDisabled()`, and `setVisible()` update a
+persistent HUD without recreating the builder. IDs of shorthand controls
+are generated automatically; prefer explicit IDs through the legacy
+`button(id,label,GizmoHUD.action(...))` form for stable external targeting.
+
+Persistent mounts are independent of component selection while Scene
+rendering continues. `destroy()` should be called from the owner's
+lifecycle cleanup to avoid keeping stale component references.
+
+**Limitations:** DOM layout is the preferred renderer. Headless fallback
+supports only the original serialized-property commands. The persistent
+mount workflow does not provide guaranteed Scene Undo, automatic keyboard
+bindings or standalone Cocos game runtime UI. It must be exercised in an
+actual Editor Scene WebView to validate focus and Scene selection.
