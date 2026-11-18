@@ -208,6 +208,13 @@ export class SceneHudElement {
                     Number.isInteger(event.pointerId) ? event.pointerId : null,
                 viewport, host, doc,
             };
+            if (row.kind === 'slider') {
+                // The rail and readout survive every Scene redraw while held.
+                // Keep their visual state in sync without replacing DOM nodes.
+                this.heldRail = (box.children[1] as HTMLElement)
+                    ?.firstElementChild as HTMLElement | null;
+                this.heldValue = box.children[2] as HTMLElement | null;
+            }
             const target: any = doc.defaultView?.addEventListener ?
                 doc.defaultView : doc;
             const prefix = pointerSupported ? 'pointer' : 'mouse';
@@ -379,10 +386,7 @@ export class SceneHudElement {
                 fontSize: '11px',
             });
             box.appendChild(number);
-            if (this.held?.rowIndex === row.index) {
-                this.heldValue = number;
-                this.heldRail = fill;
-            }
+
         } else if (row.kind === 'toggle') {
             label.style.flex = '1';
             box.appendChild(label);
