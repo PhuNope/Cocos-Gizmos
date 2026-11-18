@@ -26,6 +26,7 @@ import { hudControlScreenRect } from './GizmoHudControls';
 import { SceneViewportInput, SceneViewportInputPorts, ViewportPointer } from './SceneViewportInput';
 import { SceneEngineInput } from './SceneEngineInput';
 import { SceneOperationInput } from './SceneOperationInput';
+import { connectSceneHudInput } from './SceneHudElement';
 
 type Drag = { entry: HandleHitTarget; command: GizmoMoveCommand | GizmoRotateCommand };
 type SliderDrag = { entry: HudHitTarget; solver: HudSliderDrag; session: GizmoEditSession<number> };
@@ -742,6 +743,10 @@ export function createV3HandleAdapter(
             (captured as any)?.onViewportCancel?.();
         },
     };
+    // HUD DOM controls use their own browser event path rather than
+    // Editor raycasting, as Creator's native ParticleSystem float window
+    // does. Reuse the same application Command callbacks for consistency.
+    const disconnectHudInput=connectSceneHudInput(pointerPorts);
     const operationInput=new SceneOperationInput(pointerPorts);
     const viewportInput=new SceneViewportInput(pointerPorts);
     const engineInput=new SceneEngineInput(pointerPorts);
@@ -926,6 +931,7 @@ export function createV3HandleAdapter(
         clear,
         dispose(){
             clear();
+            disconnectHudInput();
             for(const [key,value] of registered)
                 if(typeDefs?.[key]===value)delete typeDefs[key];
             registered.clear();manager=null;typeDefs=null;
