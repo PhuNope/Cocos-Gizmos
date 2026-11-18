@@ -100,7 +100,7 @@ assert.equal(input.status().pointerSource,'canvas-client');
 delete pointerGlobal.document;
 
 const domHudHit={closest(selector){
-    assert.equal(selector,'#cocos-gizmos-scene-hud');return {};
+    assert.equal(selector,'#cocos-gizmos-scene-hud, #cocos-gizmos-builder-hud');return {};
 }};
 const handledBeforeDom=ownDown;
 assert.equal(op.emit('mousedown',{...point,target:domHudHit}),false,
