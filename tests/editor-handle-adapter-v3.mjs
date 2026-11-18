@@ -24,7 +24,7 @@ let editorRebuildsOnBegin=false;
 const component={
     node:{uuid:'v3-target',isValid:true,activeInHierarchy:true},
     isValid:true,enabled:true, __classname__:'MyV3Component',
-    position:{x:0,y:0,z:0},visible:true,radius:10,
+    position:{x:0,y:0,z:0},visible:true,radius:10,size:1,
     onGizmoHandles(){return [{property:'position',plane:'xy',visual:'point'}];},
     onGizmoHudControls(){return [
         {id:'visible',type:'checkbox',text:'Visible',
@@ -32,6 +32,8 @@ const component={
         {id:'radius',type:'slider',text:'Radius',property:'radius',
             min:0,max:100,step:1,color:'#ffffff',size:'normal'},
         {id:'reset',type:'button',text:'Reset',color:'#ffffff',size:'normal'},
+        {id:'size',type:'slider',text:'ShapeSize',property:'size',
+            min:0.1,max:5,step:0.1,color:'#ffffff',size:'normal'},
     ];},
     onGizmoHudAction(id){events.push(['button',id]);},
     onGizmoChanged(...args){events.push(['handle',...args]);},
@@ -97,6 +99,7 @@ const scope={
                 return point.x>=50&&point.x<200 ? items[0]||null:null;
             },
             hitTestHud(p,viewport,place,items){
+                if(p.x>=860&&p.x<=895)return items[3]||null;
                 if(p.x>=700&&p.x<=850)return items[2]||null;
                 if(p.x>=420&&p.x<=600)return items[1]||null;
                 return p.x>=200&&p.x<=400?items[0]||null:null;
@@ -151,7 +154,7 @@ const scope={
         }};
         if(name==='./GizmoHudControls')return {
             hudControlScreenRect(_viewport,index,_count,size) {
-                const left=index===0?200:index===1?420:700;
+                const left=index===0?200:index===1?420:index===2?700:860;
                 return {left,right:left+190,top:92,bottom:68,width:190,height:24};
             },
             normalizeHudControls(){return component.onGizmoHudControls();},
@@ -159,8 +162,13 @@ const scope={
             HudSliderDrag:class {
                 constructor(control,value,startX) {
                     this.value=value;this.startX=startX;this.base=control.min;
+                    this.control=control;
                 }
-                move(x){return Math.max(0,Math.min(100,x-400));}
+                move(x){
+                    const base=this.control.id==='size'?870:400;
+                    return Math.max(this.control.min,
+                        Math.min(this.control.max,x-base));
+                }
             },
         };
         if(name==='./SceneGizmoInput')return {
@@ -249,7 +257,7 @@ assert.equal(adapter.status().viewportInput.active,true);
 assert.ok(events.some(e=>e[0]==='engine-fallback-enabled'&&e[1]===false),
     'Native Cocos mouse fallback must not duplicate active WebView capture');
 assert.equal(adapter.status().positionHandles,1);
-assert.equal(adapter.status().hudControls,3);
+assert.equal(adapter.status().hudControls,4);
 assert.ok(paints.includes(component),'2D/3D rendering is a separate port');
 const domHoverBefore=events.length;
 bridgePort.hover({x:80,y:80,button:0,buttons:0});
@@ -346,6 +354,39 @@ assert.equal(adapter.protectedSelection()?.nodeUuid,'v3-target',
     'Delayed Scene selection refresh must not erase HUD gesture protection');
 adapter.refresh([component],new Set(['v3-target']),650);
 assert.equal(adapter.status().active,1);
+
+// Reproduction from Creator 3D: ShapeSize updates once and gets cancelled
+// if a private SelectGizmo Inspector hook throws while the slider is held.
+// Native hook errors must not roll back the Component value or break HUD.
+const nativeBegin=component.gizmo.onControlBegin;
+const nativeUpdate=component.gizmo.onControlUpdate;
+const nativeEnd=component.gizmo.onControlEnd;
+const nativeComponentChanged=component.gizmo.onComponentChanged;
+component.gizmo.onControlBegin=()=>{throw new Error('Inspector begin unsupported');};
+component.gizmo.onControlUpdate=()=>{throw new Error('Inspector update unsupported');};
+component.gizmo.onControlEnd=()=>{throw new Error('Inspector end unsupported');};
+component.gizmo.onComponentChanged=()=>{throw new Error('Inspector node stale');};
+const sizeCancels=events.filter(e=>e[0]==='hud'&&e[1]==='size'&&
+    e[2]==='cancel').length;
+assert.equal(component.gizmo.onNotGizmoMouseDown({x:870,y:80}),false);
+component.gizmo.onNotGizmoMouseMove({x:872,y:80});
+component.gizmo.onNotGizmoMouseMove({x:873,y:80});
+assert.equal(component.size,3);
+assert.equal(adapter.status().draggingSlider,1);
+assert.equal(component.gizmo.onNotGizmoMouseUp({x:873,y:80}),false);
+assert.equal(component.size,3);
+assert.equal(events.filter(e=>e[0]==='hud'&&e[1]==='size'&&
+    e[2]==='cancel').length,sizeCancels,
+    'ShapeSize must commit instead of cancelling on optional Inspector errors');
+const buttonCountBefore=events.filter(e=>e[0]==='button').length;
+component.gizmo.onNotGizmoMouseDown({x:740,y:80});
+component.gizmo.onNotGizmoMouseUp({x:740,y:80});
+assert.equal(events.filter(e=>e[0]==='button').length,buttonCountBefore+1,
+    'HUD button remains usable when native onComponentChanged throws');
+component.gizmo.onControlBegin=nativeBegin;
+component.gizmo.onControlUpdate=nativeUpdate;
+component.gizmo.onControlEnd=nativeEnd;
+component.gizmo.onComponentChanged=nativeComponentChanged;
 
 const originalHudChanged=component.onGizmoHudChanged;
 component.onGizmoHudChanged=(property,phase)=>{
