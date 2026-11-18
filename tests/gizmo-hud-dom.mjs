@@ -102,9 +102,13 @@ const body=new Element('body');
 body.appendChild(host);
 const fakeWindow=new Element('window');
 fakeWindow.PointerEvent=function PointerEvent(){};
+let sceneIs3D=false;
 const doc={
     body,defaultView:fakeWindow,
-    getElementById(id){return id==='GameDiv'?host:null;},
+    getElementById(id){
+        if(id==='Cocos3dGameContainer' && sceneIs3D)return host;
+        return id==='GameDiv'?host:null;
+    },
     createElement(name){return new Element(name);},
     createDocumentFragment(){return new Element('fragment');},
 };
@@ -261,4 +265,90 @@ assert.equal(host.children.length,0);
 assert.equal(body.children.length,1,
     'Disposal removes only the HUD portal, not the Scene canvas host');
 assert.equal(host.style.position,'');
-console.log('[gizmo-hud-dom] nested flex layout, command input, drag stability, Escape, select cleanup and DOM passthrough OK');
+
+// In Cocos Creator 3D, parent engine-view > webview has CSS
+// pointer-events:none. No native DOM event is delivered to these inputs;
+// Editor Operation coordinates must drive the very same Commands.
+sceneIs3D=true;
+const opOwner={
+    node:{uuid:'3d-operation'},size:1,wireframe:true,lastEvent:'idle',
+    changes:[],
+    onGizmoHudChanged(property,phase,value){
+        this.changes.push([property,phase,value]);
+    },
+};
+const opHud=GizmoHUD.createHud('operation-3d')
+    .width(320).padding(10)
+    .button('reset','Reset',GizmoHUD.action(owner=>{
+        owner.lastEvent='reset';
+    }))
+    .checkbox('wire','Wireframe',GizmoHUD.bind('wireframe'))
+    .slider('size','Size',GizmoHUD.bind('size'),{
+        min:0,max:4,step:.5,
+    }).build();
+const opRenderer=new GizmoHudDomRenderer(()=>doc);
+opRenderer.beginFrame();
+opRenderer.queue(opOwner,opHud);
+assert.equal(opRenderer.finishFrame(),true);
+assert.equal(opRenderer.usesSceneOperationInput(),true);
+const opRoot=body.children[1];
+const opPanel=opRoot.children[0];
+const box=(left,top,right,bottom)=>({
+    left,top,right,bottom,width:right-left,height:bottom-top,
+});
+opPanel.getBoundingClientRect=()=>box(400,70,720,340);
+const opButton=opPanel.find(x=>x.tag==='button');
+const opToggle=opPanel.find(x=>x.tag==='input'&&x.type==='checkbox');
+const opRange=opPanel.find(x=>x.tag==='input'&&x.type==='range');
+opButton.getBoundingClientRect=()=>box(420,90,520,120);
+opToggle.getBoundingClientRect=()=>box(590,140,610,165);
+opRange.getBoundingClientRect=()=>box(420,200,620,226);
+// Inverse of 3D viewport to client transformation (GameDiv 20,36,800x500).
+const toPointer=(clientX,clientY)=>({
+    x:clientX-20,y:536-clientY,
+});
+const viewport={width:800,height:500};
+assert.equal(opRenderer.operationDown(toPointer(100,95),viewport),false,
+    'Clicks outside 3D panel belong to normal Scene selection');
+assert.equal(opRenderer.operationDown(toPointer(405,75),viewport),true,
+    'HUD padding blocks native Scene unselect even without a DOM target');
+opRenderer.operationUp(toPointer(405,75),viewport);
+assert.equal(opOwner.lastEvent,'idle');
+assert.equal(opRenderer.operationDown(toPointer(460,100),viewport),true);
+assert.equal(opRenderer.operationUp(toPointer(460,100),viewport),true);
+assert.equal(opOwner.lastEvent,'reset',
+    'Scene Operation can click Reset even if browser never fires click');
+assert.equal(opRenderer.operationDown(toPointer(600,152),viewport),true);
+opRenderer.operationUp(toPointer(600,152),viewport);
+assert.equal(opOwner.wireframe,false,
+    'Scene Operation forwards checkbox changes and keeps owner state');
+assert.equal(opToggle.checked,false);
+// Slider changes from 1 to 3 and must survive multiple repaints.
+assert.equal(opRenderer.operationDown(toPointer(470,214),viewport),true);
+assert.equal(opRenderer.editing,true);
+opRenderer.beginFrame();opRenderer.queue(opOwner,opHud);
+opRenderer.finishFrame();
+assert.equal(opRoot.children[0],opPanel,
+    'Scene Operation drag must preserve DOM controls across frames');
+opRenderer.operationMove(toPointer(570,214),viewport);
+assert.equal(opOwner.size,3);
+opRenderer.operationUp(toPointer(570,214),viewport);
+assert.equal(opOwner.size,3);
+assert.equal(opRenderer.editing,false);
+assert.equal(opRange.value,'3');
+assert.ok(opOwner.changes.some(x=>x[0]==='size'&&x[1]==='end'),
+    'Slider must commit its GizmoEditSession after operation mouseup');
+opRenderer.operationDown(toPointer(470,214),viewport);
+opRenderer.operationMove(toPointer(615,214),viewport);
+opRenderer.operationCancel();
+assert.equal(opOwner.size,3,'Escape cancels Operation slider edit');
+assert.equal(opRenderer.operationStatus().captured,false);
+assert.equal(opRenderer.operationStatus().commit,3);
+opRenderer.dispose();
+sceneIs3D=false;
+const only2D=new GizmoHudDomRenderer(()=>doc);
+assert.equal(only2D.usesSceneOperationInput(),false,
+    'Working 2D HUD must remain on native DOM pointer path');
+only2D.dispose();
+
+console.log('[gizmo-hud-dom] native DOM, 3D Editor Operation click/checkbox/slider drag/rollback, padding, selection passthrough and cleanup OK');
