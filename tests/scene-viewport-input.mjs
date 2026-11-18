@@ -78,6 +78,10 @@ assert.equal(htmlControl.stopped,undefined,
     'Floating DOM HUD, not WebView fallback, owns its pointerdown');
 assert.equal(bridge.status().intercepted,0,
     'DOM click must never start a second Scene input command');
+const beforeHudHover=events.length;
+doc.emit('pointermove',{target:htmlControl.target});
+assert.equal(events.length,beforeHudHover,
+    'Moving over native DOM HUD may not repaint Scene or replace inputs');
 const missed=doc.emit('pointerdown',{clientX:450});
 assert.equal(missed.stopped,undefined,'Normal Scene selection must be untouched');
 assert.equal(bridge.status().intercepted,0);
