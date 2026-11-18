@@ -45,6 +45,9 @@ try {
     assert.match(asset, /type GizmoHandlePhase/);
     assert.match(asset, /const Gizmos2D: typeof import\('\.\/GizmosGlobal'\)\.Gizmos2D/);
     assert.match(asset, /const Gizmos3D: typeof import\('\.\/GizmosGlobal'\)\.Gizmos3D/);
+    assert.match(asset, /const GizmoHUD: typeof import\('\.\/GizmosGlobal'\)\.GizmoHUD/);
+    assert.match(asset, /onGizmoHUD\?\(\): GizmoHudDefinition/);
+    assert.match(asset, /interface GizmoHudBuilder/);
     assert.doesNotMatch(asset, /registerGizmos/);
 
     const js = ts.transpileModule(asset, {
@@ -139,12 +142,14 @@ try {
         const names = new Set(completion?.entries.map((entry) => entry.name));
         assert.ok(names.has('Gizmos2D'), 'Global completion is missing Gizmos2D');
         assert.ok(names.has('Gizmos3D'), 'Global completion is missing Gizmos3D');
+        assert.ok(names.has('GizmoHUD'), 'Global completion is missing GizmoHUD');
 
         const memberOffset = memberSource.indexOf('onGiz') + 'onGiz'.length;
         const methodNames = new Set(service.getCompletionsAtPosition(memberFile, memberOffset, {})
             ?.entries.map(entry => entry.name));
         assert.ok(methodNames.has('onGizmoHandles'), 'Component method completion is missing onGizmoHandles');
         assert.ok(methodNames.has('onGizmoChanged'), 'Component method completion is missing onGizmoChanged');
+        assert.ok(methodNames.has('onGizmoHUD'), 'Component method completion is missing onGizmoHUD');
 
         const propertyOffset = propertySource.indexOf('return [{  }];') + 'return [{ '.length;
         const fieldNames = new Set(service.getCompletionsAtPosition(propertyFile, propertyOffset, {})
