@@ -1,6 +1,7 @@
 import type { Component } from 'cc';
 import { HudControl, normalizeHudControls, formatHudControl } from './GizmoHudControls';
 import { GizmoHudText, normalizeHudItems } from './GizmoPresentation';
+import { walkGizmoHUD } from './GizmoHUD';
 
 export interface GizmoHudPlacement {
     /** Unique lifetime-stable prefix for the Label cache on this Node. */
@@ -13,6 +14,10 @@ export interface GizmoHudPlacement {
     rowCount: number;
     /** Validated HUD controls, ordered consistently for drawing and picking. */
     controls: readonly HudControl[];
+    /** New flex layout tree, separate from the legacy flat grid. */
+    tree?: GizmoHudDefinition;
+    /** Command lookup for texture fallback and direct DOM input. */
+    commands?: ReadonlyMap<string, GizmoHudCommand>;
     /** Text and control labels, in their exact display order. */
     items: readonly GizmoHudText[];
 }
@@ -20,6 +25,7 @@ export interface GizmoHudPlacement {
 type HudComponent = Component & {
     onGizmoHud?: () => unknown;
     onGizmoHudControls?: () => unknown;
+    onGizmoHUD?: () => GizmoHudDefinition;
 };
 
 /**
@@ -73,7 +79,8 @@ export class GizmoHudLayout {
             if (!node || comp.isValid === false || comp.enabled === false ||
                 node.activeInHierarchy === false ||
                 (typeof comp.onGizmoHud !== 'function' &&
-                 typeof comp.onGizmoHudControls !== 'function')) continue;
+                 typeof comp.onGizmoHudControls !== 'function' &&
+                 typeof comp.onGizmoHUD !== 'function')) continue;
             let show = false;
             try { show = visible(component); }
             catch (error) {
@@ -84,11 +91,49 @@ export class GizmoHudLayout {
 
             let texts: GizmoHudText[] = [];
             let controls: HudControl[] = [];
-            if (typeof comp.onGizmoHud === 'function') {
+            let tree: GizmoHudDefinition | undefined;
+            const commands = new Map<string, GizmoHudCommand>();
+            if(typeof comp.onGizmoHUD === 'function') {
+                try {
+                    const candidate=comp.onGizmoHUD();
+                    if (candidate?.kind==='hud' && candidate.root?.kind==='column') {
+                        tree=candidate;
+                        const rawControls: unknown[]=[];
+                        walkGizmoHUD(tree.root,(item)=>{
+                            if(item.kind==='row'||item.kind==='column')return;
+                            if(item.kind==='text') {
+                                texts.push({
+                                    id:item.id,text:item.text,
+                                    order:texts.length,fontSize:item.style?.fontSize||14,
+                                    color:item.style?.color||'#dce7ef',
+                                    size:'normal',style:item.style||{},
+                                });
+                                return;
+                            }
+                            commands.set(item.id,item.command);
+                            if(item.kind==='button') {
+                                rawControls.push({
+                                    type:'button',id:item.id,text:item.text,
+                                    style:item.style||{},size:'normal',
+                                });
+                            }else if(item.command.kind==='property'){
+                                rawControls.push({
+                                    type:item.kind,id:item.id,text:item.text,
+                                    property:item.command.property,
+                                    min:item.min,max:item.max,step:item.step,
+                                    style:item.style||{},size:'normal',
+                                });
+                            }
+                        });
+                        controls=normalizeHudControls(rawControls,64);
+                    }
+                }catch(error){onError?.(component,'onGizmoHUD',error);}
+            }
+            if (!tree && typeof comp.onGizmoHud === 'function') {
                 try { texts = normalizeHudItems(comp.onGizmoHud()); }
                 catch (error) { onError?.(component, 'onGizmoHud', error); }
             }
-            if (typeof comp.onGizmoHudControls === 'function') {
+            if (!tree && typeof comp.onGizmoHudControls === 'function') {
                 try { controls = normalizeHudControls(comp.onGizmoHudControls()); }
                 catch (error) { onError?.(component, 'onGizmoHudControls', error); }
             }
@@ -116,6 +161,8 @@ export class GizmoHudLayout {
                 textCount: texts.length,
                 rowCount: items.length,
                 controls,
+                tree,
+                commands,
                 items,
             });
             nodeRows.set(node, startRow + items.length);
