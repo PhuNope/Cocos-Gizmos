@@ -60,10 +60,22 @@ Component descriptors / Gizmos2D & Gizmos3D / HUD size+style
   It does **not** inherit `BoxColliderComponentGizmo`, read its
   `_cubeNode` / `_editHandlesShape` internals, or spawn a physics
   collider.
-- **HUD:** `SceneHudElement` mounts an optional non-intercepting DOM
-  element into the engine WebView. `GizmoHudOverlay` retains a compact
-  textured UI fallback if the DOM is inaccessible. Both renderers share
-  the HUD grid and native pointer geometry.
+- **HUD, following ParticleSystem's separation:** `SceneHudElement`
+  mounts a compact floating DOM window inside the Scene WebView. The root
+  passes through pointer events, while individual controls capture their
+  own DOM pointerdown/move/up/cancel events through `connectSceneHudInput`
+  and forward them to the same application Command/EditSession used by
+  the 2D/3D handles. DOM rows are **not replaced while dragging**; the
+  slider readout and fill update in place. This prevents Editor frame
+  refreshes from destroying pointer capture or clicking through to Node
+  selection. Unlike `EngineView.attachFloatWindow`, this port is available
+  in the Scene Script environment without private Editor-panel APIs.
+  `GizmoHudOverlay` keeps the textured HUD + Scene Operation fallback when
+  DOM is unavailable.
+- **2D hover:** `GizmoHandleRenderer` notifies `Gizmos2D.invalidateHover`
+  when the selected handle changes. Only the next color-keyed Graphics
+  cache flush clears obsolete strokes immediately; the normal 750ms
+  idle-frame geometry grace remains unchanged for other drawing.
 
 ## Public API
 
