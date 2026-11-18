@@ -77,6 +77,7 @@ assert.equal(isSceneHudDomTarget({clientX:300,clientY:80}),true,
     'Targetless 3D Operation event must preserve native DOM input by hit testing');
 assert.equal(isSceneHudDomTarget({clientX:100,clientY:80}),false,
     'Actual Scene canvas event may still use geometric picking fallback');
+scope.document.elementFromPoint=()=>null;
 root.style.display='none';
 assert.equal(isSceneHudPointerEvent({clientX:300,clientY:80}),false,
     'A hidden HUD must never block Scene selection');
