@@ -128,7 +128,7 @@ export class GizmoHudDomRenderer {
                 position:'absolute',
                 [top?'top':'bottom']: (12+previous)+'px',
                 [left?'left':'right']: '12px',
-                pointerEvents:'none',
+                pointerEvents:'auto',
             });
             offsets[corner]=previous+(item.definition.root.height||150)+8;
             fragment.appendChild(panel);
@@ -193,6 +193,17 @@ export class GizmoHudDomRenderer {
         event?.stopPropagation?.();
     }
 
+    private addPanelEvents(panel: HTMLElement): void {
+        // The entire *visible* panel, including labels and padding, belongs
+        // to the HUD. Only the transparent full-screen host passes Scene input.
+        // Bubble listeners preserve button/input target handlers and native
+        // checkbox/range default actions (do not preventDefault here).
+        for(const kind of ['pointerdown','mousedown','pointerup','mouseup',
+            'click','dblclick','contextmenu','wheel'] as const) {
+            panel.addEventListener(kind,(event)=>this.stop(event));
+        }
+    }
+
     private addControlEvents(element: HTMLElement): void {
         for(const kind of ['pointerdown','mousedown','click','dblclick','pointerup',
             'mouseup','wheel','keydown','keyup'] as const) {
@@ -249,8 +260,9 @@ export class GizmoHudDomRenderer {
                     boxShadow:'0 8px 28px rgba(0,0,0,.32)',
                     pointerEvents:'none',
                 });
-                // Background remains pointer transparent; only actual
-                // Button/Slider/Checkbox/Toggle controls own mouse input.
+                // The panel is opaque to picking; the full-screen host is not.
+                element.style.pointerEvents='auto';
+                this.addPanelEvents(element);
             }
             for(const child of node.children)
                 element.appendChild(this.drawNode(doc,item,child,scope+'/'+node.id));
