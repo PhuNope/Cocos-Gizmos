@@ -6,7 +6,7 @@ import ts from 'typescript';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const fail = (message) => { throw new Error('[verify-output] ' + message); };
-const expected = ['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'GizmoHandlePresets.js', 'Gizmos2D.js', 'Gizmos3D.js', 'RegisterGizmos.js', 'RegisterGizmos.d.ts'].sort();
+const expected = ['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'GizmoHandlePresets.js', 'GizmoHUD.js', 'Gizmos2D.js', 'Gizmos3D.js', 'RegisterGizmos.js', 'RegisterGizmos.d.ts'].sort();
 const actual = readdirSync(dist).sort();
 if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     fail('Expected runtime and type files, got: ' + actual.join(', '));
@@ -27,10 +27,10 @@ for (const statement of ast.statements) {
         fail('Unexpected export form in public entry');
     }
 }
-if (JSON.stringify(exported.sort()) !== JSON.stringify(['Gizmos2D', 'Gizmos3D'])) {
-    fail('Only Gizmos2D and Gizmos3D may be publicly exported: ' + exported);
+if (JSON.stringify(exported.sort()) !== JSON.stringify(['Gizmos2D', 'Gizmos3D', 'GizmoHUD'])) {
+    fail('Only supported Gizmos2D/Gizmos3D/GizmoHUD may be publicly exported: ' + exported);
 }
-if (!publicEntry.includes('if (EDITOR_NOT_IN_PREVIEW) Object.assign(globalThis, { Gizmos2D, Gizmos3D })')) {
+if (!publicEntry.includes('if (EDITOR_NOT_IN_PREVIEW) Object.assign(globalThis, { Gizmos2D, Gizmos3D, GizmoHUD })')) {
     fail('Missing runtime global registration');
 }
 // Cocos 3.8.x: Each script can have at most one Component. The old single-file
@@ -59,7 +59,7 @@ if (totalDecorated !== 2) fail('Expected exactly two separate private Component 
 if (publicEntry.includes('ccclass(') || publicEntry.includes('__decorate')) {
     fail('Public entry must not register a Cocos Component');
 }
-for (const dependency of ['Gizmos2D.js', 'Gizmos3D.js', 'ExecuteGizmos.js']) {
+for (const dependency of ['Gizmos2D.js', 'Gizmos3D.js', 'GizmoHUD.js', 'ExecuteGizmos.js']) {
     if (!publicEntry.includes("'" + (dependency === 'ExecuteGizmos.js' ? './ExecuteGizmos.js' : './' + dependency) + "'")) {
         fail('Missing module dependency ' + dependency);
     }
@@ -84,9 +84,11 @@ if (!decoratorJS.includes('EDITOR_NOT_IN_PREVIEW') ||
 }
 const dts = read('Gizmos.d.ts');
 for (const line of ['export declare class Gizmos2D', 'export declare class Gizmos3D',
+    'export declare class GizmoHUD',
     "const Gizmos2D: typeof import('./Gizmos').Gizmos2D",
     "const Gizmos3D: typeof import('./Gizmos').Gizmos3D",
+    "const GizmoHUD: typeof import('./Gizmos').GizmoHUD",
     'onDrawGizmos?(): void;']) {
     if (!dts.includes(line)) fail('Declaration is missing: ' + line);
 }
-console.log('[verify-output] two public globals, two separated private Components, and TypeScript declarations OK');
+console.log('[verify-output] three public globals, two separated private Components, and TypeScript declarations OK');
