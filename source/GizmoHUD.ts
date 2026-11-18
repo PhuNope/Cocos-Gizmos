@@ -68,6 +68,13 @@ export class GizmoHudCommandRegistry {
     public clear(): void { this.entries.clear(); }
 }
 
+const COMMANDS_KEY = '__cocosGizmosHudCommandsV3';
+function sharedCommands(): GizmoHudCommandRegistry {
+    const scope=globalThis as any;
+    return scope[COMMANDS_KEY] ||
+        (scope[COMMANDS_KEY]=new GizmoHudCommandRegistry());
+}
+
 type MountedHudRecord = {
     owner: any;
     definition: GizmoHudDefinition;
@@ -150,11 +157,14 @@ class HudBuilderImpl implements GizmoHudBuilder {
     private justifyValue: GizmoHudJustify = 'start';
 
     constructor(private readonly id: string,
-        private readonly kind: 'row' | 'column' = 'column') {
+        private readonly kind: 'row' | 'column' = 'column',
+        private readonly makeId?: (prefix:string)=>string) {
         assertId(id);
     }
 
-    private autoId(prefix: string): string { return prefix + '-' + (++this.nextId); }
+    private autoId(prefix: string): string {
+        return this.makeId ? this.makeId(prefix) : prefix + '-' + (++this.nextId);
+    }
     public title(value: string): this {
         this.text(this.autoId('title'),value,{style:{fontSize:16,fontWeight:600}});
         return this;
@@ -220,7 +230,7 @@ class HudBuilderImpl implements GizmoHudBuilder {
         const id=typeof input==='string'?input:this.autoId(kind);
         assertId(id);
         if (typeof callback !== 'function') throw new Error('GizmoHUD: group builder is required');
-        const group = new HudBuilderImpl(id, kind);
+        const group = new HudBuilderImpl(id, kind, prefix => this.autoId(prefix));
         if (typeof input!=='string') {
             if(input.gap!==undefined)group.gap(input.gap);
             if(input.padding!==undefined)group.padding(input.padding);
@@ -363,7 +373,7 @@ class HudBuilderImpl implements GizmoHudBuilder {
 }
 
 export class GizmoHUD {
-    public static readonly commands = new GizmoHudCommandRegistry();
+    public static get commands(): GizmoHudCommandRegistry { return sharedCommands(); }
 
     public static command(id: string): GizmoHudActionCommand {
         assertId(id);
