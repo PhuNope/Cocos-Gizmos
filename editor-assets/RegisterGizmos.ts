@@ -14,6 +14,7 @@ export interface IDrawGizmos<T extends Component = Component> {
     onGizmoHandles?(): GizmoHandleList;
     onDrawGizmos?(): void;
     onDrawGizmosSelected?(): void;
+    onGizmoHUD?(): GizmoHudDefinition;
     onGizmoHud?(): GizmoHudItem[];
     onGizmoHudControls?(): GizmoHudControlList;
     onGizmoChanged?(property: string, phase: GizmoHandlePhase, index?: number): void;
@@ -28,7 +29,7 @@ export type GizmosDrawerConstructor<T extends Component> =
 const hooks = [
     'onGizmoSettings', 'onGizmoHandles',
     'onDrawGizmos', 'onDrawGizmosSelected',
-    'onGizmoHud', 'onGizmoHudControls',
+    'onGizmoHUD', 'onGizmoHud', 'onGizmoHudControls',
     'onGizmoChanged', 'onGizmoHudChanged', 'onGizmoHudAction',
 ] as const;
 
