@@ -65,6 +65,18 @@ assert.equal(isSceneHudPointerEvent({clientX:100,clientY:80}),false,
 assert.equal(isSceneHudPointerEvent({x:300,y:420},
     {x:300,y:420},{width:800,height:500}),true,
     'Targetless 3D Scene coordinates resolve to the HUD panel');
+const {isSceneHudDomTarget}=scope.exports;
+const browserHudTarget={closest:()=>root};
+assert.equal(isSceneHudDomTarget({target:browserHudTarget}),true,
+    'Actual HTML buttons must reach DOM event handlers');
+assert.equal(isSceneHudDomTarget({clientX:300,clientY:80}),false,
+    'Geometry alone does not prove there is a browser target');
+scope.document.elementFromPoint=(x,y)=>x>=260&&x<=540&&y>=30&&y<=210?
+    browserHudTarget:null;
+assert.equal(isSceneHudDomTarget({clientX:300,clientY:80}),true,
+    'Targetless 3D Operation event must preserve native DOM input by hit testing');
+assert.equal(isSceneHudDomTarget({clientX:100,clientY:80}),false,
+    'Actual Scene canvas event may still use geometric picking fallback');
 root.style.display='none';
 assert.equal(isSceneHudPointerEvent({clientX:300,clientY:80}),false,
     'A hidden HUD must never block Scene selection');
