@@ -252,23 +252,47 @@ function createSelectHandleGizmo(
             return property;
         }
 
+        private readonly nativeHookWarnings = new Set<string>();
+
+        private safeNativeHook(label: string, action: () => void): void {
+            try { action(); }
+            catch (error) {
+                // The Editor's private SelectGizmo Undo/Inspector hooks differ
+                // across Creator 3.8.x variants. A failing optional hook must
+                // NEVER throw through a GizmoEditSession update: that turned
+                // a valid HUD Slider drag into update -> immediate cancel.
+                if (!this.nativeHookWarnings.has(label)) {
+                    this.nativeHookWarnings.add(label);
+                    console.warn('[cocos-gizmos/v3] Native Editor hook ' +
+                        label + ' failed (gesture continues):', error);
+                }
+            }
+        }
+
         private changed(property: string): void {
             const component=this.component();
             if (!component) return;
-            this.onControlUpdate?.(this.editorPropertyPath(property));
-            this.onComponentChanged?.(component.node);
+            const path=this.editorPropertyPath(property);
+            this.safeNativeHook('update:'+property,()=>
+                this.onControlUpdate?.(path));
+            this.safeNativeHook('component:'+property,()=>
+                this.onComponentChanged?.(component.node));
             requestSceneRepaint();
         }
 
         private beginEdit(property: string): void {
-            this.onControlBegin?.(this.editorPropertyPath(property));
+            const path=this.editorPropertyPath(property);
+            this.safeNativeHook('begin:'+property,()=>
+                this.onControlBegin?.(path));
         }
 
         private endEdit(property: string, cancelled: boolean): void {
             const path=this.editorPropertyPath(property);
-            if(cancelled && typeof this.onControlCancel==='function')
-                this.onControlCancel(path);
-            else this.onControlEnd?.(path);
+            this.safeNativeHook('end:'+property,()=>{
+                if(cancelled && typeof this.onControlCancel==='function')
+                    this.onControlCancel(path);
+                else this.onControlEnd?.(path);
+            });
         }
 
         private startHandle(entry: HandleHitTarget, event: any): void {
@@ -468,7 +492,8 @@ function createSelectHandleGizmo(
                     // can drop the currently selected Node. Actions should
                     // update their own properties and notify Scene redraw.
                     component.onGizmoHudAction?.(control.id);
-                    this.onComponentChanged?.(component.node);
+                    this.safeNativeHook('button:'+control.id,()=>
+                        this.onComponentChanged?.(component.node));
                     requestSceneRepaint();
                     return;
                 }
