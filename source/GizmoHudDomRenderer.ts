@@ -1,5 +1,5 @@
 import { GizmoHudCommandController, GizmoHudCommandHooks } from './GizmoHUDController';
-import { walkGizmoHUD } from './GizmoHUD';
+import { GizmoHUD, walkGizmoHUD } from './GizmoHUD';
 import { normalizeHudStyle } from './GizmoHudStyle';
 
 export interface GizmoHudView {
@@ -78,7 +78,12 @@ export class GizmoHudDomRenderer {
     }
 
     public finishFrame(): boolean {
-        if (!this.items.length) {
+        // Persistent mounts are independent of per-frame Component callbacks.
+        // Query the shared registry on every frame so show/hide/update works.
+        const items=[...this.items, ...GizmoHUD.mounted().map(entry=>({
+            component:entry.owner,definition:entry.definition,
+        }))];
+        if (!items.length) {
             if (!this.gesture) this.hide();
             return false;
         }
@@ -97,13 +102,13 @@ export class GizmoHudDomRenderer {
             // it. Cocos can redraw on every Component value update.
             return true;
         }
-        const snapshot=this.items.map(item=>({
+        const snapshot=items.map(item=>({
             node:item.component?.node?.uuid,
             definition:this.structureKey(item.definition),
             values:this.valuesKey(item),
         }));
         const signature=JSON.stringify(snapshot);
-        const owners=this.items.map(item=>item.component);
+        const owners=items.map(item=>item.component);
         const sameOwners=owners.length===this.renderedOwners.length &&
             owners.every((component,index)=>component===this.renderedOwners[index]);
         if(this.signature===signature && sameOwners)return true;
@@ -111,7 +116,7 @@ export class GizmoHudDomRenderer {
         this.renderedOwners=owners;
         const fragment=doc.createDocumentFragment();
         this.liveInputs.clear();
-        for(const item of this.items) {
+        for(const item of items) {
             const panel=this.drawNode(doc,item,item.definition.root,
                 item.definition.id,true);
             fragment.appendChild(panel);
@@ -133,14 +138,21 @@ export class GizmoHudDomRenderer {
                 node.command.kind,
                 node.command.kind==='property'?node.command.property:null];
         };
-        return [definition.id,key(definition.root)];
+        return [definition.id,definition.position,definition.theme,key(definition.root)];
     }
 
     private valuesKey(item: GizmoHudView): unknown {
         const result: unknown[]=[];
         walkGizmoHUD(item.definition.root,(node)=>{
-            if(!('command' in node) || node.command.kind!=='property')return;
-            result.push([node.id,item.component[node.command.property]]);
+            if(!('command' in node))return;
+            if(node.command.kind==='property')
+                result.push([node.id,item.component[node.command.property]]);
+            else if(node.command.kind==='value')
+                result.push([node.id,node.command.read(item.component)]);
+            else if(node.command.commandId)
+                result.push([node.id,GizmoHUD.commands.canExecute(
+                    node.command.commandId,item.component)]);
+            result.push([node.id,node.disabled,node.visible]);
         });
         return result;
     }
@@ -181,6 +193,7 @@ export class GizmoHudDomRenderer {
         scope: string, isRoot = false): HTMLElement {
         const element=doc.createElement('div');
         element.setAttribute('data-gizmo-hud-id', scope + '/' + node.id);
+        if ('visible' in node && node.visible===false)element.style.display='none';
         Object.assign(element.style,{
             boxSizing:'border-box', minWidth:'0',
             flexGrow: String(node.grow ?? 0),
@@ -212,11 +225,14 @@ export class GizmoHudDomRenderer {
             if(node.width!==undefined)element.style.width=node.width+'px';
             if(node.height!==undefined)element.style.height=node.height+'px';
             if(isRoot) {
+                const light=item.definition.theme==='light';
                 Object.assign(element.style,{
                     maxWidth:'min(420px, 40vw)', maxHeight:'70vh',
                     overflowY:'auto',
-                    background:'rgba(17,23,32,.95)',
-                    border:'1px solid rgba(171,194,215,.2)',
+                    background:light?'rgba(247,249,253,.97)':'rgba(17,23,32,.95)',
+                    color:light?'#202938':'#dce7ef',
+                    border:light?'1px solid rgba(49,63,87,.22)':
+                        '1px solid rgba(171,194,215,.2)',
                     borderRadius:'10px',
                     boxShadow:'0 8px 28px rgba(0,0,0,.32)',
                     pointerEvents:'none',
@@ -229,6 +245,13 @@ export class GizmoHudDomRenderer {
             return element;
         }
         this.applyStyle(element,node.style);
+        if(node.kind==='separator') {
+            Object.assign(element.style,{
+                height:'1px',background:'rgba(159,180,205,.2)',
+                margin:'4px 0',pointerEvents:'none',
+            });
+            return element;
+        }
         if(!('command' in node)) {
             element.textContent=node.text;
             Object.assign(element.style,{
@@ -245,13 +268,17 @@ export class GizmoHudDomRenderer {
         if(node.kind==='button') {
             const button=doc.createElement('button');
             button.type='button';
-            button.textContent=node.text;
+            button.textContent=node.icon ? node.icon+'  '+node.text : node.text;
             Object.assign(button.style,{
                 cursor:'pointer',padding:'5px 10px',
                 borderRadius:'6px',border:'1px solid rgba(112,197,189,.45)',
                 color:'#f1fcfa',background:'#2c666f',
             });
             this.applyStyle(button,node.style);
+            const registryDisabled=!!(node.command.kind==='action' &&
+                node.command.commandId && !GizmoHUD.commands.canExecute(
+                    node.command.commandId,item.component));
+            button.disabled=!!node.disabled || registryDisabled;
             this.addControlEvents(button);
             button.addEventListener('click',()=>{
                 this.commands.click(item.component,node);
@@ -276,7 +303,8 @@ export class GizmoHudDomRenderer {
             input.step=String(node.step ?? 'any');
             const command=node.command;
             input.value=command.kind==='property' ?
-                String(item.component[command.property]) : input.min;
+                String(item.component[command.property]) :
+                command.kind==='value'?String(command.read(item.component)):input.min;
             const current=doc.createElement('span');
             current.textContent=input.value;
             Object.assign(current.style,{
@@ -302,12 +330,14 @@ export class GizmoHudDomRenderer {
             input.style.flex='none';
             const command=node.command;
             input.checked=command.kind==='property' ?
-                item.component[command.property]===true:false;
+                item.component[command.property]===true:
+                command.kind==='value'?command.read(item.component)===true:false;
             input.addEventListener('change',()=>{
                 this.commands.commitValue(item.component,node,input.checked);
             });
             element.appendChild(input);
         }
+        input.disabled=!!node.disabled;
         this.addControlEvents(input);
         this.liveInputs.set(scope+'/'+node.id,input);
         return element;
