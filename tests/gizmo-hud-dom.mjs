@@ -67,12 +67,18 @@ class Element {
     emit(name,event={}){
         const e={
             button:0,pointerId:7,
-            stopImmediatePropagation(){this.stopped=true;},
+            stopImmediatePropagation(){
+                this.stopped=true;
+                this.immediateStopped=true;
+            },
             stopPropagation(){this.stopped=true;},
             preventDefault(){this.prevented=true;},
             ...event,
         };
-        for(const fn of this.listeners.get(name)||[])fn(e);
+        for(const fn of this.listeners.get(name)||[]) {
+            fn(e);
+            if(e.immediateStopped)break;
+        }
         return e;
     }
     setPointerCapture(id){this.pointerId=id;}
@@ -162,7 +168,8 @@ assert.equal(owner.wireframe,false);
 assert.equal(owner.events.at(-1)[1],'end');
 const latestButton=latestPanel.find(x=>x.tag==='button');
 latestButton.emit('click');
-assert.equal(owner.lastEvent,'reset');
+assert.equal(owner.lastEvent,'reset',
+    'stopPropagation must not suppress same-target Button command click');
 assert.equal(owner.size,1);
 assert.equal(latestButton.emit('pointerdown').stopped,true);
 renderer.beginFrame();renderer.queue(owner,hud());renderer.finishFrame();
