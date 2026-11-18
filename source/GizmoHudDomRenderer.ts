@@ -131,7 +131,10 @@ export class GizmoHudDomRenderer {
         if(!panels.some(panel=>this.inside(panel,pt.x,pt.y)))return false;
         // Panel padding and labels also belong to HUD and cannot unselect.
         const control=[...this.operationControls].reverse().find(item=>
-            !item.node.disabled && this.inside(item.element,pt.x,pt.y))||null;
+            !item.node.disabled && (this.inside(item.element,pt.x,pt.y) ||
+                (item.node.kind==='toggle'||item.node.kind==='checkbox') &&
+                !!item.element.parentElement &&
+                this.inside(item.element.parentElement,pt.x,pt.y)))||null;
         this.operationGesture={control,lastX:pt.x,lastY:pt.y};
         this.operationDownCount++;
         if(control?.node.kind==='slider' &&
@@ -179,7 +182,10 @@ export class GizmoHudDomRenderer {
             this.updateOperationSlider(entry,x);
             this.commands.finish(false);
             this.operationCommitCount++;
-        }else if(entry && this.inside(entry.element,x,y)){
+        }else if(entry && (this.inside(entry.element,x,y) ||
+            (entry.node.kind==='toggle'||entry.node.kind==='checkbox') &&
+            !!entry.element.parentElement &&
+            this.inside(entry.element.parentElement,x,y))){
             if(entry.node.kind==='button'){
                 if(this.commands.click(entry.component,entry.node))
                     this.operationCommitCount++;
