@@ -25,9 +25,11 @@ function load(name, imports = {}) {
 const appearance = load('GizmoHudStyle');
 const controls = load('GizmoHudControls', { './GizmoHudStyle': appearance });
 const presentation = load('GizmoPresentation', { './GizmoHudStyle': appearance });
+const builder = load('GizmoHUD');
 const { GizmoHudLayout } = load('GizmoHudLayout', {
     './GizmoHudControls': controls,
     './GizmoPresentation': presentation,
+    './GizmoHUD': builder,
 });
 
 const sameNode = { uuid: 'one', activeInHierarchy: true, isValid: true };
@@ -71,6 +73,32 @@ assert.ok(pa.items[1].style &&
     typeof pa.items[1].style === 'object');
 
 assert.match(pb.items[1].text, /20/);
+const {GizmoHUD}=builder;
+const newComponent={
+    node:{uuid:'built',activeInHierarchy:true,isValid:true},
+    isValid:true,enabled:true,size:1,visible:true,
+    onGizmoHUD(){
+        return GizmoHUD.createHud('sample')
+            .text('heading','New builder HUD')
+            .row('group',row=>row.gap(6)
+                .slider('size','Size',GizmoHUD.bind('size'),{
+                    min:0,max:3,step:.25,
+                })
+                .checkbox('visible','Visible',GizmoHUD.bind('visible')))
+            .button('reset','Reset',GizmoHUD.action(c=>{c.size=1;}))
+            .build();
+    },
+};
+layout.beginFrame([newComponent],()=>true);
+const newPlacement=layout.get(newComponent);
+assert.equal(newPlacement.tree.kind,'hud');
+assert.equal(newPlacement.textCount,1);
+assert.deepEqual(Array.from(newPlacement.controls,x=>x.id),
+    ['size','visible','reset']);
+assert.equal(newPlacement.commands.get('reset').kind,'action');
+assert.equal(newPlacement.commands.get('size').property,'size');
+assert.equal(newPlacement.rowCount,4,'Flex tree has flat texture fallback rows');
+
 assert.equal(reads.a, 2, 'Each HUD callback runs once per component per frame');
 assert.equal(reads.b, 1);
 
