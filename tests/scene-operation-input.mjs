@@ -13,10 +13,19 @@ vm.runInNewContext(transpile('../source/SceneGizmoInput.ts'),portScope);
 const leaseScope={exports:{}};
 vm.runInNewContext(transpile('../source/SceneSelectionLease.ts'),leaseScope);
 
+const pointerScope={exports:{}};
+vm.runInNewContext(transpile('../source/ScenePointerCoordinates.ts'),{
+    exports:pointerScope.exports,globalThis:{},
+    require(name) {
+        if(name==='./SceneGizmoInput')return portScope.exports;
+        throw Error(name);
+    },
+});
 const source=transpile('../source/SceneOperationInput.ts');
 const scope={exports:{},console,require(name){
     if(name==='./SceneGizmoInput')return portScope.exports;
     if(name==='./SceneSelectionLease')return leaseScope.exports;
+    if(name==='./ScenePointerCoordinates')return pointerScope.exports;
     throw Error('Unexpected import: '+name);
 }};
 vm.runInNewContext(source,scope);
