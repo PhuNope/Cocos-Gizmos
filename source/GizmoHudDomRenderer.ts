@@ -119,10 +119,11 @@ export class GizmoHudDomRenderer {
                 return [node.kind,node.id,node.width,node.height,node.grow,
                     node.gap,node.padding,node.align,node.justify,
                     (node.children || []).map(key)];
+            if(node.kind==='text')return [node.kind,node.id,node.text,node.style,node.grow];
             return [node.kind,node.id,node.text,node.style,node.grow,
                 node.min,node.max,node.step,
-                node.command?.kind,
-                node.command?.kind==='property'?node.command.property:null];
+                node.command.kind,
+                node.command.kind==='property'?node.command.property:null];
         };
         return [definition.id,key(definition.root)];
     }
