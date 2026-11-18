@@ -810,16 +810,23 @@ export function createV3HandleAdapter(
             // priority than Gizmo=99 and Camera=98 avoids update->cancel
             // from native Scene selection after a custom HUD/control click.
             operationInput.refresh();
-            if(operationInput.status().active){
-                // Scene Operation may become available AFTER the first
-                // engine/WebView mouse-down. Never detach the fallback port
-                // while it owns a gesture: detach() must cancel its capture.
-                // The new Operation subscription stays passive until the
-                // old port has committed on mouse-up. Switch next frame.
-                if(!captured){
+            const nativeActive=operationInput.status().active;
+            const webCapturing=viewportInput.status().captured;
+            const engineCapturing=engineInput.status().captured;
+            if(nativeActive){
+                // Input adapters can become available asynchronously between
+                // frames. Never detach an adapter that owns a held pointer:
+                // that detach is defined to cancel the current EditSession.
+                if(!webCapturing && !engineCapturing){
                     viewportInput.detach();
                     engineInput.refresh(false);
                 }
+            } else if(engineCapturing){
+                // A late WebView mount must not steal a Cocos engine drag.
+                engineInput.refresh(true);
+            } else if(webCapturing){
+                viewportInput.refresh();
+                engineInput.refresh(false);
             } else {
                 viewportInput.refresh();
                 engineInput.refresh(!viewportInput.status().active);
