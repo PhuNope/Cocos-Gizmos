@@ -18,6 +18,7 @@ const events=[],paints=[];
 let bridgePort=null;
 let bridgeMounts=0;
 let bridgeDetaches=0;
+let bridgeCaptured=false;
 let editorRebuildsOnUpdate=false;
 let editorRebuildsOnBegin=false;
 const component={
@@ -174,10 +175,32 @@ const scope={
         };
         if(name==='./SceneSelectionLease')return leaseScope.exports;
         if(name==='./SceneViewportInput')return {SceneViewportInput:class {
-            constructor(ports){this.ports=ports;bridgePort=ports;}
+            constructor(ports){
+                this.ports=ports;
+                bridgePort={
+                    ...ports,
+                    down(event) {
+                        const acquired=ports.down(event);
+                        if(acquired)bridgeCaptured=true;
+                        return acquired;
+                    },
+                    up(event) {
+                        try{return ports.up(event);}
+                        finally{bridgeCaptured=false;}
+                    },
+                    cancel() {
+                        try{return ports.cancel();}
+                        finally{bridgeCaptured=false;}
+                    },
+                };
+            }
             refresh(){bridgeMounts++;}
-            detach(){bridgeDetaches++;}
-            status(){return {active:true,reason:'mock-pointer-capture',captured:false,
+            detach(){
+                bridgeDetaches++;
+                if(bridgeCaptured)bridgePort.cancel();
+            }
+            status(){return {active:true,reason:'mock-pointer-capture',
+                captured:bridgeCaptured,
                 observed:0,intercepted:0,hover:0,cancelled:0};}
         }};
         if(name==='./SceneEngineInput')return {SceneEngineInput:class {
