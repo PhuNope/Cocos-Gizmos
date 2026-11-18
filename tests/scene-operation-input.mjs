@@ -66,7 +66,11 @@ op.on('mousedown',(event)=>{
     nativeSelection++;
     events.push(['native-selection']);
 },99);
-op.on('mousedown',()=>nativeCamera++,98);
+op.on('mousedown',(event)=>{
+    if(event?.target?.closest?.('#cocos-gizmos-scene-hud, #cocos-gizmos-builder-hud'))
+        return;
+    nativeCamera++;
+},98);
 let ownDown=0;
 const ports={
     viewport(){return {width:800,height:500};},
