@@ -31,10 +31,11 @@ class GizmosRenderer {
 
     constructor(private readonly graphic: Graphics) {}
 
-    public draw(now: number = Date.now()): void {
+    public draw(now: number = Date.now(), immediatelyClearStale = false): void {
         if (this.commands.isEmpty) {
             if (this.hasGeometry &&
-                now - this.lastSubmittedAt > GizmosRenderer.GEOMETRY_GRACE_MS) {
+                (immediatelyClearStale ||
+                now - this.lastSubmittedAt > GizmosRenderer.GEOMETRY_GRACE_MS)) {
                 this.graphic.clear();
                 this.hasGeometry = false;
                 this.previous.length = 0;
@@ -66,6 +67,15 @@ class GizmosRenderer {
 @executeInEditMode
 class GizmosDebugDraw extends Component {
     private readonly _renderers = new Map<string, GizmosRenderer>();
+    private _clearStaleOnHoverFrame = false;
+
+    /** Color-keyed Graphics renderers retain their previous draw commands for
+     * 750ms during idle Scene updates. Switching hover colors must override
+     * that grace immediately, or old hover strokes remain visible on exit.
+     */
+    public invalidateHoverFrame(): void {
+        this._clearStaleOnHoverFrame = true;
+    }
     private readonly _labelMap = new Map<string, Label>();
     private readonly _spriteMap = new Map<string, Sprite>();
     private _color: Color = Gizmos2D.DEFAULT_COLOR;
@@ -97,7 +107,9 @@ class GizmosDebugDraw extends Component {
             }
         });
 
-        this._renderers.forEach((renderer) => renderer.draw(now));
+        this._renderers.forEach((renderer) =>
+            renderer.draw(now, this._clearStaleOnHoverFrame));
+        this._clearStaleOnHoverFrame = false;
 
         for (const drawCall of this._drawCallsNoneGeometry) drawCall();
         this._drawCallsNoneGeometry.length = 0;
@@ -465,6 +477,17 @@ export class Gizmos2D {
                 console.warn('[cocos-gizmos/2d] Cannot flush restored Scene Graphics:', error);
             }
         }
+    }
+
+    /** Expire old color-keyed 2D strokes on the next Scene paint, without
+     * removing the 750ms idle grace for unrelated Gizmo labels and geometry.
+     */
+    public static invalidateHover(node: Node): void {
+        const debug = this._debugNodes.get(node);
+        if (!debug || debug.isValid === false || debug.node?.isValid === false)
+            return;
+        debug.invalidateHoverFrame();
+        this._pendingFrame.add(debug);
     }
 
     /** Release any pending references before switching or resetting Scene. */
