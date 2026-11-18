@@ -202,6 +202,39 @@ assert.equal(op.listeners.get('mousemove').length,0);
 assert.equal(op.listeners.get('mouseup').length,0);
 assert.equal(input.status().active,false);
 
+// Cocos Creator 3D WebView ignores native pointer events. The Scene
+// Operation priority-100 route must invoke the HUD port directly and stop
+// the native selection tool, including multi-frame slider drag and Escape.
+const hudEvents=[];
+const op3D=new MockOperation();
+let selected3D=0;
+op3D.on('mousedown',()=>selected3D++,99);
+const hudPort={
+    usesSceneOperationInput:()=>true,
+    operationDown(p){hudEvents.push(['down',p.x,p.y]);return p.x>300&&p.x<500;},
+    operationMove(p){hudEvents.push(['move',p.x,p.y]);return true;},
+    operationUp(p){hudEvents.push(['up',p?.x,p?.y]);return true;},
+    operationCancel(){hudEvents.push(['cancel']);},
+};
+const bridge3D=new SceneOperationInput(ports,()=>op3D,()=>hudPort);
+bridge3D.refresh();
+assert.equal(op3D.emit('mousedown',{...point,x:360}),false);
+assert.equal(selected3D,0,'3D HUD click must never unselect Node');
+assert.equal(bridge3D.status().builderHudGesture,true);
+assert.equal(bridge3D.status().builderHudDown,1);
+assert.equal(op3D.emit('mousemove',{...point,x:420}),false);
+assert.equal(op3D.emit('mouseup',{...point,x:440}),false);
+assert.deepEqual(hudEvents.slice(-3),[
+    ['down',360,80],['move',420,80],['up',440,80],
+]);
+assert.equal(bridge3D.status().builderHudGesture,false);
+assert.equal(op3D.emit('mousedown',{...point,x:360}),false);
+assert.equal(op3D.emit('keydown',{key:'Escape',keyCode:27}),false);
+assert.deepEqual(hudEvents.at(-1),['cancel']);
+assert.equal(op3D.emit('mousedown',{...point,x:600}),undefined);
+assert.equal(selected3D,1,'Outside 3D HUD remains selectable');
+bridge3D.detach();
+
 const absent=new SceneOperationInput(ports,()=>null);
 absent.refresh();
 assert.equal(absent.status().reason,'scene-operation-unavailable');
