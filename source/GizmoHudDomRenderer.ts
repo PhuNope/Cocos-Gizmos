@@ -400,7 +400,8 @@ export class GizmoHudDomRenderer {
             pointerId:Number.isInteger(event.pointerId)?event.pointerId:null};
         view.addEventListener(prefix+'up',this.onPointerEnd,true);
         view.addEventListener(pointer?'pointercancel':'mouseleave',this.onPointerCancel,true);
-        view.addEventListener('blur',this.onPointerCancel,true);
+        // Switching focus from the Scene canvas to an HTML control is not
+        // a drag cancellation. Use pointercancel/Escape/dispose instead.
         view.addEventListener('keydown',this.onKeyDown,true);
         try{(element as any).setPointerCapture?.(event.pointerId);}
         catch { /* window listener is still installed */ }
@@ -420,7 +421,7 @@ export class GizmoHudDomRenderer {
         view.removeEventListener(prefix+'up',this.onPointerEnd,true);
         view.removeEventListener(pointer?'pointercancel':'mouseleave',
             this.onPointerCancel,true);
-        view.removeEventListener('blur',this.onPointerCancel,true);
+        // No blur listener: normal Editor focus transitions keep slider alive.
         view.removeEventListener('keydown',this.onKeyDown,true);
         try{(gesture.element as any).releasePointerCapture?.(gesture.pointerId);}
         catch { /* DOM node may already be disconnected */ }
