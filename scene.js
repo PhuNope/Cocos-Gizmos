@@ -9,7 +9,8 @@ exports.load = function load() {
     if (globalThis.Editor?.App?.path) module.paths.push(path.join(globalThis.Editor.App.path, 'node_modules'));
     const { Gizmos2D } = require('./editor-runtime/Gizmos2D.js');
     const { Gizmos3D } = require('./editor-runtime/Gizmos3D.js');
-    installed = { Gizmos2D, Gizmos3D };
+    const { GizmoHUD } = require('./editor-runtime/GizmoHUD.js');
+    installed = { Gizmos2D, Gizmos3D, GizmoHUD };
     Object.assign(globalThis, installed);
     updater = require('./editor-runtime/ExecuteGizmos.js');
     const { GizmoPresentationService } = require('./editor-runtime/GizmoPresentationService.js');
@@ -35,6 +36,7 @@ exports.unload = function unload() {
     if (!installed) return;
     if (globalThis.Gizmos2D === installed.Gizmos2D) delete globalThis.Gizmos2D;
     if (globalThis.Gizmos3D === installed.Gizmos3D) delete globalThis.Gizmos3D;
+    if (globalThis.GizmoHUD === installed.GizmoHUD) delete globalThis.GizmoHUD;
     installed = null;
 };
 let resetting = false;
