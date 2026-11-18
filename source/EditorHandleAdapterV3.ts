@@ -848,15 +848,18 @@ export function createV3HandleAdapter(
                     (typeof component.onGizmoHudControls!=='function' ||
                      (hudLayout&&!hudLayout.get(component)))))continue;
                 wanted.add(component);
-                let installed=!typeDefs; // DOM/engine input needs no Gizmo pool.
+                // Never require our Component's name to be free in the
+                // Editor's private Gizmo pool. Another extension or stale
+                // version may already own that name, but screen-space input
+                // must still function for this selected Component.
+                // A native SelectGizmo registration improves Undo only.
                 if(typeDefs) {
                     for(const key of selectedKeys(component)){
                         if(!typeDefs[key]){
-                            typeDefs[key]=ctor;registered.set(key,ctor);installed=true;
-                        }else if(typeDefs[key]===ctor)installed=true;
+                            typeDefs[key]=ctor;registered.set(key,ctor);
+                        }
                     }
                 }
-                if(!installed)continue;
                 const old=active.get(component);
                 if(old&&old.isHandleVisible?.()!==false &&
                     !old.isHandleDisposed?.())old.refreshHandles?.();
