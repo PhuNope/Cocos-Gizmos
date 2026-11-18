@@ -43,24 +43,26 @@ export default class CocosGizmosSmokeDemo extends Component {
         ];
     }
 
-    public onGizmoHud(): GizmoHudItem[] {
-        return [
-            { id: 'title', text: 'Gizmo Smoke Probe', order: 0, color: '#ffffff' },
-            { id: 'state', text: 'Last change: ' + this.lastPhase, order: 1 },
-        ];
-    }
-
-    public onGizmoHudControls(): GizmoHudControlList {
-        return [
-            { type: 'slider', id: 'radius', text: 'Radius', property: 'radius', min: 0, max: 300, step: 5 },
-            { type: 'toggle', id: 'show-range', text: 'Show Range', property: 'showRange' },
-            { type: 'checkbox', id: 'show-grid', text: 'Show Grid', property: 'showGrid' },
-            { type: 'button', id: 'reset-radius', text: 'Reset radius' },
-        ];
-    }
-
-    public onGizmoHudAction(id: string): void {
-        if (id === 'reset-radius') this.radius = 75;
+    /** Minimal new-API regression HUD for selected 2D Nodes. */
+    public onGizmoHUD(): GizmoHudDefinition {
+        return GizmoHUD.createHud('smoke-probe')
+            .title('Gizmo Smoke Probe')
+            .position('top-left').theme('dark').size(280,'auto')
+            .text('state','Last change: ' + this.lastPhase)
+            .slider('Radius', {
+                property:'radius', min:0, max:300, step:5,
+            })
+            .row({ gap:8 }, row => {
+                row.toggle('Show Range', { property:'showRange' })
+                    .checkbox('Show Grid', { property:'showGrid' });
+            })
+            .button('Reset radius', {
+                command:GizmoHUD.action((owner: GizmoSmokeProbe) => {
+                    owner.radius = 75;
+                    owner.lastPhase = 'reset';
+                }),
+            })
+            .build();
     }
 
     public onGizmoHudChanged(property: string, phase: GizmoHandlePhase, value: number | boolean): void {
