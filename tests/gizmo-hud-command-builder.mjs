@@ -45,7 +45,7 @@ assert.equal(hud.root.children[3].command.property,'opacity');
 const mount=GizmoHUD.mount(hud,owner);
 assert.equal(GizmoHUD.mounted().length,1);
 mount.get('title-1').setText('Updated');
-mount.get('button-1').setDisabled(true);
+mount.get('button-3').setDisabled(true);
 assert.equal(GizmoHUD.mounted()[0].definition.root.children[0].text,'Updated');
 assert.equal(GizmoHUD.mounted()[0].definition.root.children[1].children[0].disabled,true);
 mount.hide();
