@@ -4,6 +4,14 @@ All notable changes to Cocos-Gizmos are documented here.
 
 ## [Unreleased] — v3 development (not published)
 
+### Particle-style floating DOM HUD and 2D hover (development build)
+- HUD controls in the Scene WebView are now real pointer-interactive DOM rows with a separate Command input port. Non-control areas remain pointer-transparent; outside clicks and native Scene selection still pass through.
+- DOM Slider/button pointer events are captured directly by the control and forwarded to the existing Gizmo EditSession/Command layer. While a pointer is held, the HUD preserves its DOM nodes across Scene redraws and updates the slider readout/fill in place; browser pointerup and cancel explicitly finish the gesture.
+- When the Scene runtime cannot access the WebView DOM, the existing textured HUD and Scene Operation input remain as fallback. This design borrows ParticleSystem's separation of UI controls from gizmo rendering; it does not depend on invoking the Editor-only `EngineView.attachFloatWindow()` from a Scene Script.
+- Fix the 2D Move/Rotate hover exit delay: invalidate stale color-keyed Graphics immediately on hover transitions instead of retaining the previous highlighted stroke for 750ms. Hover enter/leave also bypasses the 32ms redraw throttle.
+- Add simulated DOM capture, stable-slider and 2D color-cache regression tests.
+
+
 ### Fixes for Creator 3.8.8 input alignment and selection
 - Map Scene Operation `clientX/clientY` through the actual `GameCanvas.getBoundingClientRect()` into the camera viewport coordinate system shared by Gizmo render, ray casting and HUD picking; preserve raw Editor coordinates only when canvas mapping is unavailable.
 - Remove the HUD selection guard that forcibly re-selected a previously active Node; real Editor selection events now decide what remains selected, including switching from a test Node to another Node.
