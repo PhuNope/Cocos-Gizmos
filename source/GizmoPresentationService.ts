@@ -1,6 +1,7 @@
 import { Component } from 'cc';
 import { Gizmos3D } from './Gizmos3D';
 import { GizmoHudOverlay } from './GizmoHudOverlay';
+import { GizmoHudDomRenderer } from './GizmoHudDomRenderer';
 import { formatHudControl, normalizeHudControls } from './GizmoHudControls';
 import { GizmoHudLayout } from './GizmoHudLayout';
 import {
@@ -19,6 +20,7 @@ export interface GizmoComponentVisibility {
 /** Coordinates per-component settings, HUD rendering, and extension defaults. */
 export class GizmoPresentationService {
     private readonly overlay = new GizmoHudOverlay();
+    private readonly builderHud = new GizmoHudDomRenderer();
     private defaults: GizmoViewConfig = normalizeViewConfig(undefined);
     private readonly layout = new GizmoHudLayout();
     private planned = false;
@@ -32,6 +34,7 @@ export class GizmoPresentationService {
     ): void {
         this.planned = true;
         this.overlay.beginFrame?.();
+        this.builderHud.beginFrame();
         this.layout.beginFrame(
             components,
             (component) => this.evaluate(component, selected.has(component.node.uuid)).hud,
@@ -41,12 +44,15 @@ export class GizmoPresentationService {
 
     public finishFrame(): void {
         this.overlay.finishFrame?.(this.layout.totalRows);
+        this.builderHud.finishFrame();
     }
 
     public clearFrame(): void {
         this.planned = false;
         this.layout.clear();
         this.overlay.clearFrame?.();
+        this.builderHud.beginFrame();
+        this.builderHud.hide();
     }
 
 
@@ -72,6 +78,12 @@ export class GizmoPresentationService {
     public renderHud(component: Component): number {
         const plannedPlacement = this.layout.get(component);
         if (plannedPlacement) {
+            // A built HUD uses native DOM flex layout and direct commands.
+            // The existing row renderer is only its fallback on headless
+            // Creator Scene processes without an accessible WebView DOM.
+            if (plannedPlacement.tree && this.builderHud.canRender()) {
+                return this.builderHud.queue(component,plannedPlacement.tree);
+            }
             const count = this.overlay.render(component, plannedPlacement.items, plannedPlacement);
             // On a 2D Canvas, rendering through Gizmos2D must not create a
             // separate 3D debug root just to reset its drawing color.
@@ -113,9 +125,12 @@ export class GizmoPresentationService {
         return {
             hudLabels: this.overlay.totalDrawn,
             overlay: this.overlay.diagnosticState,
+            builderHud: {active:this.builderHud.active,editing:this.builderHud.editing},
             defaults: this.getSettings(),
         };
     }
 
-    public dispose(): void { this.clearFrame(); this.overlay.dispose(); }
+    public dispose(): void {
+        this.clearFrame();this.overlay.dispose();this.builderHud.dispose();
+    }
 }
