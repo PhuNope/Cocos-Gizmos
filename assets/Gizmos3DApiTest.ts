@@ -121,6 +121,35 @@ export default class Gizmos3DApiTest extends Component {
         ];
     }
 
+    public onGizmoHUD(): GizmoHudDefinition {
+        return GizmoHUD.createHud('shape3d')
+            .width(344).padding(12).gap(8)
+            .text('title','3D · Gizmos', {
+                style: { color:'#93ddd3',fontSize:17,fontWeight:600 },
+            })
+            .text('event','Last: '+this.lastEvent, {
+                style: { color:'#a7b6c5',fontSize:11 },
+            })
+            .slider('size','Shape size',GizmoHUD.bind('size'), {
+                min:0.5,max:3,step:0.25,
+                style: { color:'#e2f1f3' },
+            })
+            .row('settings', row => {
+                row.gap(12)
+                    .toggle('wire','Wireframe',GizmoHUD.bind('wireframe'))
+                    .checkbox('depth','Depth',GizmoHUD.bind('depthTest'));
+            })
+            .row('actions', row => {
+                row.gap(12)
+                    .checkbox('labels','Labels',GizmoHUD.bind('showLabels'))
+                    .button('reset','Reset 3D',GizmoHUD.action((owner) =>
+                        owner.onGizmoHudAction('reset')), {
+                        style: { backgroundColor:'#28656a',color:'#e9fffc' },
+                    });
+            })
+            .build();
+    }
+
     public onGizmoHud(): GizmoHudItem[] {
         return [
             { id: 'title', text: '3D · Gizmos', order: 0,
