@@ -13,6 +13,8 @@ const {GizmoHUD,walkGizmoHUD}=api.exports;
 const calls=[];
 const builder=GizmoHUD.createHud('shape')
     .width(330).padding(12).gap(8)
+    .style({backgroundColor:'#202b32',borderRadius:10})
+    .wrap(false).shrink(0).basis(330)
     .text('title','Particle-style HUD',{style:{color:'#ffffff'}})
     .row('settings',row=>{
         row.gap(12)
@@ -29,6 +31,10 @@ assert.equal(hud.kind,'hud');
 assert.equal(hud.root.kind,'column');
 assert.equal(hud.root.width,330);
 assert.equal(hud.root.gap,8);
+assert.equal(hud.root.basis,330);
+assert.equal(hud.root.shrink,0);
+assert.equal(hud.root.wrap,false);
+assert.equal(hud.root.style.backgroundColor,'#202b32');
 assert.equal(hud.root.children[1].kind,'row');
 assert.equal(hud.root.children[1].children.length,2);
 assert.equal(hud.root.children[1].children[0].command.property,'size');
