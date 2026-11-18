@@ -184,9 +184,13 @@ export class GizmoHudDomRenderer {
         Object.assign(element.style,{
             boxSizing:'border-box', minWidth:'0',
             flexGrow: String(node.grow ?? 0),
-            flexShrink: String(node.shrink ?? 1),
-            ...(node.basis !== undefined ?
-                { flexBasis: node.basis + 'px' } : {}),
+            // Only container nodes currently expose shrink and basis; leaf
+            // defaults use the browser's native flex sizing.
+            ...('children' in node ? {
+                flexShrink: String(node.shrink ?? 1),
+                ...(node.basis !== undefined ?
+                    { flexBasis: node.basis + 'px' } : {}),
+            } : {}),
         });
         if('children' in node) {
             Object.assign(element.style,{
