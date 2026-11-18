@@ -271,6 +271,9 @@ declare global {
         readonly width?: number;
         readonly height?: number;
         readonly grow?: number;
+        readonly shrink?: number;
+        readonly basis?: number;
+        readonly wrap?: boolean;
         readonly align?: GizmoHudAlign;
         readonly justify?: GizmoHudJustify;
         readonly style?: GizmoHudDomStyle;
@@ -307,6 +310,10 @@ declare global {
         width(value: number): this;
         height(value: number): this;
         grow(value?: number): this;
+        shrink(value?: number): this;
+        basis(value: number): this;
+        wrap(value?: boolean): this;
+        style(value: GizmoHudDomStyle): this;
         gap(value: number): this;
         padding(value: number): this;
         align(value: GizmoHudAlign): this;
