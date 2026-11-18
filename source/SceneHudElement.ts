@@ -24,6 +24,30 @@ export interface SceneHudRow {
 
 export interface SceneHudViewport { width: number; height: number }
 
+/** ParticleSystem-style HUD separation: the DOM owns pointer capture and
+ * controls, while the Scene application adapter owns Commands and values.
+ * This port is registered by EditorHandleAdapterV3 when its Scene loads.
+ * No engine raycast, physics Controller or Node is needed for HUD input.
+ */
+export interface SceneHudPointer {
+    x: number; y: number; button: number; buttons: number; event: any;
+}
+export interface SceneHudInputPort {
+    down(event: SceneHudPointer): boolean;
+    move(event: SceneHudPointer): void;
+    up(event: SceneHudPointer): void;
+    cancel(): void;
+}
+let currentHudInputPort: SceneHudInputPort | null = null;
+
+export function connectSceneHudInput(port: SceneHudInputPort): () => void {
+    currentHudInputPort = port;
+    return () => {
+        if (currentHudInputPort === port) currentHudInputPort = null;
+    };
+}
+
+
 const PALETTE = Object.freeze({
     surface: 'rgba(17, 23, 32, 0.94)',
     foreground: '#dce7ef',
@@ -68,9 +92,11 @@ function applyAppearance(element: HTMLElement, style?: HudDomStyle): void {
 }
 
 /**
- * A compact Scene-WebView HUD. No game Canvas or Node is used for the DOM.
- * Creator's embedded Scene routes the input through GizmoOperation, so the
- * transparent element never intercepts pointer/keyboard events.
+ * Scene-local floating DOM HUD following the ParticleSystem separation:
+ * HTML controls own their click/drag; Gizmo commands own values and Undo.
+ * The root is pointer-transparent except over actual controls, so ordinary
+ * Scene selection/orbit still belongs to Creator. Texture HUD remains only
+ * for Editor builds without a usable Scene DOM.
  */
 export class SceneHudElement {
     private root: HTMLElement | null = null;
@@ -78,6 +104,125 @@ export class SceneHudElement {
     private originalPosition = '';
     private adjustedPosition = false;
     private signature = '';
+    private held: { rowIndex: number; pointerId: number | null;
+        viewport: SceneHudViewport; host: HTMLElement; doc: Document } | null = null;
+    private heldValue: HTMLElement | null = null;
+    private heldRail: HTMLElement | null = null;
+
+    private stopEvent(event: any): void {
+        event?.stopImmediatePropagation?.();
+        event?.stopPropagation?.();
+        event?.preventDefault?.();
+    }
+
+    private toViewport(event: any, host: HTMLElement,
+        viewport: SceneHudViewport): SceneHudPointer | null {
+        const rect = host.getBoundingClientRect?.();
+        if (!rect || !(rect.width > 0) || !(rect.height > 0) ||
+            !Number.isFinite(event?.clientX) ||
+            !Number.isFinite(event?.clientY)) return null;
+        return {
+            x: (event.clientX - rect.left) * viewport.width / rect.width,
+            y: (rect.bottom - event.clientY) * viewport.height / rect.height,
+            button: typeof event.button === 'number' ? event.button : 0,
+            buttons: typeof event.buttons === 'number' ? event.buttons : 1,
+            event,
+        };
+    }
+
+    private readonly onDragMove = (event: any): void => {
+        const held = this.held;
+        if (!held || (held.pointerId !== null &&
+            event.pointerId !== undefined && event.pointerId !== held.pointerId)) return;
+        const pointer = this.toViewport(event, held.host, held.viewport);
+        this.stopEvent(event);
+        if (!pointer) return;
+        try { currentHudInputPort?.move(pointer); }
+        catch (error) {
+            this.endDrag(true);
+            console.warn('[cocos-gizmos/hud] DOM drag failed:', error);
+        }
+    };
+
+    private readonly onDragUp = (event: any): void => {
+        const held = this.held;
+        if (!held || (held.pointerId !== null &&
+            event.pointerId !== undefined && event.pointerId !== held.pointerId)) return;
+        const pointer = this.toViewport(event, held.host, held.viewport);
+        this.stopEvent(event);
+        try {
+            if (pointer) currentHudInputPort?.up(pointer);
+            else currentHudInputPort?.cancel();
+        } finally {
+            this.endDrag(false);
+        }
+    };
+
+    private readonly onDragCancel = (event: any): void => {
+        if (!this.held) return;
+        this.stopEvent(event);
+        this.endDrag(true);
+    };
+
+    private endDrag(cancel: boolean): void {
+        const held = this.held;
+        if (!held) return;
+        this.held = null;
+        const target: any = held.doc.defaultView?.addEventListener ?
+            held.doc.defaultView : held.doc;
+        const mouse = typeof (held.doc.defaultView as any)?.PointerEvent !== 'function';
+        const prefix = mouse ? 'mouse' : 'pointer';
+        target.removeEventListener?.(prefix + 'move', this.onDragMove, true);
+        target.removeEventListener?.(prefix + 'up', this.onDragUp, true);
+        target.removeEventListener?.(mouse ? 'mouseleave' : 'pointercancel',
+            this.onDragCancel, true);
+        if (cancel) {
+            try { currentHudInputPort?.cancel(); }
+            catch (error) { console.warn('[cocos-gizmos/hud] Cancel:', error); }
+        }
+        this.heldValue = null;
+        this.heldRail = null;
+        // Reconcile DOM content only AFTER mouse-up; replacing active control
+        // DOM nodes each Editor tick drops browser pointer capture.
+        this.signature = '';
+    }
+
+    private bindControl(
+        box: HTMLElement, row: SceneHudRow, host: HTMLElement,
+        viewport: SceneHudViewport, doc: Document,
+    ): void {
+        if (!currentHudInputPort || typeof box.addEventListener !== 'function')
+            return;
+        box.style.pointerEvents = 'auto';
+        box.style.cursor = row.kind === 'slider' ? 'ew-resize' : 'pointer';
+        (box as any).tabIndex = -1;
+        const pointerSupported = typeof (doc.defaultView as any)?.PointerEvent === 'function';
+        box.addEventListener(pointerSupported ? 'pointerdown' : 'mousedown', (event: any) => {
+            if (this.held || event.button !== 0 || !currentHudInputPort) return;
+            const pointer = this.toViewport(event, host, viewport);
+            if (!pointer) return;
+            this.stopEvent(event);
+            if (!currentHudInputPort.down(pointer)) return;
+            this.held = {
+                rowIndex: row.index, pointerId:
+                    Number.isInteger(event.pointerId) ? event.pointerId : null,
+                viewport, host, doc,
+            };
+            const target: any = doc.defaultView?.addEventListener ?
+                doc.defaultView : doc;
+            const prefix = pointerSupported ? 'pointer' : 'mouse';
+            target.addEventListener(prefix + 'move', this.onDragMove, true);
+            target.addEventListener(prefix + 'up', this.onDragUp, true);
+            target.addEventListener(pointerSupported ? 'pointercancel' : 'mouseleave',
+                this.onDragCancel, true);
+            try { box.setPointerCapture?.(event.pointerId); }
+            catch { /* The window capture listener still keeps the gesture. */ }
+        });
+        // A button click must never leak through to the Scene Node picker,
+        // even when Chromium fires click after a captured pointer-up.
+        box.addEventListener('click', (event: any) => this.stopEvent(event));
+        box.addEventListener('dblclick', (event: any) => this.stopEvent(event));
+    }
 
     constructor(private readonly documentPort: () => Document | null =
         () => (globalThis as any).document || null) {}
@@ -97,6 +242,25 @@ export class SceneHudElement {
         }
         this.attach(doc, host);
         if (!this.root) return false;
+        if (this.held) {
+            // Keep exactly the same DOM nodes while the mouse is down.
+            // The browser native slider/checkbox keeps capture and focus.
+            const current = rows.find(row => row.index === this.held?.rowIndex);
+            if (current) {
+                if (this.heldValue && typeof current.value === 'number')
+                    this.heldValue.textContent =
+                        String(Math.round(current.value * 1000) / 1000);
+                if (this.heldRail && typeof current.value === 'number' &&
+                    Number.isFinite(current.min) && Number.isFinite(current.max) &&
+                    (current.max as number) > (current.min as number)) {
+                    const progress = (current.value - (current.min as number)) /
+                        ((current.max as number) - (current.min as number));
+                    this.heldRail.style.width =
+                        Math.max(0, Math.min(100, progress * 100)) + '%';
+                }
+            }
+            return true;
+        }
         const grid = hudGrid(viewport, count);
         const sx = host.clientWidth > 0 ? host.clientWidth / viewport.width : 1;
         const sy = host.clientHeight > 0 ? host.clientHeight / viewport.height : 1;
@@ -142,6 +306,7 @@ export class SceneHudElement {
                     border: '1px solid ' + PALETTE.border,
                 });
                 this.renderControl(doc, box, viewport, count, row, hit.left);
+                this.bindControl(box, row, host, viewport, doc);
             } else {
                 Object.assign(box.style, {
                     left: screen.x + 'px',
@@ -214,6 +379,10 @@ export class SceneHudElement {
                 fontSize: '11px',
             });
             box.appendChild(number);
+            if (this.held?.rowIndex === row.index) {
+                this.heldValue = number;
+                this.heldRail = fill;
+            }
         } else if (row.kind === 'toggle') {
             label.style.flex = '1';
             box.appendChild(label);
@@ -280,10 +449,14 @@ export class SceneHudElement {
         }
     }
 
-    public hide(): void { if (this.root) this.root.style.display = 'none'; }
+    public hide(): void {
+        if (this.held) return; // Scene selection updates may race mouse-up.
+        if (this.root) this.root.style.display = 'none';
+    }
     public dispose(): void { this.detach(); }
 
     private detach(): void {
+        this.endDrag(true);
         this.root?.remove();
         if (this.host && this.adjustedPosition)
             this.host.style.position = this.originalPosition;
