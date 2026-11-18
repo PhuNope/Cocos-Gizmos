@@ -68,6 +68,16 @@ bridge.refresh();
 bridge.refresh();
 assert.equal((doc.handlers.get('pointerdown')||[]).length,1,'Re-mount must reuse capture listeners');
 assert.equal(bridge.status().reason,'pointer-capture');
+const htmlControl=doc.emit('pointerdown',{target:{
+    closest(selector){
+        assert.equal(selector,'#cocos-gizmos-scene-hud');
+        return {};
+    },
+}});
+assert.equal(htmlControl.stopped,undefined,
+    'Floating DOM HUD, not WebView fallback, owns its pointerdown');
+assert.equal(bridge.status().intercepted,0,
+    'DOM click must never start a second Scene input command');
 const missed=doc.emit('pointerdown',{clientX:450});
 assert.equal(missed.stopped,undefined,'Normal Scene selection must be untouched');
 assert.equal(bridge.status().intercepted,0);
