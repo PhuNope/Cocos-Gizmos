@@ -37,11 +37,22 @@ export class SceneOperationInput {
         const operation=this.operationPort();
         if(!operation || typeof operation.on!=='function' ||
             typeof (operation.removeListener || operation.off)!=='function') {
+            if(this.capturing){
+                // A temporary Scene recreation must not force a rollback
+                // before the old dispatcher sends mouse-up. Teardown
+                // explicitly calls detach() and still cancels on purpose.
+                this.reason='operation-transition-deferred';
+                return;
+            }
             if(this.operation)this.detach();
             this.reason='scene-operation-unavailable';
             return;
         }
         if(operation===this.operation)return;
+        if(this.capturing){
+            this.reason='operation-transition-deferred';
+            return;
+        }
         this.detach();
         this.operation=operation;
         operation.on('mousedown',this.onDown,SCENE_GIZMO_INPUT_PRIORITY);
