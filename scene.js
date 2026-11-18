@@ -71,7 +71,7 @@ function gizmosReset(selected = []) {
         presentation.configure(savedSettings);
         handles = createV3HandleAdapter((component) =>
             presentation.evaluate(component, true).hud,
-            presentation.getLayout());
+            presentation.getLayout(),presentation.getBuilderHud());
         updater.setPresentationAdapter(presentation);
         updater.setPositionHandleAdapter(handles);
         const started = updater.start();
