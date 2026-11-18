@@ -1,6 +1,6 @@
 # GizmoHUD v3 — Fluent Builder and Command Architecture
 
-Status: **development API on `v3`**, not a tagged release.
+Status: **available since v3.0.2** (Editor-only HUD API).
 
 ## Design
 
