@@ -101,6 +101,7 @@ export class GizmoHudLayout {
                         const rawControls: unknown[]=[];
                         walkGizmoHUD(tree.root,(item)=>{
                             if('children' in item)return;
+                            if(item.kind==='separator')return;
                             if(!('command' in item)) {
                                 texts.push({
                                     id:item.id,text:item.text,
