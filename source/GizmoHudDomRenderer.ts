@@ -115,11 +115,11 @@ export class GizmoHudDomRenderer {
 
     private structureKey(definition: GizmoHudDefinition): unknown {
         const key=(node: GizmoHudNode): unknown => {
-            if(node.kind==='row'||node.kind==='column')
+            if('children' in node)
                 return [node.kind,node.id,node.width,node.height,node.grow,
                     node.gap,node.padding,node.align,node.justify,
                     (node.children || []).map(key)];
-            if(node.kind==='text')return [node.kind,node.id,node.text,node.style,node.grow];
+            if(!('command' in node))return [node.kind,node.id,node.text,node.style,node.grow];
             return [node.kind,node.id,node.text,node.style,node.grow,
                 node.min,node.max,node.step,
                 node.command.kind,
@@ -131,8 +131,7 @@ export class GizmoHudDomRenderer {
     private valuesKey(item: GizmoHudView): unknown {
         const result: unknown[]=[];
         walkGizmoHUD(item.definition.root,(node)=>{
-            if(node.kind==='row'||node.kind==='column'||node.kind==='text' ||
-                node.command.kind!=='property')return;
+            if(!('command' in node) || node.command.kind!=='property')return;
             result.push([node.id,item.component[node.command.property]]);
         });
         return result;
@@ -175,7 +174,7 @@ export class GizmoHudDomRenderer {
             boxSizing:'border-box', minWidth:'0',
             flexGrow: String(node.grow ?? 0),
         });
-        if(node.kind==='row'||node.kind==='column') {
+        if('children' in node) {
             Object.assign(element.style,{
                 display:'flex',
                 flexDirection:node.kind==='row'?'row':'column',
@@ -213,7 +212,7 @@ export class GizmoHudDomRenderer {
             return element;
         }
         this.applyStyle(element,node.style);
-        if(node.kind==='text') {
+        if(!('command' in node)) {
             element.textContent=node.text;
             Object.assign(element.style,{
                 fontSize:element.style.fontSize||'13px',
