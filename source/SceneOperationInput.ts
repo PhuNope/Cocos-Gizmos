@@ -79,7 +79,12 @@ export class SceneOperationInput {
 
     private readonly onDown=(event:any):boolean|void=>{
         if(event?.target?.closest?.('#cocos-gizmos-scene-hud') ||
-            event?.event?.target?.closest?.('#cocos-gizmos-scene-hud')) return;
+            event?.event?.target?.closest?.('#cocos-gizmos-scene-hud')) {
+            // DOM floating controls own this gesture; consume only the
+            // Editor Operation dispatch so its native Scene picker does not
+            // run a second Node-selection mouse-down.
+            return false;
+        }
         if(this.capturing || !isPrimaryScenePointer(event))return;
         const point=this.point(event);
         if(!point)return;
