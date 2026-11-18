@@ -181,6 +181,12 @@ const scope={
             isPrimaryScenePointer(e){return e?.button===undefined||e.button===0;},
             readSceneHandleName(e){return e?.handleName||null;},
         };
+        if(name==='./SceneHudElement')return {
+            connectSceneHudInput(port) {
+                events.push(['dom-hud-connected',!!port]);
+                return () => events.push(['dom-hud-disconnected']);
+            },
+        };
         if(name==='./SceneSelectionLease')return leaseScope.exports;
         if(name==='./ScenePointerCoordinates')return {
             sceneEventToViewport(event) {
