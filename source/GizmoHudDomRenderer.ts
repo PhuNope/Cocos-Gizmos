@@ -161,7 +161,10 @@ export class GizmoHudDomRenderer {
     }
 
     private stop(event: any): void {
-        event?.stopImmediatePropagation?.();
+        // The control's own click/change handlers must still run. Using
+        // stopImmediatePropagation() here prevents later same-element
+        // listeners (including our Button command) from ever firing.
+        // stopPropagation() is sufficient to keep Editor Scene picking out.
         event?.stopPropagation?.();
     }
 
