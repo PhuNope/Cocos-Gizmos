@@ -22,7 +22,7 @@ const TEST_FILES = [
  * (onDrawGizmos hooks). Internal namespaces and runtime statements are
  * stripped.
  */
-const PUBLIC_CLASSES = ['Gizmos2D', 'Gizmos3D'];
+const PUBLIC_CLASSES = ['Gizmos2D', 'Gizmos3D', 'GizmoHUD'];
 
 function fail(message) {
     console.error(`[type] ERROR: ${message}`);
@@ -215,6 +215,11 @@ function collectGlobalHandleDeclarations(emittedText, sourceFile) {
         'GizmoDisplayMode', 'GizmoViewSettings', 'GizmoHudItem',
         'GizmoHudButton', 'GizmoHudSlider', 'GizmoHudToggle', 'GizmoHudCheckbox',
         'GizmoHudControl', 'GizmoHudControlList',
+        'GizmoHudAlign', 'GizmoHudJustify', 'GizmoHudPropertyCommand',
+        'GizmoHudActionCommand', 'GizmoHudCommand',
+        'GizmoHudItemOptions', 'GizmoHudSliderOptions',
+        'GizmoHudContainer', 'GizmoHudTextNode', 'GizmoHudControlNode',
+        'GizmoHudNode', 'GizmoHudDefinition', 'GizmoHudBuilder',
     ];
     const found = new Set(declarations.map((entry) => entry.name));
     for (const name of expected) {
@@ -278,6 +283,7 @@ function buildOutputText(emittedText) {
         ...globalHandles.map(({ text }) => text.split('\n').map((line) => '    ' + line).join('\n')),
         "    const Gizmos2D: typeof import('./Gizmos').Gizmos2D;",
         "    const Gizmos3D: typeof import('./Gizmos').Gizmos3D;",
+        "    const GizmoHUD: typeof import('./Gizmos').GizmoHUD;",
         '}',
     ];
     parts.push(globalBlock.join('\n'));
@@ -291,6 +297,8 @@ function checkOutput(output) {
     const mustContain = [
         'export declare class Gizmos2D {',
         'export declare class Gizmos3D {',
+        'export declare class GizmoHUD {',
+        'onGizmoHUD?(): GizmoHudDefinition;',
         "declare module 'cc' {",
         'onDrawGizmos?(): void;',
         'onDrawGizmosSelected?(): void;',
@@ -308,6 +316,7 @@ function checkOutput(output) {
         'declare global {',
         "const Gizmos2D: typeof import('./Gizmos').Gizmos2D;",
         "const Gizmos3D: typeof import('./Gizmos').Gizmos3D;",
+        "const GizmoHUD: typeof import('./Gizmos').GizmoHUD;",
         'export {};',
     ];
     for (const snippet of mustContain) {
