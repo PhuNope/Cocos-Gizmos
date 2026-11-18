@@ -63,6 +63,51 @@ export function consumeOwnedSceneEvent(event: any): void {
 }
 
 /**
+ * Is the original browser hit target (or current element at its coordinates)
+ * part of a real DOM HUD? Unlike a screen-rectangle hit, this means the
+ * browser still needs to dispatch pointerdown/up/click to the HTML control.
+ */
+export function isSceneHudDomTarget(
+    event: any,
+    viewportPoint?: { x: number; y: number } | null,
+    viewport?: { width: number; height: number } | null,
+): boolean {
+    const selector='#cocos-gizmos-scene-hud, #cocos-gizmos-builder-hud';
+    const wrapped=[event,event?.event,event?.detail?.event,
+        event?.data?.event,event?.nativeEvent];
+    for(const value of wrapped) {
+        const target=value?.target;
+        if(target && typeof target.closest==='function') {
+            try { if(target.closest(selector))return true; }
+            catch { /* Editor wrappers can expose a non-DOM target */ }
+        }
+    }
+    const doc=(globalThis as any).document ||
+        (globalThis as any).window?.document;
+    if(!doc?.elementFromPoint)return false;
+    let clientX:number|undefined;
+    let clientY:number|undefined;
+    for(const value of wrapped) {
+        if(Number.isFinite(value?.clientX) && Number.isFinite(value?.clientY)){
+            clientX=value.clientX;clientY=value.clientY;break;
+        }
+    }
+    if(clientX===undefined && viewportPoint && viewport &&
+       viewport.width>0 && viewport.height>0){
+        const canvas=doc.getElementById?.('GameCanvas') ||
+            doc.getElementById?.('GameDiv');
+        const rect=canvas?.getBoundingClientRect?.();
+        if(rect && rect.width>0 && rect.height>0){
+            clientX=rect.left+viewportPoint.x*rect.width/viewport.width;
+            clientY=rect.bottom-viewportPoint.y*rect.height/viewport.height;
+        }
+    }
+    if(clientX===undefined || clientY===undefined)return false;
+    try { return !!doc.elementFromPoint(clientX,clientY)?.closest?.(selector); }
+    catch {return false;}
+}
+
+/**
  * Test whether a Scene input belongs to a floating HUD, including Creator
  * Operation events that discard the original browser event.target.
  *
