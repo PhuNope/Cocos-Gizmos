@@ -25,6 +25,7 @@ import { SceneSelectionLease, consumeOwnedSceneEvent } from './SceneSelectionLea
 import { hudControlScreenRect } from './GizmoHudControls';
 import { SceneViewportInput, SceneViewportInputPorts, ViewportPointer } from './SceneViewportInput';
 import { SceneEngineInput } from './SceneEngineInput';
+import { SceneOperationInput } from './SceneOperationInput';
 
 type Drag = { entry: HandleHitTarget; command: GizmoMoveCommand | GizmoRotateCommand };
 type SliderDrag = { entry: HudHitTarget; solver: HudSliderDrag; session: GizmoEditSession<number> };
@@ -672,6 +673,7 @@ export interface V3HandleAdapter {
         input:GizmoInputSnapshot;
         viewportInput: ReturnType<SceneViewportInput['status']>;
         engineInput: ReturnType<SceneEngineInput['status']>;
+        operationInput: ReturnType<SceneOperationInput['status']>;
     };
 }
 
@@ -714,6 +716,7 @@ export function createV3HandleAdapter(
             (captured as any)?.onViewportCancel?.();
         },
     };
+    const operationInput=new SceneOperationInput(pointerPorts);
     const viewportInput=new SceneViewportInput(pointerPorts);
     const engineInput=new SceneEngineInput(pointerPorts);
     let manager:any=null, typeDefs:any=null, ctor:any=null;
@@ -755,6 +758,7 @@ export function createV3HandleAdapter(
     }
     function clear():void {
         for(const [component,gizmo] of owned)release(component,gizmo);
+        operationInput.detach();
         viewportInput.detach();
         engineInput.detach();
         owned.clear();active.clear();lastSelected.clear();latestScan=-Infinity;
@@ -802,8 +806,17 @@ export function createV3HandleAdapter(
     }
     return {
         refresh(components,selected,now) {
-            viewportInput.refresh();
-            engineInput.refresh(!viewportInput.status().active);
+            // Creator 3.8.8 Scene Operation is the source of truth: higher
+            // priority than Gizmo=99 and Camera=98 avoids update->cancel
+            // from native Scene selection after a custom HUD/control click.
+            operationInput.refresh();
+            if(operationInput.status().active){
+                viewportInput.detach();
+                engineInput.refresh(false);
+            } else {
+                viewportInput.refresh();
+                engineInput.refresh(!viewportInput.status().active);
+            }
             for(const component of components){
                 if(isSelectable(component)&&selected.has(component.node.uuid)){
                     try{drawSelectedPositionMarkers(component);}
@@ -893,6 +906,7 @@ export function createV3HandleAdapter(
             }
             return {registered:registered.size,active:active.size,
                 reason,...counts,input:input.snapshot(),
+                operationInput:operationInput.status(),
                 viewportInput:viewportInput.status(),
                 engineInput:engineInput.status()};
         },
