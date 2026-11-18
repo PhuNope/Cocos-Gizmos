@@ -180,7 +180,7 @@ const entries = [
   ['dist/Gizmos.d.ts', readFileSync(path.join(distDir, 'Gizmos.d.ts'))],
   ['dist/RegisterGizmos.js', readFileSync(path.join(distDir, 'RegisterGizmos.js'))],
   ['dist/RegisterGizmos.d.ts', readFileSync(path.join(distDir, 'RegisterGizmos.d.ts'))],
-  ...['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'GizmoHandlePresets.js', 'Gizmos2D.js', 'Gizmos3D.js']
+  ...['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'GizmoHandlePresets.js', 'GizmoHUD.js', 'Gizmos2D.js', 'Gizmos3D.js']
     .map(name => ['dist/' + name, readFileSync(path.join(distDir, name))]),
 ];
 // Regression test: load the extracted directory structure in Node's own
