@@ -349,6 +349,26 @@ now += 451;
 rendererNode.components[0].lateUpdate(0);
 assert.equal(oldSceneGraphic.clearCount, restoredClearCount + 1,
     'Abandoned Scene geometry eventually clears to prevent ghost lines');
+// Regression: hovering a selected 2D handle changes the Graphics renderer
+// color key. The old color must disappear in the SAME flush (not after the
+// 750ms idle geometry grace), or leaving the handle looks delayed.
+const hoverNode=new Node('hover color test');
+const hoverYellow=new Color(255,245,90,255);
+const normalRed=new Color(255,90,94,255);
+Gizmos2D.beginColor(hoverNode,hoverYellow);
+Gizmos2D.drawLine(hoverNode,{x:0,y:0},{x:20,y:0});
+Gizmos2D.flushEditorFrame();
+const hoverGraphic=hoverNode.children[0].children[0].components[0];
+const priorHoverClear=hoverGraphic.clearCount;
+Gizmos2D.invalidateHover(hoverNode);
+Gizmos2D.beginColor(hoverNode,normalRed);
+Gizmos2D.drawLine(hoverNode,{x:0,y:0},{x:20,y:0});
+Gizmos2D.flushEditorFrame();
+assert.equal(hoverGraphic.clearCount,priorHoverClear+1,
+    'Exit hover must remove the old yellow stroke immediately');
+const normalGraphic=hoverNode.children[0].children[1].components[0];
+assert.ok(normalGraphic.calls.some(x=>x[0]==='lineTo'),
+    'The normal-color 2D handle is drawn in the same frame');
 Gizmos2D.clearPendingFrame();
 
-console.log('[draw-commands-2d] buffered Graphics refresh even when restored Scene skips lateUpdate OK');
+console.log('[draw-commands-2d] immediate 2D hover exit, buffered graphics and Scene refresh OK');
