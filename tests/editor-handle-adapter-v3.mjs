@@ -17,6 +17,7 @@ vm.runInNewContext(leaseJs,leaseScope);
 const events=[],paints=[];
 let bridgePort=null;
 let bridgeMounts=0;
+let bridgeDetaches=0;
 let editorRebuildsOnUpdate=false;
 let editorRebuildsOnBegin=false;
 const component={
@@ -175,7 +176,7 @@ const scope={
         if(name==='./SceneViewportInput')return {SceneViewportInput:class {
             constructor(ports){this.ports=ports;bridgePort=ports;}
             refresh(){bridgeMounts++;}
-            detach(){}
+            detach(){bridgeDetaches++;}
             status(){return {active:true,reason:'mock-pointer-capture',captured:false,
                 observed:0,intercepted:0,hover:0,cancelled:0};}
         }};
@@ -537,6 +538,29 @@ assert.deepEqual(nativeSelectionCalls,['node','camera'],
 operationAdapter.dispose();
 assert.equal(nativeOperation.listeners.get('mousedown').length,2,
     'Unload removes only extension listeners and never the Editor handlers');
+delete cce.Operation;
+
+// Regression: the Editor initializes cce.Operation in the middle of a
+// WebView/engine fallback drag. Swapping ports must never emit cancel.
+component.gizmo=null;
+const switching=createV3HandleAdapter(()=>true,layout);
+switching.refresh([component],new Set(['v3-target']),4000);
+assert.equal(bridgePort.down({x:80,y:80,button:0,buttons:1}),true);
+const detachBeforeSwitch=bridgeDetaches;
+cce.Operation=nativeOperation;
+switching.refresh([component],new Set(['v3-target']),4100);
+assert.equal(switching.status().operationInput.active,true);
+assert.equal(bridgeDetaches,detachBeforeSwitch,
+    'Do not detach fallback listeners during their captured pointer gesture');
+const transitionCancels=events.filter(e=>e[0]==='handle'&&e[2]==='cancel').length;
+bridgePort.move({x:175,y:80,button:0,buttons:1});
+bridgePort.up({x:175,y:80,button:0,buttons:0});
+assert.equal(events.filter(e=>e[0]==='handle'&&e[2]==='cancel').length,
+    transitionCancels,'Enabling native Operation mid-drag must commit normally');
+switching.refresh([component],new Set(['v3-target']),4400);
+assert.ok(bridgeDetaches>detachBeforeSwitch,
+    'Fallback detaches after its gesture has finished');
+switching.dispose();
 delete cce.Operation;
 
 console.log('[editor-handle-adapter-v3] native Operation priorities, hover, HUD, multiframe commands and teardown OK');
