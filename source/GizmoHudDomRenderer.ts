@@ -7,6 +7,14 @@ export interface GizmoHudView {
     definition: GizmoHudDefinition;
 }
 
+type OperationControl = {
+    component: any;
+    node: GizmoHudControlNode;
+    element: HTMLElement;
+    readout?: HTMLElement;
+};
+type OperationGesture = { control: OperationControl | null; lastX: number; lastY: number };
+
 type ActiveGesture = {
     component: any;
     control: GizmoHudControlNode;
@@ -36,6 +44,11 @@ export class GizmoHudDomRenderer {
     private readonly items: GizmoHudView[] = [];
     private readonly liveInputs = new Map<string, HTMLInputElement>();
     private gesture: ActiveGesture | null = null;
+    private operationGesture: OperationGesture | null = null;
+    private readonly operationControls: OperationControl[] = [];
+    private operationDownCount = 0;
+    private operationUpdateCount = 0;
+    private operationCommitCount = 0;
     private readonly commands: GizmoHudCommandController;
 
     constructor(
@@ -71,6 +84,126 @@ export class GizmoHudDomRenderer {
 
     public get active(): boolean { return !!this.root && this.root.style.display !== 'none'; }
     public get editing(): boolean { return this.commands.editing; }
+    /**
+     * Creator 3D Scene template uses a canvas within a webview whose parent
+     * Editor Scene panel explicitly sets 'webview { pointer-events:none }'.
+     * Native HTML controls inside that webview can render but cannot click.
+     * Route 3D input from cce.Operation instead; keep working 2D DOM input.
+     */
+    public usesSceneOperationInput(): boolean {
+        const doc=this.documentPort();
+        return !!(doc?.getElementById?.('Cocos3dGameContainer') ||
+            (doc?.getElementById?.('GameCanvas') as HTMLElement | null)
+                ?.tagName?.toLowerCase()==='canvas');
+    }
+    public operationStatus() {
+        return {enabled:this.usesSceneOperationInput(),
+            captured:!!this.operationGesture,
+            down:this.operationDownCount,update:this.operationUpdateCount,
+            commit:this.operationCommitCount,controls:this.operationControls.length};
+    }
+    private operationPoint(pointer:{x:number;y:number},
+        viewport:{width:number;height:number} | null):{x:number;y:number}|null {
+        if(!viewport || viewport.width<=0 || viewport.height<=0)return null;
+        const doc=this.documentPort();
+        const canvas=doc?.getElementById?.('GameCanvas') ||
+            doc?.getElementById?.('GameDiv');
+        const r=canvas?.getBoundingClientRect?.();
+        if(!r || r.width<=0 || r.height<=0)return null;
+        return {x:r.left+pointer.x*r.width/viewport.width,
+            y:r.bottom-pointer.y*r.height/viewport.height};
+    }
+    private inside(el:HTMLElement,x:number,y:number):boolean {
+        if(el.style.display==='none')return false;
+        const r=el.getBoundingClientRect?.();
+        return !!r && r.width>0 && r.height>0 &&
+            x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
+    }
+    /** Scene Operation priority 100: hit-test the *visible panel* first. */
+    public operationDown(pointer:{x:number;y:number},
+        viewport:{width:number;height:number}|null):boolean {
+        if(!this.usesSceneOperationInput() || this.operationGesture ||
+            this.gesture || this.root?.style.display==='none' ||
+            !this.root || !viewport)return false;
+        const pt=this.operationPoint(pointer,viewport);
+        if(!pt)return false;
+        const panels=Array.from(this.root.children) as HTMLElement[];
+        if(!panels.some(panel=>this.inside(panel,pt.x,pt.y)))return false;
+        // Panel padding and labels also belong to HUD and cannot unselect.
+        const control=[...this.operationControls].reverse().find(item=>
+            !item.node.disabled && this.inside(item.element,pt.x,pt.y))||null;
+        this.operationGesture={control,lastX:pt.x,lastY:pt.y};
+        this.operationDownCount++;
+        if(control?.node.kind==='slider' &&
+            this.commands.begin(control.component,control.node)) {
+            this.updateOperationSlider(control,pt.x);
+        }
+        return true;
+    }
+    private updateOperationSlider(entry:OperationControl,x:number):void {
+        const {node,element,readout}=entry;
+        if(node.kind!=='slider'||!this.commands.editing)return;
+        const r=element.getBoundingClientRect?.();
+        if(!r || r.width<=0 || node.min===undefined || node.max===undefined)return;
+        const ratio=Math.max(0,Math.min(1,(x-r.left)/r.width));
+        const raw=node.min+(node.max-node.min)*ratio;
+        if(this.commands.update(raw)) {
+            const command=node.command;
+            const value=command.kind==='property' ?
+                entry.component[command.property] :
+                command.kind==='value'?command.read(entry.component):raw;
+            (element as HTMLInputElement).value=String(value);
+            if(readout)readout.textContent=String(value);
+            this.operationUpdateCount++;
+        }
+    }
+    public operationMove(pointer:{x:number;y:number},
+        viewport:{width:number;height:number}|null):boolean {
+        const held=this.operationGesture;
+        if(!held)return false;
+        const pt=viewport?this.operationPoint(pointer,viewport):null;
+        if(pt) {held.lastX=pt.x;held.lastY=pt.y;}
+        if(held.control?.node.kind==='slider')
+            this.updateOperationSlider(held.control,held.lastX);
+        return true;
+    }
+    public operationUp(pointer:{x:number;y:number}|null,
+        viewport:{width:number;height:number}|null):boolean {
+        const held=this.operationGesture;
+        if(!held)return false;
+        const pt=pointer && viewport?this.operationPoint(pointer,viewport):null;
+        const x=pt?.x??held.lastX,y=pt?.y??held.lastY;
+        this.operationGesture=null;
+        const entry=held.control;
+        if(entry?.node.kind==='slider'){
+            this.updateOperationSlider(entry,x);
+            this.commands.finish(false);
+            this.operationCommitCount++;
+        }else if(entry && this.inside(entry.element,x,y)){
+            if(entry.node.kind==='button'){
+                if(this.commands.click(entry.component,entry.node))
+                    this.operationCommitCount++;
+            }else if(entry.node.kind==='toggle'||entry.node.kind==='checkbox'){
+                const command=entry.node.command;
+                const previous=command.kind==='property'?
+                    entry.component[command.property] :
+                    command.kind==='value'?command.read(entry.component):false;
+                const next=previous!==true;
+                if(this.commands.commitValue(entry.component,entry.node,next)){
+                    (entry.element as HTMLInputElement).checked=next;
+                    this.operationCommitCount++;
+                }
+            }
+        }
+        this.signature='';
+        return true;
+    }
+    public operationCancel():void {
+        if(!this.operationGesture)return;
+        this.operationGesture=null;
+        if(this.commands.editing)this.commands.finish(true);
+        this.signature='';
+    }
     public canRender(): boolean {
         const doc=this.documentPort();
         const host=doc?.getElementById?.('GameDiv') ||
@@ -98,8 +231,8 @@ export class GizmoHudDomRenderer {
         this.attach(doc,host);
         if (!this.root) return false;
         this.root.style.display='flex';
-        if (this.gesture) {
-            // Never replace a live slider while browser pointer capture owns
+        if (this.gesture || this.operationGesture) {
+            // Never replace a live slider while browser or Scene capture owns
             // it. Cocos can redraw on every Component value update.
             return true;
         }
@@ -117,6 +250,7 @@ export class GizmoHudDomRenderer {
         this.renderedOwners=owners;
         const fragment=doc.createDocumentFragment();
         this.liveInputs.clear();
+        this.operationControls.length=0;
         const offsets:Record<string,number>={};
         for(const item of items) {
             const panel=this.drawNode(doc,item,item.definition.root,
@@ -308,6 +442,8 @@ export class GizmoHudDomRenderer {
             button.addEventListener('click',()=>{
                 this.commands.click(item.component,node);
             });
+            this.operationControls.push({component:item.component,
+                node,element:button});
             element.appendChild(button);
             return element;
         }
@@ -350,6 +486,8 @@ export class GizmoHudDomRenderer {
             input.addEventListener('change',()=>this.releaseGesture(false));
             element.appendChild(input);
             element.appendChild(current);
+            this.operationControls.push({component:item.component,
+                node,element:input,readout:current});
         } else {
             input.type='checkbox';
             input.style.flex='none';
@@ -361,6 +499,8 @@ export class GizmoHudDomRenderer {
                 this.commands.commitValue(item.component,node,input.checked);
             });
             element.appendChild(input);
+            this.operationControls.push({component:item.component,
+                node,element:input});
         }
         input.disabled=!!node.disabled;
         this.addControlEvents(input);
@@ -485,10 +625,12 @@ export class GizmoHudDomRenderer {
     }
 
     public hide(): void {
-        if(this.root && !this.gesture)this.root.style.display='none';
+        if(this.root && !this.gesture && !this.operationGesture)
+            this.root.style.display='none';
     }
 
     public dispose(): void {
+        this.operationCancel();
         this.releaseGesture(true);
         this.commands.cancel();
         this.root?.remove();
@@ -501,6 +643,7 @@ export class GizmoHudDomRenderer {
         this.signature='';
         this.renderedOwners=[];
         this.liveInputs.clear();
+        this.operationControls.length=0;
         this.items.length=0;
     }
 }
