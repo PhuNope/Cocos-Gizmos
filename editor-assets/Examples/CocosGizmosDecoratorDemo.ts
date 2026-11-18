@@ -13,15 +13,19 @@ class CustomDrawer implements IDrawGizmos<CocosGizmosDecoratorDemo> {
     onGizmoHandles(): GizmoHandleList {
         return [...Gizmos3D.move('moveObject')];
     }
-    onGizmoHud(): GizmoHudItem[] {
-        return [{ id: 'title', text: 'Registered Gizmos Drawer' },
-            { id: 'event', text: this.component.lastEvent }];
-    }
-    onGizmoHudControls(): GizmoHudControlList {
-        return [{ type: 'button', id: 'reset', text: 'Reset position' }];
-    }
-    onGizmoHudAction(id: string): void {
-        if (id === 'reset') this.component.moveObject = new Vec3(1.2, 0.8, 0);
+    /** The decorator forwards the new HUD definition from this drawer. */
+    onGizmoHUD(): GizmoHudDefinition {
+        return GizmoHUD.createHud('registered-drawer')
+            .title('Registered Gizmos Drawer')
+            .position('bottom-right').theme('dark').size(280,'auto')
+            .text('event','Last: ' + this.component.lastEvent)
+            .button('Reset position', {
+                command:GizmoHUD.action((owner: CocosGizmosDecoratorDemo) => {
+                    owner.moveObject = new Vec3(1.2, 0.8, 0);
+                    owner.lastEvent = 'reset';
+                }),
+            })
+            .build();
     }
     onGizmoChanged(name: string, phase: GizmoHandlePhase, index?: number): void {
         this.component.lastEvent = name +
