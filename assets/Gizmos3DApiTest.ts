@@ -121,6 +121,11 @@ export default class Gizmos3DApiTest extends Component {
         ];
     }
 
+    /**
+     * V3 declarative HUD builder. The UI is a CSS flex tree; commands are
+     * distinct from presentation. No DOM or Creator Scene APIs are called
+     * from user Components.
+     */
     public onGizmoHUD(): GizmoHudDefinition {
         return GizmoHUD.createHud('shape3d')
             .width(344).padding(12).gap(8)
