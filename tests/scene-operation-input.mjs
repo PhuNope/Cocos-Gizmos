@@ -65,7 +65,8 @@ const ports={
     up(p){events.push(['end',p.x,p.y]);},
     cancel(){events.push(['cancel']);},
 };
-const input=new SceneOperationInput(ports,()=>op);
+let currentOperation=op;
+const input=new SceneOperationInput(ports,()=>currentOperation);
 input.refresh();
 input.refresh();
 assert.equal(input.status().active,true);
@@ -98,6 +99,21 @@ assert.deepEqual(events.at(-1),['cancel']);
 assert.equal(input.status().captured,false);
 assert.equal(input.status().intercepted,2);
 assert.equal(input.status().cancelled,1);
+
+// Creator can briefly replace its Operation singleton between Scene
+// callbacks. The already-captured dispatcher must finish the old gesture.
+const cancelsBeforeSwitch=events.filter(e=>e[0]==='cancel').length;
+assert.equal(op.emit('mousedown',{...point}),false);
+currentOperation=null;
+input.refresh();
+assert.equal(input.status().reason,'operation-transition-deferred');
+assert.equal(input.status().captured,true);
+op.emit('mousemove',{...point,x:132});
+assert.equal(op.emit('mouseup',{...point,x:136}),false);
+assert.deepEqual(events.at(-1),['end',136,80]);
+assert.equal(events.filter(e=>e[0]==='cancel').length,cancelsBeforeSwitch);
+input.refresh();
+assert.equal(input.status().active,false);
 input.detach();
 assert.equal(op.listeners.get('mousedown').length,2,
     'Unmount removes all extension listeners but leaves Editor listeners');
