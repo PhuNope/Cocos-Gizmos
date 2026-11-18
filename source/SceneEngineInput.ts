@@ -38,8 +38,12 @@ export class SceneEngineInput {
 
     public refresh(enabled: boolean): void {
         if (!enabled) {
+            if(this.captured){
+                this.reason='engine-transition-deferred';
+                return;
+            }
             this.detach();
-            this.reason = 'webview-pointer-preferred';
+            this.reason = 'higher-priority-scene-input';
             return;
         }
         if (this.boundPort) return;
