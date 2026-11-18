@@ -165,8 +165,10 @@ async function onSelectionSelect(type, uuid) {
     // Reconcile on the following turn; ignore if a newer event arrived.
     await new Promise(resolve => setTimeout(resolve, 0));
     if (revision === selectionRevision) {
+        // The Editor's current selection is authoritative after its event
+        // turn. Do not add the original event UUID back unconditionally:
+        // that revives a Node which the user has since deselected.
         const final = selectedNodeIds();
-        for (const id of ids) if (!final.includes(id)) final.push(id);
         try { await syncSceneSelection(final); }
         catch (error) { console.warn('[cocos-gizmos/selection] select reconcile:', error); }
     }
@@ -176,31 +178,10 @@ async function onSelectionUnselect(type, uuid) {
     const unselected = new Set((Array.isArray(uuid) ? uuid : [uuid])
         .filter(id => typeof id === 'string'));
 
-    // Cocos 3.8.8 may run Scene picking even after a HUD Button/Slider
-    // handled its own pointer event. Only restore a Node if the Scene's
-    // current Gizmo gesture explicitly owns that same Node. This is a
-    // bounded fallback for Editor builds that ignore event propagation.
-    // Ordinary clicks on empty Scene still unselect normally.
-    try {
-        const editor = globalThis.Editor;
-        const lease = await editor?.Message?.request?.('scene', 'execute-scene-script', {
-            name: 'cocos-gizmos',
-            method: 'gizmosProtectedSelection',
-            args: [],
-        });
-        if (typeof lease?.nodeUuid === 'string' &&
-            unselected.has(lease.nodeUuid) &&
-            typeof editor?.Selection?.select === 'function') {
-            const revision = ++selectionRevision;
-            editor.Selection.select('node', lease.nodeUuid);
-            await syncSceneSelection([...new Set([...selectedNodeIds(), lease.nodeUuid])], revision);
-            return;
-        }
-    } catch (error) {
-        // The Scene may be restarting; fall through to normal selection
-        // behavior rather than retaining a stale selection indefinitely.
-        console.warn('[cocos-gizmos/selection] ownership check:', error);
-    }
+    // Never force Editor.Selection.select() from a Gizmo callback.
+    // Native Scene Operation already consumes plugin-owned mouse events;
+    // Editor.Selection is the only authority for changing the selected Node.
+    // A delayed unselect must not be undone by a stale HUD gesture lease.
 
     // Do not leave the last selected component cached when clicking empty.
     const selected = selectedNodeIds().filter(id => !unselected.has(id));
