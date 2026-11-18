@@ -29,6 +29,9 @@ export class GizmoHudDomRenderer {
     private priorPosition = '';
     private changedHostPosition = false;
     private signature = '';
+    // JSON signatures cannot tell two deserialized Component objects with
+    // the same Node UUID apart. Rebind Commands when Editor replaces an owner.
+    private renderedOwners: any[] = [];
     private readonly items: GizmoHudView[] = [];
     private readonly liveInputs = new Map<string, HTMLInputElement>();
     private gesture: ActiveGesture | null = null;
@@ -100,8 +103,12 @@ export class GizmoHudDomRenderer {
             values:this.valuesKey(item),
         }));
         const signature=JSON.stringify(snapshot);
-        if(this.signature===signature)return true;
+        const owners=this.items.map(item=>item.component);
+        const sameOwners=owners.length===this.renderedOwners.length &&
+            owners.every((component,index)=>component===this.renderedOwners[index]);
+        if(this.signature===signature && sameOwners)return true;
         this.signature=signature;
+        this.renderedOwners=owners;
         const fragment=doc.createDocumentFragment();
         this.liveInputs.clear();
         for(const item of this.items) {
@@ -393,6 +400,7 @@ export class GizmoHudDomRenderer {
         this.host=null;
         this.changedHostPosition=false;
         this.signature='';
+        this.renderedOwners=[];
         this.liveInputs.clear();
         this.items.length=0;
     }
