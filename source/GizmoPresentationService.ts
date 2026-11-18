@@ -128,7 +128,7 @@ export class GizmoPresentationService {
             hudLabels: this.overlay.totalDrawn,
             overlay: this.overlay.diagnosticState,
             builderHud: {active:this.builderHud.active,editing:this.builderHud.editing,
-                operation:this.builderHud.operationStatus()},
+                operation:this.builderHud.operationStatus?.() || {enabled:false}},
             defaults: this.getSettings(),
         };
     }
