@@ -51,32 +51,39 @@ assert.ok(calls.every(call => typeof call[1] === 'number'),
 for (let i = 1; i < calls.length; i++) {
     assert.ok(calls[i][1] > calls[i - 1][1], 'Selection revisions are monotonic');
 }
-// Scene may receive select before Editor.Selection.getSelected() is updated.
+// The event UUID handles a stale Editor Selection snapshot on the first
+// notification; next-turn synchronization must respect the real Editor state.
 selected = [];
+const firstStart=calls.length;
 await extension.methods.onSelectionSelect('node', 'first-click');
-assert.deepEqual(calls.at(-1)[0], ['first-click'],
-    'First click uses event UUID even if Editor selection snapshot is stale');
+assert.deepEqual(calls[firstStart][0], ['first-click'],
+    'First event uses UUID before the Editor Selection snapshot updates');
+assert.deepEqual(calls.at(-1)[0],[],
+    'A later deselection cannot be undone by an earlier select callback');
 selected = [];
+const arrayStart=calls.length;
 await extension.methods.onSelectionSelect('node', ['first-from-array']);
-assert.deepEqual(calls.at(-1)[0], ['first-from-array'],
-    'Creator 3.8.8 array selection event also activates on the first click');
+assert.deepEqual(calls[arrayStart][0], ['first-from-array']);
+assert.deepEqual(calls.at(-1)[0],[]);
 selected = ['first-from-array'];
 await extension.methods.onSelectionUnselect('node', ['first-from-array']);
 assert.deepEqual(calls.at(-1)[0], [],
-    'Array unselect events clear all handles on the first deselection');
-// Native Scene input may still produce selection:unselect after a HUD
-// button executes. A short-lived Scene input lease must restore ONLY the
-// node whose own Gizmo handled the click, not override ordinary selection.
+    'Array unselect events clear handles');
+// A stale HUD gesture lease must NEVER call Editor.Selection.select() to
+// resurrect the old Node after the user clicks another node.
 protectedNode = {nodeUuid:'first-from-array',active:false};
+selected = ['other-node'];
+await extension.methods.onSelectionUnselect('node','first-from-array');
+assert.deepEqual(reselected,[],
+    'Gizmo selection guard may not force-select a deselected Node');
+assert.deepEqual(calls.at(-1)[0],['other-node'],
+    'Switching to another Node must hide the former Node handles');
+protectedNode = {nodeUuid:'first-from-array',active:true};
 selected = [];
 await extension.methods.onSelectionUnselect('node','first-from-array');
-assert.deepEqual(reselected,['first-from-array']);
-assert.deepEqual(calls.at(-1)[0],['first-from-array']);
-protectedNode = {nodeUuid:'some-other-node',active:true};
-selected = [];
-await extension.methods.onSelectionUnselect('node','first-from-array');
-assert.equal(reselected.length,1,'Unrelated leases cannot suppress unselect');
-assert.deepEqual(calls.at(-1)[0],[]);
+assert.deepEqual(reselected,[]);
+assert.deepEqual(calls.at(-1)[0],[],
+    'Even a held selection lease cannot override authoritative unselect');
 protectedNode = null;
 delete globalThis.Editor;
-console.log('[selection-reentry] normal unselect, bounded HUD selection lease, and reselect OK');
+console.log('[selection-reentry] authoritative select/unselect and no HUD-driven reselect OK');
