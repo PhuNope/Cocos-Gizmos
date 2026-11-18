@@ -5,12 +5,13 @@ All notable changes to Cocos-Gizmos are documented here.
 ## [Unreleased] — v3 development (not published)
 
 ### Added — Fluent HUD Builder and Commands (development API)
-- `GizmoHUD.createHud()`: declarative, immutable row/column flex-tree with `width`, `height`, `grow`, `gap`, `padding`, `align`, `justify`, `text`, `slider`, `checkbox`, `toggle`, and `button`.
+- `GizmoHUD.createHud()`: declarative, immutable row/column flex-tree with `width`, `height`, `grow`, `shrink`, `basis`, `wrap`, `style`, `gap`, `padding`, `align`, `justify`, `text`, `slider`, `checkbox`, `toggle`, and `button`.
 - `GizmoHUD.bind(property)` creates property Command descriptors; `GizmoHUD.action(handler)` creates Button actions. Component callback `onGizmoHUD()` returns the finished definition without touching DOM or Editor-only APIs.
 - `GizmoHudCommandController` uses the existing application EditSession for begin/update/commit/cancel with rollback, including isolated native Inspector hook failures.
 - `GizmoHudDomRenderer` turns the tree into a compact CSS Flexbox floating Scene HUD with real HTML inputs and stable DOM throughout held Slider gestures. No new runtime npm dependencies; Flexily's compositional node model inspired the builder, not the renderer implementation.
 - The old Scene HUD grid remains a headless/texture fallback (flattening builder controls); native Editor Ctrl+Z for new DOM-backed Command sessions still requires Creator-side verification.
 - Added 3D Builder demo, editor API documentation, public TypeScript completion and standalone builder/DOM/selection regression tests.
+- Fixed DOM Button commands being blocked by a same-target `stopImmediatePropagation()` listener. The UI now stops bubbling to Scene selection without silencing its own click handler; regression tests simulate real event-listener semantics.
 
 
 ### Particle-style floating DOM HUD and 2D hover (development build)
