@@ -320,7 +320,7 @@ function checkOutput(output) {
         'export {};',
     ];
     for (const snippet of mustContain) {
-        if (!output.includes(snippet)) fail(`output is missing '${snippet}'`);
+        if (!output.includes(snippet)) { const at=output.indexOf('class GizmoHUD'); fail(`output is missing '${snippet}' near: ${output.slice(Math.max(0,at-80),at+200)}`); }
     }
     const mustNotContain = ['namespace _', 'private ', 'protected ', 'registerGizmos', 'getDebugNode'];
     for (const snippet of mustNotContain) {
