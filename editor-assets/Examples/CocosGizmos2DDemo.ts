@@ -73,36 +73,32 @@ export default class CocosGizmos2DDemo extends Component {
         ];
     }
 
-    public onGizmoHud(): GizmoHudItem[] {
-        return [
-            { id: 'title', text: '2D · Gizmos', order: 0,
-                style: { color: '#93ddd3', fontWeight: 600 } },
-            { id: 'point', text: 'Point: ' + this.point.x + ', ' + this.point.y,
-                order: 1, size: 'small', style: { color: '#bac8d6' } },
-            { id: 'event', text: 'Last: ' + this.lastEvent, order: 2,
-                size: 'small', style: { color: '#a7b6c5', fontSize: 11 } },
-        ];
+    /** Editor-only fluent HUD example; each control owns a command. */
+    public onGizmoHUD(): GizmoHudDefinition {
+        return GizmoHUD.createHud('example2d')
+            .title('2D · Gizmos')
+            .position('top-right').theme('dark').size(308,'auto')
+            .padding(10).gap(7)
+            .text('point','Point: ' + this.point.x + ', ' + this.point.y)
+            .text('event','Last: ' + this.lastEvent, {
+                style: { color:'#a7b6c5', fontSize:11 },
+            })
+            .slider('Radius', { property:'radius', min:10, max:90, step:5 })
+            .row({ gap:8 }, row => {
+                row.toggle('Filled shapes', { property:'showFilled' })
+                    .checkbox('Labels', { property:'showLabels' });
+            })
+            .row({ gap:8 }, row => {
+                row.checkbox('Sprite', { property:'showSprite' })
+                    .button('Reset 2D', {
+                        command:GizmoHUD.action((owner: CocosGizmos2DDemo) => owner.resetHud()),
+                        style: { backgroundColor:'#28656a', color:'#e9fffc' },
+                    });
+            })
+            .build();
     }
 
-    public onGizmoHudControls(): GizmoHudControlList {
-        return [
-            { type: 'slider', id: 'radius', text: 'Radius',
-                property: 'radius', min: 10, max: 90, step: 5 },
-            { type: 'toggle', id: 'filled', text: 'Filled shapes',
-                property: 'showFilled', size: 'small' },
-            { type: 'checkbox', id: 'labels', text: 'Labels',
-                property: 'showLabels', size: 'small' },
-            { type: 'checkbox', id: 'sprite', text: 'Sprite',
-                property: 'showSprite', size: 'small' },
-            { type: 'button', id: 'reset', text: 'Reset 2D',
-                size: { width: 126, height: 22 },
-                style: { backgroundColor: '#28656a', color: '#e9fffc',
-                    borderRadius: 7, fontWeight: 600 } },
-        ];
-    }
-
-    public onGizmoHudAction(id: string): void {
-        if (id !== 'reset') return;
+    private resetHud(): void {
         this.radius = 40;
         this.showFilled = true;
         this.showLabels = true;

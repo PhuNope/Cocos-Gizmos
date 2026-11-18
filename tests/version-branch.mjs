@@ -10,7 +10,7 @@ const lock = JSON.parse(read('package-lock.json'));
 const workflow = read('.github/workflows/release.yml');
 const docs = read('README.md');
 const changelog = read('CHANGELOG.md');
-assert.equal(pkg.version, '3.0.1');
+assert.equal(pkg.version, '3.0.2');
 assert.equal(pkg.package_version, 2,
     'Creator manifest package_version is schema version 2, not the extension major');
 assert.equal(lock.version, pkg.version);
@@ -25,4 +25,4 @@ assert.match(docs, /only after approval/);
 assert.match(workflow, /github\.ref_type == 'tag'/);
 assert.doesNotMatch(workflow, /startsWith\(github\.event\.head_commit\.message, 'release: v'\)/);
 assert.match(changelog, /^## \[3\.0\.1\]/m);
-console.log('[version-branch] v3 branch and 3.0.1 release version synchronized');
+console.log('[version-branch] v3 branch and 3.0.2 release version synchronized');

@@ -37,15 +37,22 @@ export class GizmoHudCommandController {
 
     public begin(owner: any, node: GizmoHudControlNode): boolean {
         if (this.active || !owner || node.kind === 'button' ||
-            node.command.kind !== 'property') return false;
-        const property = node.command.property;
-        const original = owner[property];
+            node.command.kind !== 'property' && node.command.kind !== 'value') return false;
+        const command=node.command;
+        const property = command.kind==='property'?command.property:node.id;
+        const read=():number|boolean =>command.kind==='property'?
+            owner[command.property] : command.read(owner);
+        const write=(value:number|boolean):void=>{
+            if(command.kind==='property')owner[command.property]=value;
+            else command.write(owner,value);
+        };
+        const original = read();
         if (node.kind === 'slider' ?
             typeof original !== 'number' || !Number.isFinite(original) :
             typeof original !== 'boolean') return false;
         const session=new GizmoEditSession<number | boolean>(
-            () => owner[property],
-            (value) => {owner[property]=value;},
+            read,
+            write,
             {
                 begin: (value) => {
                     this.safe('begin', () => this.hooks.begin?.(owner,property));
@@ -124,6 +131,7 @@ export class GizmoHudCommandController {
 
     public click(owner: any,node: GizmoHudControlNode): boolean {
         if(node.kind!=='button' || node.command.kind!=='action')return false;
+        if(node.disabled)return false;
         try {
             node.command.execute(owner);
             this.safe('dirty',()=>this.hooks.dirty?.(owner));

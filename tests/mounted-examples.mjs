@@ -57,11 +57,14 @@ for (const { src, oldName, name, uuid } of samples) {
         "@ccclass('" + name + "')").replace('class ' + oldName + ' extends Component',
         'class ' + name + ' extends Component')
         .replace("from '../dist/RegisterGizmos'", "from '../RegisterGizmos'");
-    if (oldName === 'GizmosDecoratorTest') expected = expected.replaceAll(oldName, name);
+    // New builder actions capture their Component type, not just the class declaration.
+    expected = expected.replaceAll(oldName, name);
     assert.equal(mounted.endsWith(expected), true,
         name + ' must stay in sync with its corresponding project example');
     assert.match(mounted, /import\s*{[^}]*Component[^}]*}\s*from\s*['"]cc['"]/s);
-    assert.match(mounted, /onGizmoHudControls\(\)/);
+    assert.match(mounted, /onGizmoHUD\(\)/);
+    assert.match(mounted, /GizmoHUD\.createHud\(/);
+    assert.match(mounted, /\.build\(\)/);
     assert.match(mounted, /onGizmoHandles\(\)/);
     assert.match(mounted, /onGizmoChanged\(/);
     if (name === 'CocosGizmos2DDemo' || name === 'CocosGizmos3DDemo') {

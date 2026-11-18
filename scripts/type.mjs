@@ -135,7 +135,7 @@ function classToDeclarationText(classNode, sourceText, sourceFile) {
         .split('\n')
         .map((line, index) => (index > 0 && line.startsWith('    ') ? line.slice(4) : line))
         .join('\n');
-    return { text: `export declare ${dedented}`, usedNames };
+    return { text: `export declare ${dedented.replace(/^export\s+(?:declare\s+)?/, '')}`, usedNames };
 }
 
 function collectIdentifiers(node) {
@@ -215,7 +215,7 @@ function collectGlobalHandleDeclarations(emittedText, sourceFile) {
         'GizmoDisplayMode', 'GizmoViewSettings', 'GizmoHudItem',
         'GizmoHudButton', 'GizmoHudSlider', 'GizmoHudToggle', 'GizmoHudCheckbox',
         'GizmoHudControl', 'GizmoHudControlList',
-        'GizmoHudAlign', 'GizmoHudJustify', 'GizmoHudPropertyCommand',
+        'GizmoHudAlign', 'GizmoHudJustify', 'GizmoHudCommandRegistry', 'GizmoHudPropertyCommand',
         'GizmoHudActionCommand', 'GizmoHudCommand',
         'GizmoHudItemOptions', 'GizmoHudSliderOptions',
         'GizmoHudContainer', 'GizmoHudTextNode', 'GizmoHudControlNode',

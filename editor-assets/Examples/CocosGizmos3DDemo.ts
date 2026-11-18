@@ -122,72 +122,33 @@ export default class CocosGizmos3DDemo extends Component {
         ];
     }
 
-    /**
-     * V3 declarative HUD builder. The UI is a CSS flex tree; commands are
-     * distinct from presentation. No DOM or Creator Scene APIs are called
-     * from user Components.
-     */
+    /** Editor-only HUD builder; uses the new shorthand controls. */
     public onGizmoHUD(): GizmoHudDefinition {
         return GizmoHUD.createHud('shape3d')
-            .width(344).padding(12).gap(8)
-            .text('title','3D · Gizmos', {
-                style: { color:'#93ddd3',fontSize:17,fontWeight:600 },
+            .title('3D · Gizmos')
+            .position('top-right').theme('dark').size(344,'auto')
+            .padding(12).gap(8)
+            .text('event','Last: ' + this.lastEvent, {
+                style:{ color:'#a7b6c5',fontSize:11 },
             })
-            .text('event','Last: '+this.lastEvent, {
-                style: { color:'#a7b6c5',fontSize:11 },
+            .slider('Shape size', {
+                property:'size', min:0.5, max:3, step:0.25,
             })
-            .slider('size','Shape size',GizmoHUD.bind('size'), {
-                min:0.5,max:3,step:0.25,
-                style: { color:'#e2f1f3' },
+            .row({ gap:12 }, row => {
+                row.toggle('Wireframe', { property:'wireframe' })
+                    .checkbox('Depth', { property:'depthTest' });
             })
-            .row('settings', row => {
-                row.gap(12)
-                    .toggle('wire','Wireframe',GizmoHUD.bind('wireframe'))
-                    .checkbox('depth','Depth',GizmoHUD.bind('depthTest'));
-            })
-            .row('actions', row => {
-                row.gap(12)
-                    .checkbox('labels','Labels',GizmoHUD.bind('showLabels'))
-                    .button('reset','Reset 3D',GizmoHUD.action((owner) =>
-                        owner.onGizmoHudAction('reset')), {
-                        style: { backgroundColor:'#28656a',color:'#e9fffc' },
+            .row({ gap:12 }, row => {
+                row.checkbox('Labels', { property:'showLabels' })
+                    .button('Reset 3D', {
+                        command:GizmoHUD.action((owner: CocosGizmos3DDemo) => owner.resetHud()),
+                        style:{ backgroundColor:'#28656a',color:'#e9fffc' },
                     });
             })
             .build();
     }
 
-    public onGizmoHud(): GizmoHudItem[] {
-        return [
-            { id: 'title', text: '3D · Gizmos', order: 0,
-                size: 'normal',
-                style: { color: '#93ddd3', fontWeight: 600 } },
-            { id: 'move', text: 'Move: XYZ axes / XY·XZ·YZ planes', order: 1,
-                size: 'small', style: { color: '#bac8d6' } },
-            { id: 'event', text: 'Last: ' + this.lastEvent, order: 2,
-                size: 'small', style: { color: '#a7b6c5', fontSize: 11 } },
-        ];
-    }
-
-    public onGizmoHudControls(): GizmoHudControlList {
-        return [
-            { type: 'slider', id: 'size', text: 'Shape size',
-                property: 'size', min: 0.5, max: 3, step: 0.25,
-                size: 'normal', style: { color: '#cfe2e8' } },
-            { type: 'toggle', id: 'wire', text: 'Wireframe', property: 'wireframe',
-                size: 'small' },
-            { type: 'checkbox', id: 'depth', text: 'Depth test', property: 'depthTest',
-                size: 'small' },
-            { type: 'checkbox', id: 'labels', text: 'Labels', property: 'showLabels',
-                size: 'small' },
-            { type: 'button', id: 'reset', text: 'Reset 3D',
-                size: { width: 126, height: 22 },
-                style: { backgroundColor: '#28656a', borderRadius: 7,
-                    color: '#e9fffc', fontWeight: 600 } },
-        ];
-    }
-
-    public onGizmoHudAction(id: string): void {
-        if (id !== 'reset') return;
+    private resetHud(): void {
         this.size = 1;
         this.wireframe = true;
         this.depthTest = true;

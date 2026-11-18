@@ -719,6 +719,7 @@ export interface V3HandleAdapter {
 export function createV3HandleAdapter(
     allowHud:(component:Component)=>boolean=()=>true,
     hudLayout?:GizmoHudLayout,
+    builderHud?: import('./SceneOperationInput').BuilderHudOperationPort,
 ):V3HandleAdapter {
     const registered=new Map<string,any>();
     const active=new Map<Component,any>();
@@ -755,7 +756,8 @@ export function createV3HandleAdapter(
     // Editor raycasting, as Creator's native ParticleSystem float window
     // does. Reuse the same application Command callbacks for consistency.
     const disconnectHudInput=connectSceneHudInput(pointerPorts);
-    const operationInput=new SceneOperationInput(pointerPorts);
+    const operationInput=new SceneOperationInput(pointerPorts,undefined,
+        () => builderHud||null);
     const viewportInput=new SceneViewportInput(pointerPorts);
     const engineInput=new SceneEngineInput(pointerPorts);
     let manager:any=null, typeDefs:any=null, ctor:any=null;

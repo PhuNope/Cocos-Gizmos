@@ -93,11 +93,22 @@ class Element {
 }
 const host=new Element('div');
 host.style.position='';
+let viewportRect={left:20,top:36,width:800,height:500};
+host.getBoundingClientRect=()=>({
+    ...viewportRect,right:viewportRect.left+viewportRect.width,
+    bottom:viewportRect.top+viewportRect.height,
+});
+const body=new Element('body');
+body.appendChild(host);
 const fakeWindow=new Element('window');
 fakeWindow.PointerEvent=function PointerEvent(){};
+let sceneIs3D=false;
 const doc={
-    defaultView:fakeWindow,
-    getElementById(id){return id==='GameDiv'?host:null;},
+    body,defaultView:fakeWindow,
+    getElementById(id){
+        if(id==='Cocos3dGameContainer' && sceneIs3D)return host;
+        return id==='GameDiv'?host:null;
+    },
     createElement(name){return new Element(name);},
     createDocumentFragment(){return new Element('fragment');},
 };
@@ -127,14 +138,27 @@ const renderer=new GizmoHudDomRenderer(()=>doc);
 renderer.beginFrame();
 assert.equal(renderer.queue(owner,hud()),5);
 assert.equal(renderer.finishFrame(),true);
-assert.equal(host.children.length,1);
-const root=host.children[0];
+assert.equal(host.children.length,0,
+    'HUD may not live beneath Canvas or its stacking context');
+assert.equal(body.children.length,2);
+const root=body.children[1];
+assert.equal(root.parentElement,body,'HUD must portal above GameDiv');
+assert.equal(root.style.position,'fixed');
+assert.equal(root.style.zIndex,'2147483647',
+    'Portal must sit above other Scene canvas overlay stacking contexts');
+assert.equal(root.style.left,'20px');
+assert.equal(root.style.top,'36px');
+assert.equal(root.style.width,'800px');
+assert.equal(root.style.height,'500px');
 assert.equal(root.id,'cocos-gizmos-builder-hud');
 assert.equal(root.style.pointerEvents,'none',
     'Floating HUD background cannot steal Scene selection');
 const panel=root.children[0];
 assert.equal(panel.style.flexDirection,'column');
-assert.equal(panel.style.pointerEvents,'none');
+assert.equal(panel.style.pointerEvents,'auto',
+    'Inside the visible 3D HUD panel native Scene picking must be blocked');
+assert.equal(panel.emit('pointerdown').stopped,true,
+    'Clicking HUD padding does not reach Scene selection');
 assert.equal(panel.style.width,'320px');
 assert.equal(panel.style.flexBasis,'320px');
 assert.equal(panel.style.flexShrink,'0');
@@ -149,6 +173,8 @@ assert.equal(slider.value,'1');
 assert.equal(checkbox.checked,true);
 assert.equal(button.textContent,'Reset');
 assert.equal(slider.style.pointerEvents,'auto');
+assert.equal(row.style.pointerEvents,'none',
+    'Nested flex layout keeps individual controls interactive');
 slider.emit('pointerdown');
 assert.equal(renderer.editing,true);
 slider.value='1.75';
@@ -160,6 +186,9 @@ renderer.finishFrame();
 assert.equal(root.children[0],panel,
     'Repaint while slider is captured must never replace flex DOM');
 assert.equal(renderer.editing,true);
+fakeWindow.emit('blur');
+assert.equal(renderer.editing,true,
+    'Editor focusing the HTML slider must not cancel the drag');
 fakeWindow.emit('pointerup');
 assert.equal(renderer.editing,false);
 assert.equal(owner.events.at(-1)[1],'end');
@@ -177,6 +206,13 @@ assert.equal(owner.lastEvent,'reset',
     'stopPropagation must not suppress same-target Button command click');
 assert.equal(owner.size,1);
 assert.equal(latestButton.emit('pointerdown').stopped,true);
+// Window resizing/repositioning must move the fixed portal with the viewport.
+viewportRect={left:100,top:75,width:960,height:540};
+renderer.beginFrame();renderer.queue(owner,hud());renderer.finishFrame();
+assert.equal(root.style.left,'100px');
+assert.equal(root.style.top,'75px');
+assert.equal(root.style.width,'960px');
+assert.equal(root.style.height,'540px');
 renderer.beginFrame();renderer.queue(owner,hud());renderer.finishFrame();
 const refreshedSlider=root.find(x=>x.tag==='input'&&x.type==='range');
 refreshedSlider.emit('pointerdown');
@@ -200,7 +236,126 @@ assert.equal(root.children.length,1);
 renderer.beginFrame();
 renderer.finishFrame();
 assert.equal(root.style.display,'none','Unselected Node hides its builder HUD');
+// Persistent mounts are rendered without a selected component callback.
+const unregister=GizmoHUD.commands.register({
+    id:'gizmo.persist',
+    execute:context=>{context.lastEvent='persistent';},
+});
+const persistent=GizmoHUD.createHud('persist')
+    .position('bottom-left')
+    .theme('light')
+    .button('Run',{command:'gizmo.persist'})
+    .mount(replacement);
+renderer.beginFrame();
+assert.equal(renderer.finishFrame(),true);
+const persistentButton=root.find(x=>x.tag==='button');
+persistentButton.emit('click');
+assert.equal(replacement.lastEvent,'persistent');
+assert.equal(root.children[0].style.bottom,'12px');
+persistent.hide();
+renderer.beginFrame();renderer.finishFrame();
+assert.equal(root.style.display,'none');
+persistent.show();
+renderer.beginFrame();renderer.finishFrame();
+assert.equal(root.style.display,'flex');
+persistent.destroy();
+unregister();
 renderer.dispose();
 assert.equal(host.children.length,0);
+assert.equal(body.children.length,1,
+    'Disposal removes only the HUD portal, not the Scene canvas host');
 assert.equal(host.style.position,'');
-console.log('[gizmo-hud-dom] nested flex layout, command input, drag stability, Escape, select cleanup and DOM passthrough OK');
+
+// In Cocos Creator 3D, parent engine-view > webview has CSS
+// pointer-events:none. No native DOM event is delivered to these inputs;
+// Editor Operation coordinates must drive the very same Commands.
+sceneIs3D=true;
+// Restore the original viewport rectangle after the resize test above.
+viewportRect={left:20,top:36,width:800,height:500};
+const opOwner={
+    node:{uuid:'3d-operation'},size:1,wireframe:true,lastEvent:'idle',
+    changes:[],
+    onGizmoHudChanged(property,phase,value){
+        this.changes.push([property,phase,value]);
+    },
+};
+const opHud=GizmoHUD.createHud('operation-3d')
+    .width(320).padding(10)
+    .button('reset','Reset',GizmoHUD.action(owner=>{
+        owner.lastEvent='reset';
+    }))
+    .checkbox('wire','Wireframe',GizmoHUD.bind('wireframe'))
+    .slider('size','Size',GizmoHUD.bind('size'),{
+        min:0,max:4,step:.5,
+    }).build();
+const opRenderer=new GizmoHudDomRenderer(()=>doc);
+opRenderer.beginFrame();
+opRenderer.queue(opOwner,opHud);
+assert.equal(opRenderer.finishFrame(),true);
+assert.equal(opRenderer.usesSceneOperationInput(),true);
+const opRoot=body.children[1];
+const opPanel=opRoot.children[0];
+const box=(left,top,right,bottom)=>({
+    left,top,right,bottom,width:right-left,height:bottom-top,
+});
+opPanel.getBoundingClientRect=()=>box(400,70,720,340);
+const opButton=opPanel.find(x=>x.tag==='button');
+const opToggle=opPanel.find(x=>x.tag==='input'&&x.type==='checkbox');
+const opRange=opPanel.find(x=>x.tag==='input'&&x.type==='range');
+opButton.getBoundingClientRect=()=>box(420,90,520,120);
+opToggle.getBoundingClientRect=()=>box(590,140,610,165);
+opToggle.parentElement.getBoundingClientRect=()=>box(420,140,615,170);
+opRange.getBoundingClientRect=()=>box(420,200,620,226);
+// Inverse of 3D viewport to client transformation (GameDiv 20,36,800x500).
+const toPointer=(clientX,clientY)=>({
+    x:clientX-20,y:536-clientY,
+});
+const viewport={width:800,height:500};
+assert.equal(opRenderer.operationDown(toPointer(100,95),viewport),false,
+    'Clicks outside 3D panel belong to normal Scene selection');
+assert.equal(opRenderer.operationDown(toPointer(405,75),viewport),true,
+    'HUD padding blocks native Scene unselect even without a DOM target');
+opRenderer.operationUp(toPointer(405,75),viewport);
+assert.equal(opOwner.lastEvent,'idle');
+assert.equal(opRenderer.operationDown(toPointer(460,100),viewport),true);
+assert.equal(opRenderer.operationUp(toPointer(460,100),viewport),true);
+assert.equal(opOwner.lastEvent,'reset',
+    'Scene Operation can click Reset even if browser never fires click');
+assert.equal(opRenderer.operationDown(toPointer(600,152),viewport),true);
+opRenderer.operationUp(toPointer(600,152),viewport);
+assert.equal(opOwner.wireframe,false,
+    'Scene Operation forwards checkbox changes and keeps owner state');
+assert.equal(opToggle.checked,false);
+assert.equal(opRenderer.operationDown(toPointer(450,152),viewport),true);
+opRenderer.operationUp(toPointer(450,152),viewport);
+assert.equal(opOwner.wireframe,true,
+    'Checkbox label area must also trigger the operation command');
+// Slider changes from 1 to 3 and must survive multiple repaints.
+assert.equal(opRenderer.operationDown(toPointer(470,214),viewport),true);
+assert.equal(opRenderer.editing,true);
+opRenderer.beginFrame();opRenderer.queue(opOwner,opHud);
+opRenderer.finishFrame();
+assert.equal(opRoot.children[0],opPanel,
+    'Scene Operation drag must preserve DOM controls across frames');
+opRenderer.operationMove(toPointer(570,214),viewport);
+assert.equal(opOwner.size,3);
+opRenderer.operationUp(toPointer(570,214),viewport);
+assert.equal(opOwner.size,3);
+assert.equal(opRenderer.editing,false);
+assert.equal(opRange.value,'3');
+assert.ok(opOwner.changes.some(x=>x[0]==='size'&&x[1]==='end'),
+    'Slider must commit its GizmoEditSession after operation mouseup');
+opRenderer.operationDown(toPointer(470,214),viewport);
+opRenderer.operationMove(toPointer(615,214),viewport);
+opRenderer.operationCancel();
+assert.equal(opOwner.size,3,'Escape cancels Operation slider edit');
+assert.equal(opRenderer.operationStatus().captured,false);
+assert.equal(opRenderer.operationStatus().commit,4);
+opRenderer.dispose();
+sceneIs3D=false;
+const only2D=new GizmoHudDomRenderer(()=>doc);
+assert.equal(only2D.usesSceneOperationInput(),false,
+    'Working 2D HUD must remain on native DOM pointer path');
+only2D.dispose();
+
+console.log('[gizmo-hud-dom] native DOM, 3D Editor Operation click/checkbox/slider drag/rollback, padding, selection passthrough and cleanup OK');

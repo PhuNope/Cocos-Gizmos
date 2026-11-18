@@ -58,11 +58,19 @@ const point={x:120,y:80,button:0,buttons:1,
     stopPropagation(){this.stopped=true;},
     preventDefault(){this.prevented=true;}};
 let nativeSelection=0,nativeCamera=0;
-op.on('mousedown',()=>{
+op.on('mousedown',(event)=>{
+    // Native Canvas picking ignores HTML controls; our Operation adapter
+    // must not prevent the browser from dispatching those events.
+    if(event?.target?.closest?.('#cocos-gizmos-scene-hud, #cocos-gizmos-builder-hud'))
+        return;
     nativeSelection++;
     events.push(['native-selection']);
 },99);
-op.on('mousedown',()=>nativeCamera++,98);
+op.on('mousedown',(event)=>{
+    if(event?.target?.closest?.('#cocos-gizmos-scene-hud, #cocos-gizmos-builder-hud'))
+        return;
+    nativeCamera++;
+},98);
 let ownDown=0;
 const ports={
     viewport(){return {width:800,height:500};},
@@ -103,11 +111,51 @@ const domHudHit={closest(selector){
     assert.equal(selector,'#cocos-gizmos-scene-hud, #cocos-gizmos-builder-hud');return {};
 }};
 const handledBeforeDom=ownDown;
-assert.equal(op.emit('mousedown',{...point,target:domHudHit}),false,
-    'Browser floating HUD events cannot reach the native Scene picker');
+assert.equal(op.emit('mousedown',{...point,target:domHudHit}),undefined,
+    'Native DOM button/input must receive its pointerdown');
 assert.equal(ownDown,handledBeforeDom,
     'Native Operation must not begin a duplicate DOM HUD command');
+assert.equal(input.status().hudOwned,true);
+assert.equal(op.emit('mouseup',{...point}),undefined,
+    'Native DOM slider must receive pointerup');
+assert.equal(input.status().hudOwned,false);
 assert.equal(nativeSelection,0);
+// Creator 3D can strip event.target before dispatching Operation listeners.
+// The visible builder panel must still own a click by client coordinates.
+leaseScope.document={
+    getElementById(id){
+        if(id==='GameCanvas')return {getBoundingClientRect:()=>({
+            left:20,top:40,right:420,bottom:290,width:400,height:250,
+        })};
+        if(id==='cocos-gizmos-builder-hud')return {
+            style:{display:'flex'},
+            children:[{style:{pointerEvents:'auto'},
+                getBoundingClientRect:()=>({
+                    left:50,top:220,right:140,bottom:280,
+                    width:90,height:60,
+                })}],
+        };
+        return null;
+    },
+};
+const beforeGeometric=ownDown;
+assert.equal(op.emit('mousedown',{...point,
+    x:900,y:999,clientX:80,clientY:250,target:undefined}),false);
+assert.equal(input.status().hudOwned,true);
+assert.equal(nativeSelection,0,'3D HUD click never unselects the Node');
+assert.equal(ownDown,beforeGeometric,'3D HUD click cannot begin Gizmo drag');
+assert.equal(op.emit('mousemove',{...point,x:900,y:999}),undefined,
+    'HUD drag movement cannot terminate the browser event');
+assert.equal(op.emit('mouseup',{...point,x:900,y:999}),undefined,
+    'HUD release cannot terminate the browser event');
+assert.equal(input.status().hudOwned,false);
+delete leaseScope.document;
+// Editor may swallow DOM mouseup: the next unrelated down must recover.
+assert.equal(op.emit('mousedown',{...point,target:domHudHit}),undefined);
+assert.equal(input.status().hudOwned,true);
+op.emit('mousemove',{...point,buttons:0});
+assert.equal(input.status().hudOwned,false,
+    'HUD ownership must expire when native mouseup did not arrive');
 assert.equal(op.emit('mousedown',{...point}),false);
 assert.equal(nativeSelection,0,'HUD/handle click blocks native Node selection');
 assert.equal(nativeCamera,0);
@@ -153,6 +201,39 @@ assert.equal(op.listeners.get('mousedown').length,2,
 assert.equal(op.listeners.get('mousemove').length,0);
 assert.equal(op.listeners.get('mouseup').length,0);
 assert.equal(input.status().active,false);
+
+// Cocos Creator 3D WebView ignores native pointer events. The Scene
+// Operation priority-100 route must invoke the HUD port directly and stop
+// the native selection tool, including multi-frame slider drag and Escape.
+const hudEvents=[];
+const op3D=new MockOperation();
+let selected3D=0;
+op3D.on('mousedown',()=>selected3D++,99);
+const hudPort={
+    usesSceneOperationInput:()=>true,
+    operationDown(p){hudEvents.push(['down',p.x,p.y]);return p.x>300&&p.x<500;},
+    operationMove(p){hudEvents.push(['move',p.x,p.y]);return true;},
+    operationUp(p){hudEvents.push(['up',p?.x,p?.y]);return true;},
+    operationCancel(){hudEvents.push(['cancel']);},
+};
+const bridge3D=new SceneOperationInput(ports,()=>op3D,()=>hudPort);
+bridge3D.refresh();
+assert.equal(op3D.emit('mousedown',{...point,x:360}),false);
+assert.equal(selected3D,0,'3D HUD click must never unselect Node');
+assert.equal(bridge3D.status().builderHudGesture,true);
+assert.equal(bridge3D.status().builderHudDown,1);
+assert.equal(op3D.emit('mousemove',{...point,x:420}),false);
+assert.equal(op3D.emit('mouseup',{...point,x:440}),false);
+assert.deepEqual(hudEvents.slice(-3),[
+    ['down',360,80],['move',420,80],['up',440,80],
+]);
+assert.equal(bridge3D.status().builderHudGesture,false);
+assert.equal(op3D.emit('mousedown',{...point,x:360}),false);
+assert.equal(op3D.emit('keydown',{key:'Escape',keyCode:27}),false);
+assert.deepEqual(hudEvents.at(-1),['cancel']);
+assert.equal(op3D.emit('mousedown',{...point,x:600}),undefined);
+assert.equal(selected3D,1,'Outside 3D HUD remains selectable');
+bridge3D.detach();
 
 const absent=new SceneOperationInput(ports,()=>null);
 absent.refresh();
