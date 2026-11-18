@@ -550,8 +550,9 @@ export class GizmoHudOverlay {
     public finishFrame(totalRows: number): void {
         const camera = sceneCamera();
         if (this.screenRows.length && camera?.viewport) {
-            // Prefer a real Scene WebView element. The existing native Gizmo
-            // picking adapter stays responsible for mouse events.
+            // Particle-style separation: the floating DOM HUD owns its
+            // own pointer events and forwards commands through the Scene HUD
+            // input port. Texture fallback retains native Scene picking.
             const renderedInDom = this.domScreen.render(
                 camera.viewport, this.screenRows, totalRows,
             );
