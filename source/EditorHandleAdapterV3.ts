@@ -896,10 +896,11 @@ export function createV3HandleAdapter(
                     wanted.add(component);
             }
             for(const component of components){
+                const hasLegacyHandles=typeof component.onGizmoHandles==='function';
+                const hasHudControls=!!hudLayout?.get(component)?.controls?.length ||
+                    typeof component.onGizmoHudControls==='function';
                 if(!isSelectable(component)||!selected.has(component.node.uuid)||
-                    (typeof component.onGizmoHandles!=='function' &&
-                    (typeof component.onGizmoHudControls!=='function' ||
-                     (hudLayout&&!hudLayout.get(component)))))continue;
+                    (!hasLegacyHandles&&!hasHudControls))continue;
                 wanted.add(component);
                 // Never require our Component's name to be free in the
                 // Editor's private Gizmo pool. Another extension or stale
