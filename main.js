@@ -165,10 +165,13 @@ async function onSelectionSelect(type, uuid) {
     // Reconcile on the following turn; ignore if a newer event arrived.
     await new Promise(resolve => setTimeout(resolve, 0));
     if (revision === selectionRevision) {
-        // The Editor's current selection is authoritative after its event
-        // turn. Do not add the original event UUID back unconditionally:
-        // that revives a Node which the user has since deselected.
-        const final = selectedNodeIds();
+        // A select event can precede Editor.Selection's snapshot update by
+        // more than one microtask. If the snapshot still does not contain
+        // the just-selected UUID, use the event UUID for Scene Gizmo display.
+        // Unlike the old HUD lease, this NEVER calls Editor.Selection.select()
+        // and a newer select/unselect event invalidates this reconciliation.
+        const observed=selectedNodeIds();
+        const final=observed.some(id=>ids.includes(id))?observed:ids;
         try { await syncSceneSelection(final); }
         catch (error) { console.warn('[cocos-gizmos/selection] select reconcile:', error); }
     }
