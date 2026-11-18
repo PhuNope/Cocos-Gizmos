@@ -21,6 +21,8 @@ class Shape3D extends Component {
     onGizmoHUD(): GizmoHudDefinition {
         return GizmoHUD.createHud('shape')
             .width(340).padding(12).gap(8)
+            .style({ backgroundColor: '#1b2833', borderRadius: 10 })
+            .shrink(0).basis(340).wrap(false)
             .text('heading', 'Shape preview', {
                 style: { color: '#93ddd3', fontSize: 17, fontWeight: 600 },
             })
@@ -56,8 +58,10 @@ builder methods.
 
 `GizmoHUD.createHud(id?)` returns `GizmoHudBuilder`, a column by default.
 Configure the current group with `width(px)`, `height(px)`, `gap(px)`,
-`padding(px)`, `grow(factor)`, `align('start'|'center'|'end'|'stretch')`
-and `justify('start'|'center'|'end'|'between'|'around'|'evenly')`.
+`padding(px)`, `grow(factor)`, `shrink(factor)`,
+`basis(px)`, `wrap(boolean)`, `style(cssLikeStyle)`,
+`align('start'|'center'|'end'|'stretch')` and
+`justify('start'|'center'|'end'|'between'|'around'|'evenly')`.
 
 Use `row(id, row => ...)` and `column(id, column => ...)` to nest groups.
 Add `text(id, text, options?)`, `slider(id, label, command, {min,max,step?})`,
@@ -81,6 +85,10 @@ Component and emits `onGizmoHudChanged(property, phase, value)`.
 
 `GizmoHUD.action(component => ...)` creates a Button action. It only runs
 on click and is not an Inspector property path.
+
+The builder returns data, not a DOM node. A caller should return the
+definition from `onGizmoHUD()`; do not execute commands inside the callback,
+which is reevaluated whenever the Scene refreshes.
 
 `GizmoHudCommandController` in the application layer owns the edit
 transaction and uses the existing `GizmoEditSession`: begin -> zero or
