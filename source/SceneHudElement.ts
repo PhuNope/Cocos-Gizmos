@@ -169,6 +169,13 @@ export class SceneHudElement {
         this.endDrag(true);
     };
 
+    private readonly onDragKeyDown = (event: any): void => {
+        if (!this.held || event.key !== 'Escape' && event.keyCode !== 27)
+            return;
+        this.stopEvent(event);
+        this.endDrag(true);
+    };
+
     private endDrag(cancel: boolean): void {
         const held = this.held;
         if (!held) return;
@@ -181,6 +188,8 @@ export class SceneHudElement {
         target.removeEventListener?.(prefix + 'up', this.onDragUp, true);
         target.removeEventListener?.(mouse ? 'mouseleave' : 'pointercancel',
             this.onDragCancel, true);
+        target.removeEventListener?.('keydown', this.onDragKeyDown, true);
+        target.removeEventListener?.('blur', this.onDragCancel, true);
         if (cancel) {
             try { currentHudInputPort?.cancel(); }
             catch (error) { console.warn('[cocos-gizmos/hud] Cancel:', error); }
@@ -227,6 +236,8 @@ export class SceneHudElement {
             target.addEventListener(prefix + 'up', this.onDragUp, true);
             target.addEventListener(pointerSupported ? 'pointercancel' : 'mouseleave',
                 this.onDragCancel, true);
+            target.addEventListener('keydown', this.onDragKeyDown, true);
+            target.addEventListener('blur', this.onDragCancel, true);
             try { box.setPointerCapture?.(event.pointerId); }
             catch { /* The window capture listener still keeps the gesture. */ }
         });
