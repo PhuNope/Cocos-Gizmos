@@ -1,4 +1,4 @@
-import { consumeOwnedSceneEvent } from './SceneSelectionLease';
+import { consumeOwnedSceneEvent, isSceneHudPointerEvent } from './SceneSelectionLease';
 
 export interface ViewportPoint { x: number; y: number }
 export interface ViewportPointer extends ViewportPoint {
@@ -110,7 +110,7 @@ export class SceneViewportInput {
     private readonly onDown = (event: any): void => {
         // Floating HUD controls own their browser events; do not begin a
         // second Scene-input gesture from the window capture listener.
-        if (event?.target?.closest?.('#cocos-gizmos-scene-hud, #cocos-gizmos-builder-hud')) return;
+        if (isSceneHudPointerEvent(event)) return;
         if (this.captured || event?.button !== 0 ||
             this.enabled && event?.isPrimary === false) return;
         const pointer = this.point(event);
