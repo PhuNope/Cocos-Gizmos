@@ -23,6 +23,7 @@ Editor-only Component drawers can be registered with `registerGizmos`. The `Gizm
 For API examples, details, and test instructions, see:
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [HUD builder and command API](docs/HUD_BUILDER.md)
 - [Callbacks](docs/CALLBACKS.md)
 - [Move handles](docs/MOVE_GIZMO.md)
 - [Rotate handles](docs/ROTATE_GIZMO.md)
