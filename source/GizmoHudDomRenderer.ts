@@ -125,6 +125,7 @@ export class GizmoHudDomRenderer {
             if('children' in node)
                 return [node.kind,node.id,node.width,node.height,node.grow,
                     node.gap,node.padding,node.align,node.justify,
+                    node.style,node.shrink,node.basis,node.wrap,
                     (node.children || []).map(key)];
             if(!('command' in node))return [node.kind,node.id,node.text,node.style,node.grow];
             return [node.kind,node.id,node.text,node.style,node.grow,
@@ -183,12 +184,15 @@ export class GizmoHudDomRenderer {
         Object.assign(element.style,{
             boxSizing:'border-box', minWidth:'0',
             flexGrow: String(node.grow ?? 0),
+            flexShrink: String(node.shrink ?? 1),
+            ...(node.basis !== undefined ?
+                { flexBasis: node.basis + 'px' } : {}),
         });
         if('children' in node) {
             Object.assign(element.style,{
                 display:'flex',
                 flexDirection:node.kind==='row'?'row':'column',
-                flexWrap:'nowrap',
+                flexWrap:node.wrap ? 'wrap' : 'nowrap',
                 alignItems:node.align==='start'?'flex-start':
                     node.align==='end'?'flex-end':node.align==='center'?
                     'center':'stretch',
@@ -200,6 +204,7 @@ export class GizmoHudDomRenderer {
                 padding:(node.padding??8)+'px',
                 pointerEvents:'none',
             });
+            this.applyStyle(element,node.style);
             if(node.width!==undefined)element.style.width=node.width+'px';
             if(node.height!==undefined)element.style.height=node.height+'px';
             if(isRoot) {
