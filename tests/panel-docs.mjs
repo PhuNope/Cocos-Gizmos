@@ -23,10 +23,12 @@ assert.match(doc.template, /Gizmos2D\.rotate/);
 assert.match(doc.template, /Gizmos2D\.move/);
 assert.match(doc.template, /Gizmos2D\.point/);
 assert.match(doc.template, /onGizmoHudControls/);
+assert.match(doc.template, /GizmoHUD\\.createHud/);
+assert.match(doc.template, /GizmoHUD\\.bind/);
 assert.match(doc.template, /<svg[^>]+role="img"/);
 assert.match(doc.style, /cg-api-card/);
-assert.equal((doc.template.match(/class="cg-api-card"/g) || []).length, 16,
-    'Open Document ships sixteen API cards, including Move, Rotate, decorator and callbacks');
+assert.equal((doc.template.match(/class="cg-api-card"/g) || []).length, 17,
+    'Open Document ships seventeen API cards, including GizmoHUD builder, Move, Rotate and callbacks');
 for (const callback of ['onGizmoChanged', 'onGizmoHudChanged', 'onGizmoHudAction',
     'onRestore', 'GizmoHandlePhase']) {
     assert.ok(doc.template.includes(callback), 'Open Document documents ' + callback);
