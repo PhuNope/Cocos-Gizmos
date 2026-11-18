@@ -56,7 +56,26 @@ void [plane, axis, space, phase, callback, handleChanged];
 comp.onGizmoHandles?.();
 comp.onGizmoChanged?.('target', 'update', 0);
 
-const sceneSettings: GizmoViewSettings = { display: 'selected', hud: 'off' };
+// Fluent HUD builder is a public global; no runtime module import required.
+const builtHud: GizmoHudDefinition = GizmoHUD.createHud('preview')
+    .width(320).gap(8).padding(12)
+    .text('heading','Preview',{style:{color:'#ffffff',fontWeight:600}})
+    .row('options',row=>{
+        row.gap(10)
+            .slider('size','Size',GizmoHUD.bind('size'),{
+                min:.5,max:3,step:.25,
+            })
+            .checkbox('enabled','Enabled',GizmoHUD.bind('enabled'));
+    })
+    .button('reset','Reset',GizmoHUD.action((owner:{size:number})=>{
+        owner.size=1;
+    }))
+    .build();
+const getBuiltHud: NonNullable<Component['onGizmoHUD']> =()=>builtHud;
+comp.onGizmoHUD?.();
+void [builtHud,getBuiltHud];
+
+
 const displayMode: GizmoDisplayMode = 'always';
 const sizedHud: GizmoHudControlList = [
     { type: 'slider', id: 's', text: 'Speed', property: 'speed',
