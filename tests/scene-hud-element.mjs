@@ -25,7 +25,25 @@ class Element {
         this.textContent = '';
         this.clientWidth = 900;
         this.clientHeight = 540;
+        this.listeners = new Map();
     }
+    addEventListener(type, callback) {
+        const listeners=this.listeners.get(type)||[];
+        listeners.push(callback);this.listeners.set(type,listeners);
+    }
+    removeEventListener(type, callback) {
+        this.listeners.set(type,(this.listeners.get(type)||[])
+            .filter(item=>item!==callback));
+    }
+    emit(type, event) {
+        for(const callback of this.listeners.get(type)||[])
+            callback(event);
+    }
+    get firstElementChild() { return this.children[0]||null; }
+    getBoundingClientRect() {
+        return {left:0,top:0,right:900,bottom:540,width:900,height:540};
+    }
+    setPointerCapture(id) { this.pointerCaptured=id; }
     appendChild(child) {
         if (child.tag === 'fragment') {
             for (const entry of [...child.children]) this.appendChild(entry);
@@ -45,9 +63,12 @@ class Element {
         this.parentElement = null;
     }
 }
+const fakeWindow=new Element('window');
+fakeWindow.PointerEvent=function PointerEvent(){};
 const scene = new Element('div');
 scene.style.position = '';
 const doc = {
+    defaultView:fakeWindow,
     getElementById(id) {
         if (id === 'GameDiv') return scene;
         if (id === 'cocos-gizmos-scene-hud') return scene.children.find(child => child.id === id) || null;
@@ -116,6 +137,59 @@ hud.hide();
 assert.equal(root.style.display, 'none');
 assert.equal(hud.render(viewport, rows, 4), true);
 assert.equal(root.style.display, 'block');
+// DOM floating controls directly own their browser mouse events. They
+// must keep the exact same DOM nodes across Editor redraws while dragging.
+const inputEvents=[];
+const disconnect=scope.exports.connectSceneHudInput({
+    down(pointer){inputEvents.push(['down',pointer.x,pointer.y]);return true;},
+    move(pointer){inputEvents.push(['move',pointer.x,pointer.y]);},
+    up(pointer){inputEvents.push(['up',pointer.x,pointer.y]);},
+    cancel(){inputEvents.push(['cancel']);},
+});
+assert.equal(hud.render(viewport,rows,4),true);
+const slider=root.children[1];
+assert.equal(slider.style.pointerEvents,'auto',
+    'Only controls receive pointer input; the floating root stays transparent');
+const sliderHit=controls.exports.hudControlScreenRect(viewport,1,4);
+const event=(x,y,id=1)=>({
+    clientX:x,clientY:540-y,button:0,buttons:1,pointerId:id,
+    stopImmediatePropagation(){this.stopped=true;},
+    stopPropagation(){this.stopped=true;},
+    preventDefault(){this.prevented=true;},
+});
+const press=event(sliderHit.left+20,sliderHit.bottom+10);
+slider.emit('pointerdown',press);
+assert.equal(press.stopped,true,'HUD press cannot select the Scene Node');
+assert.equal(press.prevented,true);
+assert.equal(inputEvents.at(-1)[0],'down');
+assert.equal(fakeWindow.listeners.get('pointermove').length,1);
+const nextRows=rows.map(row=>({...row}));
+nextRows[1].value=82;
+assert.equal(hud.render(viewport,nextRows,4),true);
+assert.equal(root.children[1],slider,
+    'Editor redraw must not replace DOM slider during pointer capture');
+assert.equal(slider.children[2].textContent,'82',
+    'Value readout updates without replacing the active slider');
+const sliderMove=event(sliderHit.left+55,sliderHit.bottom+10);
+fakeWindow.emit('pointermove',sliderMove);
+assert.equal(inputEvents.at(-1)[0],'move');
+fakeWindow.emit('pointerup',sliderMove);
+assert.equal(inputEvents.at(-1)[0],'up');
+assert.equal(fakeWindow.listeners.get('pointermove').length,0,
+    'Global pointer listener is detached on release');
+assert.equal(hud.render(viewport,nextRows,4),true);
+assert.equal(root.children.length,4);
+
+const button=root.children[3];
+const buttonHit=controls.exports.hudControlScreenRect(viewport,3,4);
+const buttonPress=event(buttonHit.left+10,buttonHit.bottom+10,2);
+button.emit('pointerdown',buttonPress);
+fakeWindow.emit('pointerup',buttonPress);
+assert.equal(inputEvents.at(-1)[0],'up');
+assert.equal(inputEvents.filter(x=>x[0]==='cancel').length,0);
+assert.equal(root.style.pointerEvents,'none',
+    'Background click must still reach native Scene selection');
+disconnect();
 hud.dispose();
 assert.equal(scene.children.length, 0);
 assert.equal(scene.style.position, '');
