@@ -241,6 +241,27 @@ declare global {
     /** Flex-like layout primitives for the GizmoHUD builder. */
     type GizmoHudAlign = 'start' | 'center' | 'end' | 'stretch';
     type GizmoHudJustify = 'start' | 'center' | 'end' | 'between' | 'around' | 'evenly';
+    type GizmoHudPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+    type GizmoHudTheme = 'dark' | 'light';
+    interface GizmoHudGroupOptions {
+        gap?: number;
+        padding?: number;
+        align?: GizmoHudAlign;
+        justify?: GizmoHudJustify;
+        style?: GizmoHudDomStyle;
+    }
+    interface GizmoHudRegisteredCommand {
+        id: string;
+        label?: string;
+        shortcut?: string;
+        canExecute?(context: any): boolean;
+        execute(context: any): void;
+    }
+    interface GizmoHudElementHandle {
+        setText(text: string): GizmoHudMount;
+        setDisabled(disabled: boolean): GizmoHudMount;
+        setVisible(visible: boolean): GizmoHudMount;
+    }
 
     /** Commands are domain data; a renderer never directly mutates a property. */
     interface GizmoHudPropertyCommand {
@@ -250,13 +271,32 @@ declare global {
     interface GizmoHudActionCommand {
         readonly kind: 'action';
         readonly execute: (component: any) => void;
+        readonly commandId?: string;
     }
-    type GizmoHudCommand = GizmoHudPropertyCommand | GizmoHudActionCommand;
+    interface GizmoHudValueCommand {
+        readonly kind: 'value';
+        readonly read: (component: any) => number | boolean;
+        readonly write: (component: any, value: number | boolean) => void;
+    }
+    type GizmoHudCommand = GizmoHudPropertyCommand | GizmoHudActionCommand | GizmoHudValueCommand;
 
     interface GizmoHudItemOptions {
         style?: GizmoHudDomStyle;
         grow?: number;
+        disabled?: boolean;
+        visible?: boolean;
     }
+    interface GizmoHudButtonOptions extends GizmoHudItemOptions {
+        command: string | GizmoHudActionCommand;
+        icon?: string;
+        variant?: 'default' | 'primary' | 'danger';
+    }
+    interface GizmoHudValueInput extends GizmoHudItemOptions {
+        property?: string;
+        value?: number | boolean;
+        onChange?(value: number | boolean): void;
+    }
+    interface GizmoHudSliderInput extends GizmoHudSliderOptions, GizmoHudValueInput {}
     interface GizmoHudSliderOptions extends GizmoHudItemOptions {
         min: number;
         max: number;
@@ -285,6 +325,12 @@ declare global {
         readonly style?: GizmoHudDomStyle;
         readonly grow?: number;
     }
+    interface GizmoHudSeparatorNode {
+        readonly kind: 'separator';
+        readonly id: string;
+        readonly text: '';
+        readonly style?: GizmoHudDomStyle;
+    }
     interface GizmoHudControlNode {
         readonly kind: 'button' | 'slider' | 'checkbox' | 'toggle';
         readonly id: string;
@@ -292,21 +338,33 @@ declare global {
         readonly command: GizmoHudCommand;
         readonly style?: GizmoHudDomStyle;
         readonly grow?: number;
+        readonly icon?: string;
+        readonly variant?: 'default' | 'primary' | 'danger';
+        readonly disabled?: boolean;
+        readonly visible?: boolean;
         readonly min?: number;
         readonly max?: number;
         readonly step?: number;
     }
-    type GizmoHudNode = GizmoHudContainer | GizmoHudTextNode | GizmoHudControlNode;
+    type GizmoHudNode = GizmoHudContainer | GizmoHudTextNode | GizmoHudSeparatorNode | GizmoHudControlNode;
     interface GizmoHudDefinition {
         readonly kind: 'hud';
         readonly id: string;
         readonly root: GizmoHudContainer;
+        readonly position?: GizmoHudPosition;
+        readonly theme?: GizmoHudTheme;
     }
 
     /** Fluent, DOM-independent flex layout builder.
      * build() returns a snapshot; no Editor DOM or Node is allocated.
      */
     interface GizmoHudBuilder {
+        title(value: string): this;
+        position(value: GizmoHudPosition): this;
+        theme(value: GizmoHudTheme): this;
+        size(width: number, height?: number | 'auto'): this;
+        label(text: string, options?: GizmoHudItemOptions): this;
+        separator(): this;
         width(value: number): this;
         height(value: number): this;
         grow(value?: number): this;
@@ -318,17 +376,22 @@ declare global {
         padding(value: number): this;
         align(value: GizmoHudAlign): this;
         justify(value: GizmoHudJustify): this;
-        row(id: string, build: (row: GizmoHudBuilder) => void): this;
-        column(id: string, build: (column: GizmoHudBuilder) => void): this;
+        row(id: string | GizmoHudGroupOptions, build: (row: GizmoHudBuilder) => void): this;
+        column(id: string | GizmoHudGroupOptions, build: (column: GizmoHudBuilder) => void): this;
         text(id: string, text: string, options?: GizmoHudItemOptions): this;
         button(id: string, text: string, command: GizmoHudActionCommand,
             options?: GizmoHudItemOptions): this;
+        button(label: string, options: GizmoHudButtonOptions): this;
         slider(id: string, text: string, command: GizmoHudPropertyCommand,
             options: GizmoHudSliderOptions): this;
+        slider(label: string, options: GizmoHudSliderInput): this;
         toggle(id: string, text: string, command: GizmoHudPropertyCommand,
             options?: GizmoHudItemOptions): this;
+        toggle(label: string, options: GizmoHudValueInput): this;
         checkbox(id: string, text: string, command: GizmoHudPropertyCommand,
             options?: GizmoHudItemOptions): this;
+        checkbox(label: string, options: GizmoHudValueInput): this;
+        mount(owner?: any): GizmoHudMount;
         build(): GizmoHudDefinition;
     }
 
