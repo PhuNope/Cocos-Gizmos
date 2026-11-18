@@ -140,6 +140,8 @@ assert.equal(body.children.length,2);
 const root=body.children[1];
 assert.equal(root.parentElement,body,'HUD must portal above GameDiv');
 assert.equal(root.style.position,'fixed');
+assert.equal(root.style.zIndex,'2147483647',
+    'Portal must sit above other Scene canvas overlay stacking contexts');
 assert.equal(root.style.left,'20px');
 assert.equal(root.style.top,'36px');
 assert.equal(root.style.width,'800px');
