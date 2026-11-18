@@ -135,7 +135,7 @@ function classToDeclarationText(classNode, sourceText, sourceFile) {
         .split('\n')
         .map((line, index) => (index > 0 && line.startsWith('    ') ? line.slice(4) : line))
         .join('\n');
-    return { text: `export declare ${dedented.replace(/^export\\s+(?:declare\\s+)?/, '')}`, usedNames };
+    return { text: `export declare ${dedented.replace(/^export\s+(?:declare\s+)?/, '')}`, usedNames };
 }
 
 function collectIdentifiers(node) {
