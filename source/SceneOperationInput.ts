@@ -1,4 +1,5 @@
-import { readScenePointer, isPrimaryScenePointer } from './SceneGizmoInput';
+import { isPrimaryScenePointer } from './SceneGizmoInput';
+import { sceneEventToViewport } from './ScenePointerCoordinates';
 import { consumeOwnedSceneEvent } from './SceneSelectionLease';
 import type { SceneViewportInputPorts, ViewportPointer } from './SceneViewportInput';
 
@@ -25,6 +26,7 @@ export class SceneOperationInput {
     private hoverEvents = 0;
     private cancellations = 0;
     private reason = 'not-mounted';
+    private lastPointerSource = 'missing';
 
     constructor(
         private readonly ports: SceneViewportInputPorts,
@@ -63,7 +65,9 @@ export class SceneOperationInput {
     }
 
     private point(event: any): ViewportPointer | null {
-        const pointer=readScenePointer(event);
+        const result=sceneEventToViewport(event,this.ports.viewport());
+        this.lastPointerSource=result.source;
+        const pointer=result.pointer;
         if(!pointer)return null;
         return {
             x:pointer.x,y:pointer.y,
@@ -159,6 +163,7 @@ export class SceneOperationInput {
             captured:this.capturing,observed:this.events,
             intercepted:this.intercepted,hover:this.hoverEvents,
             cancelled:this.cancellations,priority:SCENE_GIZMO_INPUT_PRIORITY,
+            pointerSource:this.lastPointerSource,
         };
     }
 }
