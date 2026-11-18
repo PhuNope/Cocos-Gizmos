@@ -304,6 +304,7 @@ const opToggle=opPanel.find(x=>x.tag==='input'&&x.type==='checkbox');
 const opRange=opPanel.find(x=>x.tag==='input'&&x.type==='range');
 opButton.getBoundingClientRect=()=>box(420,90,520,120);
 opToggle.getBoundingClientRect=()=>box(590,140,610,165);
+opToggle.parentElement.getBoundingClientRect=()=>box(420,140,615,170);
 opRange.getBoundingClientRect=()=>box(420,200,620,226);
 // Inverse of 3D viewport to client transformation (GameDiv 20,36,800x500).
 const toPointer=(clientX,clientY)=>({
@@ -325,6 +326,10 @@ opRenderer.operationUp(toPointer(600,152),viewport);
 assert.equal(opOwner.wireframe,false,
     'Scene Operation forwards checkbox changes and keeps owner state');
 assert.equal(opToggle.checked,false);
+assert.equal(opRenderer.operationDown(toPointer(450,152),viewport),true);
+opRenderer.operationUp(toPointer(450,152),viewport);
+assert.equal(opOwner.wireframe,true,
+    'Checkbox label area must also trigger the operation command');
 // Slider changes from 1 to 3 and must survive multiple repaints.
 assert.equal(opRenderer.operationDown(toPointer(470,214),viewport),true);
 assert.equal(opRenderer.editing,true);
@@ -345,7 +350,7 @@ opRenderer.operationMove(toPointer(615,214),viewport);
 opRenderer.operationCancel();
 assert.equal(opOwner.size,3,'Escape cancels Operation slider edit');
 assert.equal(opRenderer.operationStatus().captured,false);
-assert.equal(opRenderer.operationStatus().commit,3);
+assert.equal(opRenderer.operationStatus().commit,4);
 opRenderer.dispose();
 sceneIs3D=false;
 const only2D=new GizmoHudDomRenderer(()=>doc);
