@@ -70,7 +70,7 @@ assert.equal((doc.handlers.get('pointerdown')||[]).length,1,'Re-mount must reuse
 assert.equal(bridge.status().reason,'pointer-capture');
 const htmlControl=doc.emit('pointerdown',{target:{
     closest(selector){
-        assert.equal(selector,'#cocos-gizmos-scene-hud');
+        assert.equal(selector,'#cocos-gizmos-scene-hud, #cocos-gizmos-builder-hud');
         return {};
     },
 }});
