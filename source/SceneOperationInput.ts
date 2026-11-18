@@ -1,6 +1,7 @@
 import { isPrimaryScenePointer } from './SceneGizmoInput';
 import { sceneEventToViewport } from './ScenePointerCoordinates';
-import { consumeOwnedSceneEvent, isSceneHudPointerEvent } from './SceneSelectionLease';
+import { consumeOwnedSceneEvent, isSceneHudPointerEvent,
+    isSceneHudDomTarget } from './SceneSelectionLease';
 import type { SceneViewportInputPorts, ViewportPointer } from './SceneViewportInput';
 
 /** Creator 3.8.8 builtin/scene/@types/cce/public/operation/index.d.ts
@@ -84,16 +85,14 @@ export class SceneOperationInput {
         // a new gesture and must never inherit stale HUD ownership.
         this.hudOwned=false;
         const point=this.point(event);
-        // Editor 3D Operation events may lose the native DOM target.
-        // A geometric HUD hit must block the native selection BEFORE it runs.
+        // A browser click over the DOM HUD must reach the actual HTML
+        // control, even when Creator also reports a Scene Operation event.
+        // Stop only geometry-only Scene picks: returning false for a real
+        // DOM target terminates pointerdown before button/input handlers.
         if(isSceneHudPointerEvent(event,point,this.ports.viewport())){
-            // DOM controls must receive the original pointerdown. Returning
-            // false from this Operation listener can cause Creator's input
-            // dispatcher to terminate the browser event before it reaches
-            // the actual button/range input. The HUD panel's own DOM handlers
-            // prevent bubbling to Scene selection instead.
             this.hudOwned=true;
-            return;
+            return isSceneHudDomTarget(event,point,this.ports.viewport()) ?
+                undefined : false;
         }
         if(!point)return;
         this.events++;
