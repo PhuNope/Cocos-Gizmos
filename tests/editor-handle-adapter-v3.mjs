@@ -456,4 +456,87 @@ bridgePort.up({x:80,y:80,button:0,buttons:0});
 occupied.dispose();
 delete typeDefs.MyV3Component;
 
-console.log('[editor-handle-adapter-v3] SelectGizmo discovery, command gestures, HUD, cancel, hide and cleanup OK');
+// Integrated Editor 3.8.8 dispatcher: priority 100 must intercept the
+// mouse before the built-in GizmoOperation (99) or Camera (98) handlers.
+// This regression is deliberately exercised through createV3HandleAdapter,
+// not just the isolated SceneOperationInput unit test.
+class NativeOperation {
+    listeners=new Map();
+    on(name,fn,priority=0){
+        const listeners=this.listeners.get(name)||[];
+        listeners.push({fn,priority});
+        listeners.sort((a,b)=>b.priority-a.priority);
+        this.listeners.set(name,listeners);
+    }
+    removeListener(name,fn){
+        this.listeners.set(name,(this.listeners.get(name)||[])
+            .filter(entry=>entry.fn!==fn));
+    }
+    emit(name,event){
+        for(const entry of this.listeners.get(name)||[]){
+            if(entry.fn(event)===false)return false;
+        }
+    }
+}
+const nativeOperation=new NativeOperation();
+const nativeSelectionCalls=[];
+nativeOperation.on('mousedown',()=>nativeSelectionCalls.push('node'),99);
+nativeOperation.on('mousedown',()=>nativeSelectionCalls.push('camera'),98);
+cce.Operation=nativeOperation;
+component.gizmo=null;
+const operationAdapter=createV3HandleAdapter(()=>true,layout);
+operationAdapter.refresh([component],new Set(['v3-target']),3500);
+assert.equal(operationAdapter.status().operationInput.active,true);
+assert.equal(operationAdapter.status().operationInput.priority,100);
+assert.equal(operationAdapter.status().active,1);
+
+const mouse=(x,y,fields={})=>({x,y,button:0,buttons:1,...fields});
+const hoverStart=events.length;
+nativeOperation.emit('mousemove',mouse(80,80));
+assert.ok(events.slice(hoverStart).some(e=>e[0]==='hover'&&
+    e[1]==='position:position:single'),
+    'Native Operation route restores hover without raycast proxies');
+const previousEnds=events.filter(e=>e[0]==='handle'&&e[2]==='end').length;
+const previousCancels=events.filter(e=>e[0]==='handle'&&e[2]==='cancel').length;
+assert.equal(nativeOperation.emit('mousedown',mouse(80,80)),false);
+nativeOperation.emit('mousemove',mouse(110,80));
+nativeOperation.emit('mousemove',mouse(140,80));
+assert.equal(operationAdapter.status().draggingPosition,1);
+assert.equal(component.position.x,140);
+assert.equal(events.filter(e=>e[0]==='handle'&&e[2]==='cancel').length,
+    previousCancels,'Native Editor selection cannot cancel an in-progress drag');
+assert.equal(nativeOperation.emit('mouseup',mouse(140,80)),false);
+assert.equal(operationAdapter.status().draggingPosition,0);
+assert.equal(events.filter(e=>e[0]==='handle'&&e[2]==='end').length,
+    previousEnds+1,'Native Operation mouse-up commits exactly once');
+assert.deepEqual(nativeSelectionCalls,[],'Owning a handle blocks built-in picker');
+
+const prevActions=events.filter(e=>e[0]==='button').length;
+assert.equal(nativeOperation.emit('mousedown',mouse(740,80)),false);
+assert.equal(nativeOperation.emit('mouseup',mouse(740,80)),false);
+assert.equal(events.filter(e=>e[0]==='button').length,prevActions+1,
+    'HUD Button runs through priority 100 Scene Operation');
+assert.deepEqual(nativeSelectionCalls,[],
+    'HUD Button never unselects the node in the native dispatcher');
+
+const cancelBefore=events.filter(e=>e[0]==='hud'&&e[2]==='cancel').length;
+assert.equal(nativeOperation.emit('mousedown',mouse(440,80)),false);
+nativeOperation.emit('mousemove',mouse(465,80));
+nativeOperation.emit('mousemove',mouse(490,80));
+assert.equal(operationAdapter.status().draggingSlider,1);
+assert.equal(events.filter(e=>e[0]==='hud'&&e[2]==='cancel').length,
+    cancelBefore,'Slider stays open between native Scene frames');
+assert.equal(nativeOperation.emit('mouseup',mouse(490,80)),false);
+assert.equal(component.radius,90);
+assert.equal(events.filter(e=>e[0]==='hud'&&e[2]==='cancel').length,
+    cancelBefore,'Slider end is not converted into cancel');
+
+assert.equal(nativeOperation.emit('mousedown',mouse(650,250)),undefined);
+assert.deepEqual(nativeSelectionCalls,['node','camera'],
+    'Plain Scene click still goes to built-in selection and camera');
+operationAdapter.dispose();
+assert.equal(nativeOperation.listeners.get('mousedown').length,2,
+    'Unload removes only extension listeners and never the Editor handlers');
+delete cce.Operation;
+
+console.log('[editor-handle-adapter-v3] native Operation priorities, hover, HUD, multiframe commands and teardown OK');
