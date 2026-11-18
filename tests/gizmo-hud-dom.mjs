@@ -174,6 +174,17 @@ fakeWindow.emit('keydown',{key:'Escape',keyCode:27});
 assert.equal(owner.size,1,'Escape restores the initial Slider value');
 assert.equal(owner.events.at(-1)[1],'cancel');
 assert.equal(renderer.editing,false);
+// Editor can deserialize and replace a Component while reusing the same
+// Node UUID and property values. DOM actions must bind the NEW object.
+const replacement={
+    ...owner,node:{uuid:'hud-demo'},lastEvent:'replacement',
+    onGizmoHudChanged:owner.onGizmoHudChanged,
+};
+renderer.beginFrame();renderer.queue(replacement,hud());renderer.finishFrame();
+const rebound=root.find(x=>x.tag==='button');
+rebound.emit('click');
+assert.equal(replacement.lastEvent,'reset');
+assert.equal(root.children.length,1);
 renderer.beginFrame();
 renderer.finishFrame();
 assert.equal(root.style.display,'none','Unselected Node hides its builder HUD');
