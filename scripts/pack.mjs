@@ -10,7 +10,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const distDir = path.join(ROOT, 'dist');
 const globalTypesAsset = path.join(ROOT, 'editor-assets', 'GizmosGlobal.ts');
-const expectedDist = ['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'GizmoHandlePresets.js', 'Gizmos2D.js', 'Gizmos3D.js', 'RegisterGizmos.js', 'RegisterGizmos.d.ts'].sort();
+const expectedDist = ['Define.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos.d.ts', 'Gizmos.js', 'GizmoHandlePresets.js', 'GizmoHUD.js', 'Gizmos2D.js', 'Gizmos3D.js', 'RegisterGizmos.js', 'RegisterGizmos.d.ts'].sort();
 const actualDist = readdirSync(distDir).sort();
 if (JSON.stringify(actualDist) !== JSON.stringify(expectedDist)) {
   throw new Error(`dist/ must contain only ${expectedDist.join(', ')}; found ${actualDist.join(', ')}`);
@@ -163,7 +163,7 @@ const entries = [
   ['panels/settings/index.js', readFileSync(path.join(ROOT, 'panels/settings/index.js'))],
   ['panels/docs/index.js', readFileSync(path.join(ROOT, 'panels/docs/index.js'))],
   ['panels/full-size.js', readFileSync(path.join(ROOT, 'panels/full-size.js'))],
-  ...['Define.js', 'GizmoDiagnostics.js', 'GizmoExampleClassDiagnostics.js', 'SceneGizmoInput.js', 'SceneSelectionLease.js', 'ScenePointerCoordinates.js', 'SceneViewportInput.js', 'SceneEngineInput.js', 'SceneOperationInput.js', 'GizmoEditSession.js', 'GizmoPresentation.js', 'GizmoHudStyle.js', 'GizmoHudControls.js', 'GizmoHudLayout.js', 'GizmoHudProjection.js', 'SceneCameraBridge.js', 'SceneHudElement.js', 'GizmoHudOverlay.js', 'GizmoPresentationService.js', 'GizmoMoveCommand.js', 'GizmoRotateCommand.js', 'GizmoCommandBuilder.js', 'RotationDragSolver.js', 'RotationHandleGeometry.js', 'GizmoHandlePresets.js', 'PositionDragSolver.js', 'PlaneHandleGeometry.js', 'AxisHandleGeometry.js', 'MoveHitGeometry.js', 'MoveScreenScale.js', 'MoveStrokeGeometry.js', 'GizmoViewportGeometry.js', 'GizmoHandleRenderer.js', 'GizmoHitTest.js', 'EditorHandleAdapterV3.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos2D.js', 'Gizmos3D.js']
+  ...['Define.js', 'GizmoDiagnostics.js', 'GizmoExampleClassDiagnostics.js', 'SceneGizmoInput.js', 'SceneSelectionLease.js', 'ScenePointerCoordinates.js', 'SceneViewportInput.js', 'SceneEngineInput.js', 'SceneOperationInput.js', 'GizmoEditSession.js', 'GizmoPresentation.js', 'GizmoHUD.js', 'GizmoHUDController.js', 'GizmoHudDomRenderer.js', 'GizmoHudStyle.js', 'GizmoHudControls.js', 'GizmoHudLayout.js', 'GizmoHudProjection.js', 'SceneCameraBridge.js', 'SceneHudElement.js', 'GizmoHudOverlay.js', 'GizmoPresentationService.js', 'GizmoMoveCommand.js', 'GizmoRotateCommand.js', 'GizmoCommandBuilder.js', 'RotationDragSolver.js', 'RotationHandleGeometry.js', 'GizmoHandlePresets.js', 'PositionDragSolver.js', 'PlaneHandleGeometry.js', 'AxisHandleGeometry.js', 'MoveHitGeometry.js', 'MoveScreenScale.js', 'MoveStrokeGeometry.js', 'GizmoViewportGeometry.js', 'GizmoHandleRenderer.js', 'GizmoHitTest.js', 'EditorHandleAdapterV3.js', 'SceneUpdateScheduler.js', 'ExecuteGizmos.js', 'DrawCommandBuffer2D.js', 'Gizmos2D.js', 'Gizmos3D.js']
     .map(name => ['editor-runtime/' + name, readFileSync(path.join(ROOT, 'editor-runtime', name))]),
   ['builder.js', readFileSync(path.join(ROOT, 'builder.js'))],
   ['build/hooks.js', readFileSync(path.join(ROOT, 'build', 'hooks.js'))],
