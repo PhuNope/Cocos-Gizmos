@@ -26,6 +26,8 @@ export class GizmoPresentationService {
     private planned = false;
 
     public getLayout(): GizmoHudLayout { return this.layout; }
+    /** 3D Editor Operation HUD input, independent of the disabled WebView pointer layer. */
+    public getBuilderHud(): GizmoHudDomRenderer { return this.builderHud; }
 
     public planFrame(
         components: readonly Component[],
