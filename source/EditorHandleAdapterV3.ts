@@ -36,11 +36,12 @@ type SliderDrag = { entry: HudHitTarget; solver: HudSliderDrag; session: GizmoEd
 let captured: object | null = null;
 let lastImmediateRepaint=0;
 
-function requestSceneRepaint(): void {
-    // Native camera redraw and full Scene updates have different costs.
-    // Coalesce synchronous full passes while a slider/handle is dragging.
+function requestSceneRepaint(hoverTransition = false): void {
+    // Do not coalesce hover transitions: a pointer can enter and exit a
+    // narrow 2D handle in <32ms, and the exit must clear the previous color
+    // in the very next Scene paint. Expensive drag value updates still coalesce.
     const now=Date.now();
-    if(now-lastImmediateRepaint>=32){
+    if(hoverTransition || now-lastImmediateRepaint>=32){
         lastImmediateRepaint=now;
         try{repaintWholeScene();}
         catch { /* Scene may close between events */ }
@@ -194,7 +195,7 @@ function createSelectHandleGizmo(
             this.hover=name;
             const component=this.component();
             if(component) setSelectedHandleHover(component,name);
-            if(this.shown) requestSceneRepaint();
+            if(this.shown) requestSceneRepaint(true);
         }
 
         public refreshHandles(): void {
