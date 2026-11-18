@@ -210,8 +210,10 @@ const rotationCommands = evaluate('GizmoRotateCommand', {
 const appearance = evaluate('GizmoHudStyle');
 const controls = evaluate('GizmoHudControls', { './GizmoHudStyle': appearance });
 const presentation = { normalizeHudItems(value) { return value; } };
+const hudBuilder=evaluate('GizmoHUD');
 const layoutModule = evaluate('GizmoHudLayout', {
     './GizmoHudControls': controls, './GizmoPresentation': presentation,
+    './GizmoHUD': hudBuilder,
 });
 const projection = evaluate('GizmoHudProjection', {
     cc, './PositionDragSolver': solver,
