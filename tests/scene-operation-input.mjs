@@ -14,8 +14,9 @@ const leaseScope={exports:{}};
 vm.runInNewContext(transpile('../source/SceneSelectionLease.ts'),leaseScope);
 
 const pointerScope={exports:{}};
+const pointerGlobal={};
 vm.runInNewContext(transpile('../source/ScenePointerCoordinates.ts'),{
-    exports:pointerScope.exports,globalThis:{},
+    exports:pointerScope.exports,globalThis:pointerGlobal,
     require(name) {
         if(name==='./SceneGizmoInput')return portScope.exports;
         throw Error(name);
@@ -84,6 +85,20 @@ assert.equal(op.listeners.get('mousedown').length,3,
     'Repeated updates cannot install duplicate Scene listeners');
 op.emit('mousemove',{...point});
 assert.deepEqual(events.at(-1),['hover',120,80]);
+// Real Editor Operation x/y may differ from canvas-local pixels. Match the
+// rendered viewport via clientX/clientY and the actual canvas rectangle.
+pointerGlobal.document={getElementById(name){
+    if(name!=='GameCanvas')return null;
+    return {getBoundingClientRect:()=>({
+        left:20,top:40,right:420,bottom:290,width:400,height:250,
+    })};
+}};
+op.emit('mousemove',{...point,x:900,y:999,clientX:80,clientY:250});
+assert.deepEqual(events.at(-1),['hover',120,80],
+    'Hover is aligned to rendered handle, never raw Operation x/y');
+assert.equal(input.status().pointerSource,'canvas-client');
+delete pointerGlobal.document;
+
 assert.equal(op.emit('mousedown',{...point}),false);
 assert.equal(nativeSelection,0,'HUD/handle click blocks native Node selection');
 assert.equal(nativeCamera,0);
