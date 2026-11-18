@@ -100,8 +100,8 @@ export class GizmoHudLayout {
                         tree=candidate;
                         const rawControls: unknown[]=[];
                         walkGizmoHUD(tree.root,(item)=>{
-                            if(item.kind==='row'||item.kind==='column')return;
-                            if(item.kind==='text') {
+                            if('children' in item)return;
+                            if(!('command' in item)) {
                                 texts.push({
                                     id:item.id,text:item.text,
                                     order:texts.length,fontSize:item.style?.fontSize||14,
