@@ -40,7 +40,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/v3') }}
         uses: actions/upload-artifact@v4
         with:
-          name: Cocos-Gizmos-v3-${{ github.event_name }}-${{ github.sha }}
+          name: Cocos-Gizmos-v3-${{ github.sha }}
           # The downloaded Actions ZIP extracts directly to Cocos-Gizmos-v3.0.1/
           path: release/dev-artifact/
           if-no-files-found: error
