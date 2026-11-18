@@ -39,11 +39,16 @@ export interface SceneHudInputPort {
     cancel(): void;
 }
 let currentHudInputPort: SceneHudInputPort | null = null;
+let hudInputGeneration = 0;
 
 export function connectSceneHudInput(port: SceneHudInputPort): () => void {
     currentHudInputPort = port;
+    hudInputGeneration++;
     return () => {
-        if (currentHudInputPort === port) currentHudInputPort = null;
+        if (currentHudInputPort === port) {
+            currentHudInputPort = null;
+            hudInputGeneration++;
+        }
     };
 }
 
@@ -271,7 +276,9 @@ export class SceneHudElement {
         const grid = hudGrid(viewport, count);
         const sx = host.clientWidth > 0 ? host.clientWidth / viewport.width : 1;
         const sy = host.clientHeight > 0 ? host.clientHeight / viewport.height : 1;
-        const signature = JSON.stringify([viewport, sx, sy, count, rows]);
+        const signature = JSON.stringify([
+            hudInputGeneration, viewport, sx, sy, count, rows,
+        ]);
         this.root.style.display = 'block';
         if (signature === this.signature) return true;
         this.signature = signature;
