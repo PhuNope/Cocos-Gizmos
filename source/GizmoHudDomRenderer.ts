@@ -448,7 +448,7 @@ export class GizmoHudDomRenderer {
             this.root.id='cocos-gizmos-builder-hud';
             Object.assign(this.root.style,{
                 position:portal?'fixed':'absolute',display:'block',
-                zIndex:'2147483001',
+                zIndex:'2147483647',
                 pointerEvents:'none',
                 overflow:'hidden',
                 fontFamily:'system-ui, -apple-system, sans-serif',
