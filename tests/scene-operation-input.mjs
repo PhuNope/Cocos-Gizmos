@@ -108,6 +108,34 @@ assert.equal(op.emit('mousedown',{...point,target:domHudHit}),false,
 assert.equal(ownDown,handledBeforeDom,
     'Native Operation must not begin a duplicate DOM HUD command');
 assert.equal(nativeSelection,0);
+// Creator 3D can strip event.target before dispatching Operation listeners.
+// The visible builder panel must still own a click by client coordinates.
+leaseScope.document={
+    getElementById(id){
+        if(id==='GameCanvas')return {getBoundingClientRect:()=>({
+            left:20,top:40,right:420,bottom:290,width:400,height:250,
+        })};
+        if(id==='cocos-gizmos-builder-hud')return {
+            style:{display:'flex'},
+            children:[{style:{pointerEvents:'auto'},
+                getBoundingClientRect:()=>({
+                    left:50,top:220,right:140,bottom:280,
+                    width:90,height:60,
+                })}],
+        };
+        return null;
+    },
+};
+const beforeGeometric=ownDown;
+assert.equal(op.emit('mousedown',{...point,
+    x:900,y:999,clientX:80,clientY:250,target:undefined}),false);
+assert.equal(input.status().hudOwned,true);
+assert.equal(nativeSelection,0,'3D HUD click never unselects the Node');
+assert.equal(ownDown,beforeGeometric,'3D HUD click cannot begin Gizmo drag');
+assert.equal(op.emit('mousemove',{...point,x:900,y:999}),false);
+assert.equal(op.emit('mouseup',{...point,x:900,y:999}),false);
+assert.equal(input.status().hudOwned,false);
+delete leaseScope.document;
 assert.equal(op.emit('mousedown',{...point}),false);
 assert.equal(nativeSelection,0,'HUD/handle click blocks native Node selection');
 assert.equal(nativeCamera,0);
