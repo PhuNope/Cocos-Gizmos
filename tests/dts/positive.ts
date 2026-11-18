@@ -89,6 +89,7 @@ void sizedHud;
 const hudLabels: GizmoHudItem[] = [
     { id: 'speed', text: 'Speed: 10', order: 0, fontSize: 14, color: '#00ff00' },
 ];
+const sceneSettings: GizmoViewSettings = { display: 'selected', hud: 'off' };
 const getSettings: NonNullable<Component['onGizmoSettings']> = () => sceneSettings;
 const getHud: NonNullable<Component['onGizmoHud']> = () => hudLabels;
 comp.onGizmoSettings?.();
