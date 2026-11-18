@@ -137,6 +137,9 @@ export class SceneViewportInput {
     };
 
     private readonly onMove = (event: any): void => {
+        // Moving across an HTML HUD is not a Scene handle hover. Avoid
+        // triggering a Scene repaint before the input receives pointerdown.
+        if (!this.captured && isSceneHudPointerEvent(event)) return;
         if (this.captured && this.pointerId !== null &&
             Number.isInteger(event?.pointerId) && event.pointerId !== this.pointerId)
             return;
