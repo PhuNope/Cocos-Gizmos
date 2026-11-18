@@ -392,7 +392,7 @@ export class GizmoHUD {
     }
 
     /** Read-only views for the Scene DOM adapter (mounted HUDs survive frames). */
-    public static mounted(): readonly MountedHudRecord[] {
+    public static mounted(): readonly { owner:any; definition:GizmoHudDefinition; visible:boolean; revision:number }[] {
         return [...mounts().values()].filter(item=>item.visible);
     }
 
