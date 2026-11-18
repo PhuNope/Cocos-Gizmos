@@ -4,6 +4,13 @@ All notable changes to Cocos-Gizmos are documented here.
 
 ## [Unreleased] — v3 development (not published)
 
+### Fixes for Creator 3.8.8 input alignment and selection
+- Map Scene Operation `clientX/clientY` through the actual `GameCanvas.getBoundingClientRect()` into the camera viewport coordinate system shared by Gizmo render, ray casting and HUD picking; preserve raw Editor coordinates only when canvas mapping is unavailable.
+- Remove the HUD selection guard that forcibly re-selected a previously active Node; real Editor selection events now decide what remains selected, including switching from a test Node to another Node.
+- Treat private SelectGizmo Inspector/Undo hook exceptions as nonfatal so 3D `size` Slider and HUD Button actions can finish the edit rather than failing after a single `update`. Warn once per failed hook to aid diagnostics.
+- Add regression tests for DPI/canvas offset/Y inversion, changing Node selection, 3D ShapeSize slider and HUD Button with failing Editor hooks.
+
+
 ### Fixed — Scene input dispatch
 - Route HUD controls and 2D/3D Move/Rotate through Creator 3.8.8 `cce.Operation` at priority 100, ahead of Editor Gizmo=99 and Camera=98. Returning `false` for a true plugin hit prevents the Editor's Scene-selection handler from canceling the gesture.
 - Keep DOM and Cocos engine input routes only as fallbacks, not simultaneous listeners, and clear all listeners on Scene teardown.
