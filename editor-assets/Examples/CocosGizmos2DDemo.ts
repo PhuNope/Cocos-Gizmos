@@ -91,7 +91,7 @@ export default class CocosGizmos2DDemo extends Component {
             .row({ gap:8 }, row => {
                 row.checkbox('Sprite', { property:'showSprite' })
                     .button('Reset 2D', {
-                        command:GizmoHUD.action((owner: Gizmos2DApiTest) => owner.resetHud()),
+                        command:GizmoHUD.action((owner: CocosGizmos2DDemo) => owner.resetHud()),
                         style: { backgroundColor:'#28656a', color:'#e9fffc' },
                     });
             })
