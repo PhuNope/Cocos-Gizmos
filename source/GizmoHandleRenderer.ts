@@ -14,8 +14,15 @@ const selectedHover = new WeakMap<Component,string>();
 const lastCanvasPaint = new WeakMap<Component,number>();
 
 export function setSelectedHandleHover(component: Component, key: string | null): void {
+    if ((selectedHover.get(component) || null) === key) return;
     if (key) selectedHover.set(component,key);
     else selectedHover.delete(component);
+    // Color is part of each Gizmos2D Graphics renderer cache key. The
+    // previously hovered color otherwise stays visible for its 750ms idle
+    // grace, even after the normal color was painted. Invalidate only the
+    // 2D hover transition, not ordinary idle geometry.
+    if (component?.node && isCanvas2D(component.node))
+        Gizmos2D.invalidateHover(component.node);
 }
 
 export function lastSelectedCanvasPaint(component: Component): number {
