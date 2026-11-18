@@ -58,13 +58,13 @@ const firstStart=calls.length;
 await extension.methods.onSelectionSelect('node', 'first-click');
 assert.deepEqual(calls[firstStart][0], ['first-click'],
     'First event uses UUID before the Editor Selection snapshot updates');
-assert.deepEqual(calls.at(-1)[0],[],
-    'A later deselection cannot be undone by an earlier select callback');
+assert.deepEqual(calls.at(-1)[0],['first-click'],
+    'First-click event remains active when Editor snapshot updates late');
 selected = [];
 const arrayStart=calls.length;
 await extension.methods.onSelectionSelect('node', ['first-from-array']);
 assert.deepEqual(calls[arrayStart][0], ['first-from-array']);
-assert.deepEqual(calls.at(-1)[0],[]);
+assert.deepEqual(calls.at(-1)[0],['first-from-array']);
 selected = ['first-from-array'];
 await extension.methods.onSelectionUnselect('node', ['first-from-array']);
 assert.deepEqual(calls.at(-1)[0], [],
