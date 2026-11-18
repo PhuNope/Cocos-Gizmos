@@ -165,6 +165,9 @@ renderer.finishFrame();
 assert.equal(root.children[0],panel,
     'Repaint while slider is captured must never replace flex DOM');
 assert.equal(renderer.editing,true);
+fakeWindow.emit('blur');
+assert.equal(renderer.editing,true,
+    'Editor focusing the HTML slider must not cancel the drag');
 fakeWindow.emit('pointerup');
 assert.equal(renderer.editing,false);
 assert.equal(owner.events.at(-1)[1],'end');
