@@ -57,7 +57,7 @@ export default class CocosGizmosSmokeDemo extends Component {
                     .checkbox('Show Grid', { property:'showGrid' });
             })
             .button('Reset radius', {
-                command:GizmoHUD.action((owner: GizmoSmokeProbe) => {
+                command:GizmoHUD.action((owner: CocosGizmosSmokeDemo) => {
                     owner.radius = 75;
                     owner.lastPhase = 'reset';
                 }),
