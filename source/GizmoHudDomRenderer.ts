@@ -200,12 +200,10 @@ export class GizmoHudDomRenderer {
                     border:'1px solid rgba(171,194,215,.2)',
                     borderRadius:'10px',
                     boxShadow:'0 8px 28px rgba(0,0,0,.32)',
-                    pointerEvents:'auto',
+                    pointerEvents:'none',
                 });
-                // Panel background is visible; only actual control input
-                // elements are interactive. Unused space does not pick Nodes.
-                element.addEventListener('pointerdown',e=>this.stop(e));
-                element.addEventListener('mousedown',e=>this.stop(e));
+                // Background remains pointer transparent; only actual
+                // Button/Slider/Checkbox/Toggle controls own mouse input.
             }
             for(const child of node.children)
                 element.appendChild(this.drawNode(doc,item,child,scope+'/'+node.id));
