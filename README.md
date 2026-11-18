@@ -8,7 +8,7 @@ Cocos Creator Editor extension for drawing and interacting with Gizmos in Scene 
 - **Interactive handles:** move/rotate handles, coordinate constraints, snapping, selection-aware interaction and editing callbacks.
 - **Editor-only rendering:** custom drawing runs in the Editor's Scene View and is excluded from game runtime code.
 - **Declarative registration:** register standalone Gizmo drawers for Components with `registerGizmos`.
-- **Customizable Scene HUD:** compact labels, buttons, sliders and toggles with per-item size and CSS-like appearance.
+- **Scene HUD builder:** `GizmoHUD.createHud()` defines nested row/column layouts, property-bound controls and action commands, rendered in the Scene View.
 - **Editor tools:** Gizmos settings, diagnostics, reset command, API document panel and ready-to-use example Components.
 - **Build-time cleanup:** removes Editor-only Gizmo drawing hooks from game build output.
 
