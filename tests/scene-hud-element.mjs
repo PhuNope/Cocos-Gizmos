@@ -187,6 +187,13 @@ interactiveButton.emit('pointerdown',buttonPress);
 fakeWindow.emit('pointerup',buttonPress);
 assert.equal(inputEvents.at(-1)[0],'up');
 assert.equal(inputEvents.filter(x=>x[0]==='cancel').length,0);
+// Escape/window loss must cancel an active DOM slider and release listeners.
+const currentSlider=root.children[1];
+currentSlider.emit('pointerdown',event(sliderHit.left+12,sliderHit.bottom+10,3));
+fakeWindow.emit('keydown',{key:'Escape',keyCode:27,
+    stopImmediatePropagation(){},preventDefault(){}});
+assert.equal(inputEvents.at(-1)[0],'cancel');
+assert.equal(fakeWindow.listeners.get('pointermove').length,0);
 assert.equal(root.style.pointerEvents,'none',
     'Background click must still reach native Scene selection');
 disconnect();
