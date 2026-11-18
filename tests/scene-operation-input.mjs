@@ -107,6 +107,9 @@ assert.equal(op.emit('mousedown',{...point,target:domHudHit}),false,
     'Browser floating HUD events cannot reach the native Scene picker');
 assert.equal(ownDown,handledBeforeDom,
     'Native Operation must not begin a duplicate DOM HUD command');
+assert.equal(input.status().hudOwned,true);
+assert.equal(op.emit('mouseup',{...point}),false);
+assert.equal(input.status().hudOwned,false);
 assert.equal(nativeSelection,0);
 // Creator 3D can strip event.target before dispatching Operation listeners.
 // The visible builder panel must still own a click by client coordinates.
