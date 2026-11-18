@@ -98,7 +98,8 @@ function collectComponents(node: Node, out: Component[]): void {
         if (typeof comp.onDrawGizmos === 'function' || typeof comp.onDrawGizmosSelected === 'function' ||
             typeof comp.onGizmoHandles === 'function' ||
             typeof comp.onGizmoHud === 'function' ||
-            typeof comp.onGizmoHudControls === 'function') out.push(comp);
+            typeof comp.onGizmoHudControls === 'function' ||
+            typeof comp.onGizmoHUD === 'function') out.push(comp);
     }
     for (const child of node.children) collectComponents(child, out);
 }
@@ -288,7 +289,8 @@ export function start(): UpdateStats {
             }
             if (visible.hud && presentation &&
                 (typeof comp.onGizmoHud === 'function' ||
-                 typeof comp.onGizmoHudControls === 'function')) {
+                 typeof comp.onGizmoHudControls === 'function' ||
+                 typeof comp.onGizmoHUD === 'function')) {
                 try { stats.hudDrawn += presentation.renderHud(comp); }
                 catch (error) { warnOnce('onGizmoHud (' + comp.constructor?.name + ')', error); }
             }
