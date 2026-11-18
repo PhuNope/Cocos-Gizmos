@@ -79,7 +79,10 @@ export class SceneOperationInput {
     }
 
     private readonly onDown=(event:any):boolean|void=>{
-        if(this.capturing || this.hudOwned || !isPrimaryScenePointer(event))return;
+        if(this.capturing || !isPrimaryScenePointer(event))return;
+        // DOM may have swallowed the previous mouseup: a fresh down starts
+        // a new gesture and must never inherit stale HUD ownership.
+        this.hudOwned=false;
         const point=this.point(event);
         // Editor 3D Operation events may lose the native DOM target.
         // A geometric HUD hit must block the native selection BEFORE it runs.
@@ -107,7 +110,14 @@ export class SceneOperationInput {
     };
 
     private readonly onMove=(event:any):boolean|void=>{
-        if(this.hudOwned)return false;
+        if(this.hudOwned){
+            // The Scene Operation may not receive mouseup when a native DOM
+            // control owns it. Release the guard once the mouse is up.
+            const buttons=typeof event?.buttons==='number'?event.buttons:
+                typeof event?.event?.buttons==='number'?event.event.buttons:null;
+            if(buttons===0)this.hudOwned=false;
+            else return false;
+        }
         const point=this.point(event);
         if(!point)return;
         this.events++;
