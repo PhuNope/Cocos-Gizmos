@@ -25,9 +25,11 @@ function load(name, imports = {}) {
 const appearance = load('GizmoHudStyle');
 const presentation = load('GizmoPresentation', { './GizmoHudStyle': appearance });
 const controls = load('GizmoHudControls', { './GizmoHudStyle': appearance });
+const builder = load('GizmoHUD');
 const layout = load('GizmoHudLayout', {
     './GizmoHudControls': controls,
     './GizmoPresentation': presentation,
+    './GizmoHUD': builder,
 });
 const { normalizeViewConfig, shouldDrawGizmo, shouldDrawHud, normalizeHudItems } = presentation;
 assert.deepEqual({ ...normalizeViewConfig({}) }, { display: 'always', hud: 'selected' });
@@ -83,8 +85,18 @@ class FakeOverlay {
     dispose() { disposed = true; }
 }
 const gizmos3d = { DEFAULT_COLOR: {}, beginColor(node, color) { rendered.push({ reset: node }); } };
+class FakeTreeRenderer {
+    beginFrame(){}
+    finishFrame(){return false;}
+    canRender(){return false;}
+    hide(){}
+    dispose(){}
+    get active(){return false;}
+    get editing(){return false;}
+}
 const { GizmoPresentationService } = load('GizmoPresentationService', {
     cc: {},
+    './GizmoHudDomRenderer': { GizmoHudDomRenderer: FakeTreeRenderer },
     './Gizmos3D': { Gizmos3D: gizmos3d },
     './GizmoHudOverlay': { GizmoHudOverlay: FakeOverlay },
     './GizmoPresentation': presentation,
