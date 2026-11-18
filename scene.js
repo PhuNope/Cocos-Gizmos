@@ -19,7 +19,7 @@ exports.load = function load() {
     const { createV3HandleAdapter } = require('./editor-runtime/EditorHandleAdapterV3.js');
     handles = createV3HandleAdapter((component) =>
         presentation.evaluate(component, true).hud, presentation.getLayout(),
-        presentation.getBuilderHud());
+        presentation.getBuilderHud?.());
     updater.setPositionHandleAdapter(handles);
     const status = updater.start();
     console.info('[cocos-gizmos] Scene runtime loaded; updater=' + status.started +
@@ -71,7 +71,7 @@ function gizmosReset(selected = []) {
         presentation.configure(savedSettings);
         handles = createV3HandleAdapter((component) =>
             presentation.evaluate(component, true).hud,
-            presentation.getLayout(),presentation.getBuilderHud());
+            presentation.getLayout(),presentation.getBuilderHud?.());
         updater.setPresentationAdapter(presentation);
         updater.setPositionHandleAdapter(handles);
         const started = updater.start();
