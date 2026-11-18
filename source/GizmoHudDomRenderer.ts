@@ -180,12 +180,13 @@ export class GizmoHudDomRenderer {
                 display:'flex',
                 flexDirection:node.kind==='row'?'row':'column',
                 flexWrap:'nowrap',
-                alignItems:({'start':'flex-start','center':'center',
-                    'end':'flex-end','stretch':'stretch'} as Record<string,string>)[node.align||'stretch'],
-                justifyContent:({'start':'flex-start','center':'center',
-                    'end':'flex-end','between':'space-between',
-                    'around':'space-around','evenly':'space-evenly'}
-                    as Record<string,string>)[node.justify||'start'],
+                alignItems:node.align==='start'?'flex-start':
+                    node.align==='end'?'flex-end':node.align==='center'?
+                    'center':'stretch',
+                justifyContent:node.justify==='start'?'flex-start':
+                    node.justify==='end'?'flex-end':node.justify==='between'?
+                    'space-between':node.justify==='around'?'space-around':
+                    node.justify==='evenly'?'space-evenly':'center',
                 gap:(node.gap??6)+'px',
                 padding:(node.padding??8)+'px',
                 pointerEvents:'none',
