@@ -23,8 +23,8 @@ assert.match(doc.template, /Gizmos2D\.rotate/);
 assert.match(doc.template, /Gizmos2D\.move/);
 assert.match(doc.template, /Gizmos2D\.point/);
 assert.match(doc.template, /onGizmoHudControls/);
-assert.match(doc.template, /GizmoHUD\\.createHud/);
-assert.match(doc.template, /GizmoHUD\\.bind/);
+assert.match(doc.template, /GizmoHUD\.createHud/);
+assert.match(doc.template, /GizmoHUD\.bind/);
 assert.match(doc.template, /<svg[^>]+role="img"/);
 assert.match(doc.style, /cg-api-card/);
 assert.equal((doc.template.match(/class="cg-api-card"/g) || []).length, 17,
