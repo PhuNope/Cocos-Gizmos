@@ -719,6 +719,7 @@ export interface V3HandleAdapter {
 export function createV3HandleAdapter(
     allowHud:(component:Component)=>boolean=()=>true,
     hudLayout?:GizmoHudLayout,
+    builderHud?: import('./SceneOperationInput').BuilderHudOperationPort,
 ):V3HandleAdapter {
     const registered=new Map<string,any>();
     const active=new Map<Component,any>();
