@@ -182,6 +182,13 @@ const scope={
             status(){return {active:false,reason:'webview-pointer-preferred',
                 captured:false,observed:0,intercepted:0,hover:0};}
         }};
+        if(name==='./SceneOperationInput')return {SceneOperationInput:class {
+            refresh(){}
+            detach(){}
+            status(){return {active:false,reason:'scene-operation-unavailable',
+                captured:false,observed:0,intercepted:0,hover:0,cancelled:0,
+                priority:100};}
+        }};
         if(name==='./ExecuteGizmos')return {tickOnce(){paints.push('tick');}};
         throw Error(name);
     },
