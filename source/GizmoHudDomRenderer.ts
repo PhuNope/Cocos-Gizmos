@@ -359,6 +359,7 @@ export class GizmoHudDomRenderer {
         const panel=this.visiblePanel(pt.x,pt.y);
         if(!panel)return false;
         this.operationWheelCount++;
+        if(this.isCollapsed(panel))return true;
         const info=this.scrollGeometry(panel);
         if(info && Number.isFinite(deltaY) && deltaY!==0)
             panel.scrollTop=Math.max(0,Math.min(info.max,
