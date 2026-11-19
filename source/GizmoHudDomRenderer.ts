@@ -227,6 +227,13 @@ export class GizmoHudDomRenderer {
         return this.collapsedPanels.has(this.panelKey(panel));
     }
     private isCollapseHandle(panel:HTMLElement,x:number,y:number):boolean {
+        // In the real Editor a padded/sticky grip does not start exactly
+        // at panel.top. Prefer the actual button rectangle over estimates.
+        const button=this.headerButton(panel);
+        const hit=button?.getBoundingClientRect?.();
+        if(hit && hit.width>0 && hit.height>0)
+            return x>=hit.left && x<=hit.right &&
+                y>=hit.top && y<=hit.bottom;
         const r=panel.getBoundingClientRect?.();
         return !!r && y>=r.top && y<=r.top+26 &&
             x>=r.right-30 && x<=r.right;
@@ -295,9 +302,15 @@ export class GizmoHudDomRenderer {
 
     /** A visible 26px grip at the panel top, not slider/checkbox content. */
     private isDragHandle(panel:HTMLElement,x:number,y:number):boolean {
-        const r=panel.getBoundingClientRect?.();
-        return !!r && x>=r.left && x<r.right-30 &&
-            y>=r.top && y<=r.top+26;
+        const handle=panel.children[0] as HTMLElement|undefined;
+        const r=handle?.getBoundingClientRect?.();
+        if(r && r.width>0 && r.height>0)
+            return x>=r.left && x<=r.right &&
+                y>=r.top && y<=r.bottom &&
+                !this.isCollapseHandle(panel,x,y);
+        const p=panel.getBoundingClientRect?.();
+        return !!p && x>=p.left && x<p.right-30 &&
+            y>=p.top && y<=p.top+26;
     }
     private clampMovedPanels():void {
         if(!this.root || this.domPanelDrag || this.operationGesture)return;
