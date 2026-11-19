@@ -354,6 +354,7 @@ assert.equal(opRenderer.operationStatus().commit,4);
 
 // In 3D, the visible grab strip is picked by Scene Operation coordinates.
 const beforeDragCommits=opRenderer.operationStatus().commit;
+const beforeDragCount=opRenderer.operationStatus().panelDrag;
 assert.equal(opRenderer.operationDown(toPointer(660,76),viewport),true);
 assert.equal(opRenderer.operationStatus().lastHit,'drag-handle');
 opRenderer.beginFrame();opRenderer.queue(opOwner,opHud);
@@ -364,7 +365,7 @@ assert.equal(opRenderer.operationMove(toPointer(400,120),viewport),true);
 assert.equal(opPanel.style.left,'120px');
 assert.equal(opPanel.style.top,'78px');
 assert.equal(opRenderer.operationUp(toPointer(400,120),viewport),true);
-assert.equal(opRenderer.operationStatus().panelDrag,1);
+assert.equal(opRenderer.operationStatus().panelDrag,beforeDragCount+1);
 assert.equal(opRenderer.operationStatus().commit,beforeDragCommits,
     'Moving HUD must never execute a button/checkbox command');
 assert.equal(opRenderer.operationStatus().captured,false);
