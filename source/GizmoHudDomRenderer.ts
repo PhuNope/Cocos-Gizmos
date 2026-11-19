@@ -13,7 +13,13 @@ type OperationControl = {
     element: HTMLElement;
     readout?: HTMLElement;
 };
-type OperationGesture = { control: OperationControl | null; lastX: number; lastY: number };
+type ScrollbarGesture = { panel: HTMLElement; grabY: number };
+type OperationGesture = {
+    control: OperationControl | null;
+    lastX: number;
+    lastY: number;
+    scrollbar?: ScrollbarGesture;
+};
 
 type ActiveGesture = {
     component: any;
@@ -51,6 +57,8 @@ export class GizmoHudDomRenderer {
     private operationDownCount = 0;
     private operationUpdateCount = 0;
     private operationCommitCount = 0;
+    private operationWheelCount = 0;
+    private operationScrollDragCount = 0;
     private readonly commands: GizmoHudCommandController;
 
     constructor(
@@ -103,7 +111,8 @@ export class GizmoHudDomRenderer {
             captured:!!this.operationGesture,
             attempts:this.operationAttemptCount,lastHit:this.operationLastHit,
             down:this.operationDownCount,update:this.operationUpdateCount,
-            commit:this.operationCommitCount,controls:this.operationControls.length};
+            commit:this.operationCommitCount,controls:this.operationControls.length,
+            wheel:this.operationWheelCount,scrollDrag:this.operationScrollDragCount};
     }
     private operationPoint(pointer:{x:number;y:number},
         viewport:{width:number;height:number} | null):{x:number;y:number}|null {
@@ -122,6 +131,73 @@ export class GizmoHudDomRenderer {
         return !!r && r.width>0 && r.height>0 &&
             x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
     }
+    private visiblePanel(x:number,y:number): HTMLElement | null {
+        if(!this.root || this.root.style.display==='none')return null;
+        const children=Array.from(this.root.children) as HTMLElement[];
+        // Reverse order matches the DOM stacking order for overlapping HUDs.
+        return [...children].reverse().find(panel=>this.inside(panel,x,y))||null;
+    }
+
+    private scrollGeometry(panel:HTMLElement): {
+        max:number; top:number; height:number; thumb:number; travel:number;
+        right:number;
+    } | null {
+        const rect=panel.getBoundingClientRect?.();
+        const client=panel.clientHeight;
+        const total=panel.scrollHeight;
+        if(!rect || !(rect.height>0) || !(client>0) || !(total>client+1))
+            return null;
+        const height=Math.max(1,rect.height-8);
+        const max=total-client;
+        const thumb=Math.min(height,Math.max(28,height*client/total));
+        return {max,top:rect.top+4,height,thumb,
+            travel:Math.max(1,height-thumb),right:rect.right};
+    }
+
+    private scrollFromDrag(gesture:ScrollbarGesture,y:number):void {
+        const info=this.scrollGeometry(gesture.panel);
+        if(!info)return;
+        const thumbTop=y-info.top-gesture.grabY;
+        gesture.panel.scrollTop=Math.max(0,Math.min(info.max,
+            thumbTop/info.travel*info.max));
+    }
+
+    /**
+     * The 3D Scene WebView is pointer-disabled by the Editor panel, so its
+     * native scrollbar cannot receive mousedown either. Own the narrow right
+     * scrollbar strip through the same Scene Operation pointer route.
+     */
+    private beginScrollDrag(panel:HTMLElement,x:number,y:number):
+        ScrollbarGesture | null {
+        const info=this.scrollGeometry(panel);
+        if(!info || x<info.right-20)return null;
+        const current=Math.max(0,Math.min(info.max,panel.scrollTop||0));
+        const thumbTop=info.top+current/info.max*info.travel;
+        const grabY=y>=thumbTop && y<=thumbTop+info.thumb ?
+            y-thumbTop : info.thumb/2;
+        const gesture={panel,grabY};
+        this.scrollFromDrag(gesture,y);
+        this.operationScrollDragCount++;
+        return gesture;
+    }
+
+    /** Consume wheel only over a HUD panel. Outside it the Scene can zoom. */
+    public operationWheel(pointer:{x:number;y:number},
+        viewport:{width:number;height:number}|null,deltaY:number):boolean {
+        if(!this.usesSceneOperationInput() || !viewport)return false;
+        const pt=this.operationPoint(pointer,viewport);
+        if(!pt)return false;
+        const panel=this.visiblePanel(pt.x,pt.y);
+        if(!panel)return false;
+        this.operationWheelCount++;
+        const info=this.scrollGeometry(panel);
+        if(info && Number.isFinite(deltaY) && deltaY!==0)
+            panel.scrollTop=Math.max(0,Math.min(info.max,
+                (panel.scrollTop||0)+Math.max(-800,Math.min(800,deltaY))));
+        // Even at the scroll limit, do not accidentally zoom the 3D camera.
+        return true;
+    }
+
     /** Scene Operation priority 100: hit-test the *visible panel* first. */
     public operationDown(pointer:{x:number;y:number},
         viewport:{width:number;height:number}|null):boolean {
@@ -140,9 +216,17 @@ export class GizmoHudDomRenderer {
         }
         const pt=this.operationPoint(pointer,viewport);
         if(!pt){this.operationLastHit='missing-canvas-rect';return false;}
-        const panels=Array.from(this.root.children) as HTMLElement[];
-        if(!panels.some(panel=>this.inside(panel,pt.x,pt.y))){
+        const panel=this.visiblePanel(pt.x,pt.y);
+        if(!panel){
             this.operationLastHit='outside-panel';return false;
+        }
+        const scrollbar=this.beginScrollDrag(panel,pt.x,pt.y);
+        if(scrollbar){
+            this.operationGesture={control:null,lastX:pt.x,lastY:pt.y,
+                scrollbar};
+            this.operationLastHit='scrollbar';
+            this.operationDownCount++;
+            return true;
         }
         // Panel padding and labels also belong to HUD and cannot unselect.
         const control=[...this.operationControls].reverse().find(item=>
@@ -182,6 +266,10 @@ export class GizmoHudDomRenderer {
         if(!held)return false;
         const pt=viewport?this.operationPoint(pointer,viewport):null;
         if(pt) {held.lastX=pt.x;held.lastY=pt.y;}
+        if(held.scrollbar) {
+            this.scrollFromDrag(held.scrollbar,held.lastY);
+            return true;
+        }
         if(held.control?.node.kind==='slider')
             this.updateOperationSlider(held.control,held.lastX);
         return true;
@@ -193,6 +281,10 @@ export class GizmoHudDomRenderer {
         const pt=pointer && viewport?this.operationPoint(pointer,viewport):null;
         const x=pt?.x??held.lastX,y=pt?.y??held.lastY;
         this.operationGesture=null;
+        if(held.scrollbar) {
+            this.scrollFromDrag(held.scrollbar,y);
+            return true;
+        }
         const entry=held.control;
         if(entry?.node.kind==='slider'){
             this.updateOperationSlider(entry,x);
@@ -270,6 +362,12 @@ export class GizmoHudDomRenderer {
         if(this.signature===signature && sameOwners)return true;
         this.signature=signature;
         this.renderedOwners=owners;
+        const scrollOffsets=new Map<string,number>();
+        for(const existing of Array.from(this.root.children) as HTMLElement[]) {
+            const key=existing.getAttribute?.('data-gizmo-hud-id') ||
+                (existing as any).attributes?.['data-gizmo-hud-id'];
+            if(key)scrollOffsets.set(key,existing.scrollTop||0);
+        }
         const fragment=doc.createDocumentFragment();
         this.liveInputs.clear();
         this.operationControls.length=0;
@@ -291,6 +389,12 @@ export class GizmoHudDomRenderer {
             fragment.appendChild(panel);
         }
         this.root.replaceChildren(fragment);
+        for(const panel of Array.from(this.root.children) as HTMLElement[]) {
+            const key=panel.getAttribute?.('data-gizmo-hud-id') ||
+                (panel as any).attributes?.['data-gizmo-hud-id'];
+            if(key && scrollOffsets.has(key))
+                panel.scrollTop=scrollOffsets.get(key)!;
+        }
         return true;
     }
 
@@ -407,8 +511,10 @@ export class GizmoHudDomRenderer {
             if(isRoot) {
                 const light=item.definition.theme==='light';
                 Object.assign(element.style,{
-                    maxWidth:'min(420px, 40vw)', maxHeight:'70vh',
-                    overflowY:'auto',
+                    maxWidth:'min(420px, 40vw)',
+                    maxHeight:'min(70vh, calc(100% - 24px))',
+                    minHeight:'0', overflowY:'auto',overflowX:'hidden',
+                    overscrollBehavior:'contain',
                     background:light?'rgba(247,249,253,.97)':'rgba(17,23,32,.95)',
                     color:light?'#202938':'#dce7ef',
                     border:light?'1px solid rgba(49,63,87,.22)':
