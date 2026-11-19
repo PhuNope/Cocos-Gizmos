@@ -76,7 +76,7 @@ export class GizmoHudDomRenderer {
     private readonly collapsedScrollPositions = new Map<string,number>();
     private readonly expandedStyle = new WeakMap<HTMLElement,{
         width:string;height:string;minHeight:string;maxHeight:string;
-        overflowY:string;overflowX:string;flexShrink:string;
+        overflowY:string;overflowX:string;flexShrink:string;padding:string;
         children:Array<{element:HTMLElement;display:string}>;
     }>();
     private operationCollapseCount = 0;
@@ -245,7 +245,7 @@ export class GizmoHudDomRenderer {
                 width:panel.style.width,height:panel.style.height,
                 minHeight:panel.style.minHeight,maxHeight:panel.style.maxHeight,
                 overflowY:panel.style.overflowY,overflowX:panel.style.overflowX,
-                flexShrink:panel.style.flexShrink,
+                flexShrink:panel.style.flexShrink,padding:panel.style.padding,
                 children:children.map(child=>({element:child,display:child.style.display})),
             });
             this.collapsedScrollPositions.set(id,panel.scrollTop||0);
@@ -255,7 +255,7 @@ export class GizmoHudDomRenderer {
                 width:'min(190px, calc(100% - 24px))',
                 height:'28px',minHeight:'28px',
                 maxHeight:'28px',overflowY:'hidden',overflowX:'hidden',
-                flexShrink:'0',
+                flexShrink:'0',padding:'3px',
             });
         }else {
             this.collapsedPanels.delete(id);
@@ -265,7 +265,7 @@ export class GizmoHudDomRenderer {
                     width:snapshot.width,height:snapshot.height,
                     minHeight:snapshot.minHeight,maxHeight:snapshot.maxHeight,
                     overflowY:snapshot.overflowY,overflowX:snapshot.overflowX,
-                    flexShrink:snapshot.flexShrink,
+                    flexShrink:snapshot.flexShrink,padding:snapshot.padding,
                 });
                 for(const {element,display} of snapshot.children)
                     element.style.display=display;
