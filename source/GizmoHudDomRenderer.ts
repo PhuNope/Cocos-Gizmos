@@ -14,11 +14,29 @@ type OperationControl = {
     readout?: HTMLElement;
 };
 type ScrollbarGesture = { panel: HTMLElement; grabY: number };
+type PanelStyle = { left: string; top: string; right: string; bottom: string };
+type PanelDrag = {
+    panel: HTMLElement;
+    startX: number;
+    startY: number;
+    originLeft: number;
+    originTop: number;
+    before: PanelStyle;
+    prior: {left:number;top:number}|undefined;
+};
+type DomPanelDrag = {
+    data: PanelDrag;
+    view: Window | Document;
+    handle: HTMLElement;
+    pointerId: number | null;
+    usesPointer: boolean;
+};
 type OperationGesture = {
     control: OperationControl | null;
     lastX: number;
     lastY: number;
     scrollbar?: ScrollbarGesture;
+    drag?: PanelDrag;
 };
 
 type ActiveGesture = {
@@ -51,6 +69,9 @@ export class GizmoHudDomRenderer {
     private readonly liveInputs = new Map<string, HTMLInputElement>();
     private gesture: ActiveGesture | null = null;
     private operationGesture: OperationGesture | null = null;
+    private domPanelDrag: DomPanelDrag | null = null;
+    private readonly panelPositions = new Map<string,{left:number;top:number}>();
+    private operationPanelDragCount = 0;
     private readonly operationControls: OperationControl[] = [];
     private operationAttemptCount = 0;
     private operationLastHit = 'not-checked';
@@ -112,7 +133,9 @@ export class GizmoHudDomRenderer {
             attempts:this.operationAttemptCount,lastHit:this.operationLastHit,
             down:this.operationDownCount,update:this.operationUpdateCount,
             commit:this.operationCommitCount,controls:this.operationControls.length,
-            wheel:this.operationWheelCount,scrollDrag:this.operationScrollDragCount};
+            wheel:this.operationWheelCount,scrollDrag:this.operationScrollDragCount,
+            panelDrag:this.operationPanelDragCount,
+            domDragging:!!this.domPanelDrag};
     }
     private operationPoint(pointer:{x:number;y:number},
         viewport:{width:number;height:number} | null):{x:number;y:number}|null {
@@ -136,6 +159,70 @@ export class GizmoHudDomRenderer {
         const children=Array.from(this.root.children) as HTMLElement[];
         // Reverse order matches the DOM stacking order for overlapping HUDs.
         return [...children].reverse().find(panel=>this.inside(panel,x,y))||null;
+    }
+
+    private panelKey(panel:HTMLElement):string {
+        return panel.getAttribute?.('data-gizmo-hud-id') ||
+            (panel as any).attributes?.['data-gizmo-hud-id'] || '';
+    }
+    private panelBounds():{left:number;top:number;width:number;height:number}|null {
+        const r=this.host?.getBoundingClientRect?.();
+        if(!r || !(r.width>0) || !(r.height>0))return null;
+        return r;
+    }
+    private clamp(value:number,min:number,max:number):number {
+        return Math.min(max,Math.max(min,value));
+    }
+    private setPanelPosition(panel:HTMLElement,left:number,top:number):void {
+        const bounds=this.panelBounds();
+        const rect=panel.getBoundingClientRect?.();
+        if(!bounds || !rect || !Number.isFinite(left) || !Number.isFinite(top))
+            return;
+        const x=this.clamp(left,0,Math.max(0,bounds.width-rect.width));
+        const y=this.clamp(top,0,Math.max(0,bounds.height-rect.height));
+        Object.assign(panel.style,{
+            left:x+'px',top:y+'px',right:'auto',bottom:'auto',
+        });
+        const key=this.panelKey(panel);
+        if(key)this.panelPositions.set(key,{left:x,top:y});
+    }
+    private beginPanelDrag(panel:HTMLElement,x:number,y:number):PanelDrag|null {
+        const bounds=this.panelBounds();
+        const rect=panel.getBoundingClientRect?.();
+        if(!bounds || !rect || !(rect.width>0) || !(rect.height>0))return null;
+        const key=this.panelKey(panel);
+        const stored=key?this.panelPositions.get(key):undefined;
+        return {panel,startX:x,startY:y,originLeft:rect.left-bounds.left,
+            originTop:rect.top-bounds.top,
+            before:{left:panel.style.left,top:panel.style.top,
+                right:panel.style.right,bottom:panel.style.bottom},
+            prior:stored?{...stored}:undefined};
+    }
+    private movePanelDrag(gesture:PanelDrag,x:number,y:number):void {
+        this.setPanelPosition(gesture.panel,
+            gesture.originLeft+x-gesture.startX,
+            gesture.originTop+y-gesture.startY);
+    }
+    private cancelPanelDrag(gesture:PanelDrag):void {
+        Object.assign(gesture.panel.style,gesture.before);
+        const key=this.panelKey(gesture.panel);
+        if(key) {
+            if(gesture.prior)this.panelPositions.set(key,gesture.prior);
+            else this.panelPositions.delete(key);
+        }
+    }
+    /** A visible 26px grip at the panel top, not slider/checkbox content. */
+    private isDragHandle(panel:HTMLElement,x:number,y:number):boolean {
+        const r=panel.getBoundingClientRect?.();
+        return !!r && x>=r.left && x<=r.right-20 &&
+            y>=r.top && y<=r.top+26;
+    }
+    private clampMovedPanels():void {
+        if(!this.root || this.domPanelDrag || this.operationGesture)return;
+        for(const panel of Array.from(this.root.children) as HTMLElement[]) {
+            const stored=this.panelPositions.get(this.panelKey(panel));
+            if(stored)this.setPanelPosition(panel,stored.left,stored.top);
+        }
     }
 
     private scrollGeometry(panel:HTMLElement): {
@@ -220,6 +307,17 @@ export class GizmoHudDomRenderer {
         if(!panel){
             this.operationLastHit='outside-panel';return false;
         }
+        if(this.isDragHandle(panel,pt.x,pt.y)){
+            const drag=this.beginPanelDrag(panel,pt.x,pt.y);
+            if(drag){
+                this.operationGesture={control:null,lastX:pt.x,lastY:pt.y,
+                    drag};
+                this.operationLastHit='drag-handle';
+                this.operationPanelDragCount++;
+                this.operationDownCount++;
+                return true;
+            }
+        }
         const scrollbar=this.beginScrollDrag(panel,pt.x,pt.y);
         if(scrollbar){
             this.operationGesture={control:null,lastX:pt.x,lastY:pt.y,
@@ -266,6 +364,10 @@ export class GizmoHudDomRenderer {
         if(!held)return false;
         const pt=viewport?this.operationPoint(pointer,viewport):null;
         if(pt) {held.lastX=pt.x;held.lastY=pt.y;}
+        if(held.drag){
+            this.movePanelDrag(held.drag,held.lastX,held.lastY);
+            return true;
+        }
         if(held.scrollbar) {
             this.scrollFromDrag(held.scrollbar,held.lastY);
             return true;
@@ -281,6 +383,10 @@ export class GizmoHudDomRenderer {
         const pt=pointer && viewport?this.operationPoint(pointer,viewport):null;
         const x=pt?.x??held.lastX,y=pt?.y??held.lastY;
         this.operationGesture=null;
+        if(held.drag){
+            this.movePanelDrag(held.drag,x,y);
+            return true;
+        }
         if(held.scrollbar) {
             this.scrollFromDrag(held.scrollbar,y);
             return true;
@@ -316,6 +422,7 @@ export class GizmoHudDomRenderer {
         if(!this.operationGesture)return;
         this.operationGesture=null;
         if(this.commands.editing)this.commands.finish(true);
+        if(this.operationGesture?.drag)this.cancelPanelDrag(this.operationGesture.drag);
         this.signature='';
     }
     public canRender(): boolean {
