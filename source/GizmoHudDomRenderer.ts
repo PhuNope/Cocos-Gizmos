@@ -37,6 +37,7 @@ type OperationGesture = {
     lastY: number;
     scrollbar?: ScrollbarGesture;
     drag?: PanelDrag;
+    collapse?: HTMLElement;
 };
 
 type ActiveGesture = {
@@ -71,6 +72,14 @@ export class GizmoHudDomRenderer {
     private operationGesture: OperationGesture | null = null;
     private domPanelDrag: DomPanelDrag | null = null;
     private readonly panelPositions = new Map<string,{left:number;top:number}>();
+    private readonly collapsedPanels = new Set<string>();
+    private readonly collapsedScrollPositions = new Map<string,number>();
+    private readonly expandedStyle = new WeakMap<HTMLElement,{
+        width:string;height:string;minHeight:string;maxHeight:string;
+        overflowY:string;overflowX:string;flexShrink:string;
+        children:Array<{element:HTMLElement;display:string}>;
+    }>();
+    private operationCollapseCount = 0;
     private operationPanelDragCount = 0;
     private readonly operationControls: OperationControl[] = [];
     private operationAttemptCount = 0;
@@ -135,6 +144,8 @@ export class GizmoHudDomRenderer {
             commit:this.operationCommitCount,controls:this.operationControls.length,
             wheel:this.operationWheelCount,scrollDrag:this.operationScrollDragCount,
             panelDrag:this.operationPanelDragCount,
+            collapsed:this.collapsedPanels.size,
+            collapseClicks:this.operationCollapseCount,
             domDragging:!!this.domPanelDrag};
     }
     private operationPoint(pointer:{x:number;y:number},
@@ -211,10 +222,81 @@ export class GizmoHudDomRenderer {
             else this.panelPositions.delete(key);
         }
     }
+    /** All HUDs use one stable ID for their collapsed state across DOM rerenders. */
+    private isCollapsed(panel:HTMLElement):boolean {
+        return this.collapsedPanels.has(this.panelKey(panel));
+    }
+    private isCollapseHandle(panel:HTMLElement,x:number,y:number):boolean {
+        const r=panel.getBoundingClientRect?.();
+        return !!r && y>=r.top && y<=r.top+26 &&
+            x>=r.right-30 && x<=r.right;
+    }
+    private headerButton(panel:HTMLElement):HTMLElement|null {
+        const handle=panel.children[0] as HTMLElement|undefined;
+        return handle?.children?.[1] as HTMLElement || null;
+    }
+    private applyCollapse(panel:HTMLElement,collapsed:boolean):void {
+        const id=this.panelKey(panel);
+        if(!id)return;
+        if(collapsed){
+            if(this.isCollapsed(panel) && this.expandedStyle.has(panel))return;
+            const children=Array.from(panel.children) as HTMLElement[];
+            this.expandedStyle.set(panel,{
+                width:panel.style.width,height:panel.style.height,
+                minHeight:panel.style.minHeight,maxHeight:panel.style.maxHeight,
+                overflowY:panel.style.overflowY,overflowX:panel.style.overflowX,
+                flexShrink:panel.style.flexShrink,
+                children:children.map(child=>({element:child,display:child.style.display})),
+            });
+            this.collapsedScrollPositions.set(id,panel.scrollTop||0);
+            this.collapsedPanels.add(id);
+            for(const child of children.slice(1))child.style.display='none';
+            Object.assign(panel.style,{
+                width:'min(190px, calc(100% - 24px))',
+                height:'28px',minHeight:'28px',
+                maxHeight:'28px',overflowY:'hidden',overflowX:'hidden',
+                flexShrink:'0',
+            });
+        }else {
+            this.collapsedPanels.delete(id);
+            const snapshot=this.expandedStyle.get(panel);
+            if(snapshot){
+                Object.assign(panel.style,{
+                    width:snapshot.width,height:snapshot.height,
+                    minHeight:snapshot.minHeight,maxHeight:snapshot.maxHeight,
+                    overflowY:snapshot.overflowY,overflowX:snapshot.overflowX,
+                    flexShrink:snapshot.flexShrink,
+                });
+                for(const {element,display} of snapshot.children)
+                    element.style.display=display;
+                this.expandedStyle.delete(panel);
+            }
+            const scroll=this.collapsedScrollPositions.get(id);
+            if(scroll!==undefined)panel.scrollTop=scroll;
+        }
+        const button=this.headerButton(panel);
+        if(button){
+            button.textContent=collapsed?'▢':'−';
+            button.setAttribute('aria-label',collapsed?'Expand HUD':'Collapse HUD');
+            button.setAttribute('aria-expanded',collapsed?'false':'true');
+            button.title=collapsed?'Expand HUD':'Collapse HUD';
+        }
+        const grip=panel.children[0] as HTMLElement|undefined;
+        if(grip?.children?.[0]) (grip.children[0] as HTMLElement).textContent=
+            collapsed?'⠿ HUD':'⠿ Drag HUD';
+        // If a panel is already at the far right/bottom, expanding should
+        // bring it fully into the Scene viewport instead of clipping.
+        const saved=this.panelPositions.get(id);
+        if(saved)this.setPanelPosition(panel,saved.left,saved.top);
+    }
+    private toggleCollapse(panel:HTMLElement):void {
+        this.applyCollapse(panel,!this.isCollapsed(panel));
+    }
+
     /** A visible 26px grip at the panel top, not slider/checkbox content. */
     private isDragHandle(panel:HTMLElement,x:number,y:number):boolean {
         const r=panel.getBoundingClientRect?.();
-        return !!r && x>=r.left && x<=r.right-20 &&
+        return !!r && x>=r.left && x<r.right-30 &&
             y>=r.top && y<=r.top+26;
     }
     private clampMovedPanels():void {
@@ -307,6 +389,13 @@ export class GizmoHudDomRenderer {
         if(!panel){
             this.operationLastHit='outside-panel';return false;
         }
+        if(this.isCollapseHandle(panel,pt.x,pt.y)){
+            this.operationGesture={control:null,lastX:pt.x,lastY:pt.y,
+                collapse:panel};
+            this.operationLastHit='collapse-button';
+            this.operationDownCount++;
+            return true;
+        }
         if(this.isDragHandle(panel,pt.x,pt.y)){
             const drag=this.beginPanelDrag(panel,pt.x,pt.y);
             if(drag){
@@ -364,6 +453,7 @@ export class GizmoHudDomRenderer {
         if(!held)return false;
         const pt=viewport?this.operationPoint(pointer,viewport):null;
         if(pt) {held.lastX=pt.x;held.lastY=pt.y;}
+        if(held.collapse)return true;
         if(held.drag){
             this.movePanelDrag(held.drag,held.lastX,held.lastY);
             return true;
@@ -383,6 +473,13 @@ export class GizmoHudDomRenderer {
         const pt=pointer && viewport?this.operationPoint(pointer,viewport):null;
         const x=pt?.x??held.lastX,y=pt?.y??held.lastY;
         this.operationGesture=null;
+        if(held.collapse){
+            if(this.isCollapseHandle(held.collapse,x,y)){
+                this.toggleCollapse(held.collapse);
+                this.operationCollapseCount++;
+            }
+            return true;
+        }
         if(held.drag){
             this.movePanelDrag(held.drag,x,y);
             return true;
@@ -473,9 +570,9 @@ export class GizmoHudDomRenderer {
         this.renderedOwners=owners;
         const scrollOffsets=new Map<string,number>();
         for(const existing of Array.from(this.root.children) as HTMLElement[]) {
-            const key=existing.getAttribute?.('data-gizmo-hud-id') ||
-                (existing as any).attributes?.['data-gizmo-hud-id'];
-            if(key)scrollOffsets.set(key,existing.scrollTop||0);
+            const key=this.panelKey(existing);
+            if(key)scrollOffsets.set(key,this.isCollapsed(existing)?
+                this.collapsedScrollPositions.get(key)||0:existing.scrollTop||0);
         }
         const fragment=doc.createDocumentFragment();
         this.liveInputs.clear();
@@ -499,6 +596,12 @@ export class GizmoHudDomRenderer {
                 left:moved.left+'px',top:moved.top+'px',
                 right:'auto',bottom:'auto',
             });
+            if(this.collapsedPanels.has(this.panelKey(panel))){
+                // The new panel still has pristine expanded styles.
+                // Re-apply collapse without losing the saved scroll offset.
+                this.collapsedPanels.delete(this.panelKey(panel));
+                this.applyCollapse(panel,true);
+            }
             offsets[corner]=previous+(item.definition.root.height||150)+8;
             fragment.appendChild(panel);
         }
@@ -507,8 +610,11 @@ export class GizmoHudDomRenderer {
         for(const panel of Array.from(this.root.children) as HTMLElement[]) {
             const key=panel.getAttribute?.('data-gizmo-hud-id') ||
                 (panel as any).attributes?.['data-gizmo-hud-id'];
-            if(key && scrollOffsets.has(key))
-                panel.scrollTop=scrollOffsets.get(key)!;
+            if(key && scrollOffsets.has(key)){
+                if(this.isCollapsed(panel))
+                    this.collapsedScrollPositions.set(key,scrollOffsets.get(key)!);
+                else panel.scrollTop=scrollOffsets.get(key)!;
+            }
         }
         return true;
     }
@@ -572,10 +678,37 @@ export class GizmoHudDomRenderer {
     private makeDragHandle(doc:Document,panel:HTMLElement):HTMLElement {
         const handle=doc.createElement('div');
         handle.setAttribute('data-gizmo-hud-drag-handle','true');
-        handle.textContent='⠿  Drag HUD';
+        const label=doc.createElement('span');
+        label.textContent='⠿ Drag HUD';
+        Object.assign(label.style,{
+            flex:'1',pointerEvents:'none',whiteSpace:'nowrap',
+        });
+        const collapse=doc.createElement('button');
+        collapse.type='button';
+        collapse.textContent='−';
+        collapse.setAttribute('data-gizmo-hud-collapse','true');
+        collapse.setAttribute('aria-label','Collapse HUD');
+        collapse.setAttribute('aria-expanded','true');
+        collapse.title='Collapse HUD';
+        Object.assign(collapse.style,{
+            display:'flex',alignItems:'center',justifyContent:'center',
+            flex:'none',height:'22px',width:'26px',
+            padding:'0',margin:'0',border:'none',
+            borderRadius:'4px',fontSize:'17px',fontWeight:'bold',
+            color:'inherit',background:'rgba(128,149,168,.20)',
+            cursor:'pointer',pointerEvents:'auto',
+        });
+        this.addControlEvents(collapse);
+        collapse.addEventListener('click',(event:any)=>{
+            this.stop(event);
+            if(!this.usesSceneOperationInput())
+                this.toggleCollapse(panel);
+        });
+        handle.appendChild(label);
+        handle.appendChild(collapse);
         Object.assign(handle.style,{
             position:'sticky',top:'0',zIndex:'3',
-            display:'flex',justifyContent:'flex-end',
+            display:'flex',justifyContent:'space-between',gap:'6px',
             alignItems:'center',flexShrink:'0',height:'22px',
             minHeight:'22px',boxSizing:'border-box',
             padding:'0 8px',margin:'0 0 2px',
@@ -600,6 +733,7 @@ export class GizmoHudDomRenderer {
         handle:HTMLElement,event:any,usesPointer:boolean):void {
         // The 3D Editor WebView is input-disabled. Its drag comes from
         // cce.Operation; 2D keeps the native DOM input path.
+        if(event?.target?.closest?.('[data-gizmo-hud-collapse]'))return;
         if(this.usesSceneOperationInput() || this.domPanelDrag ||
             this.gesture || this.operationGesture ||
             event?.button!==0 ||
@@ -992,6 +1126,8 @@ export class GizmoHudDomRenderer {
         this.liveInputs.clear();
         this.operationControls.length=0;
         this.panelPositions.clear();
+        this.collapsedPanels.clear();
+        this.collapsedScrollPositions.clear();
         this.items.length=0;
     }
 }
