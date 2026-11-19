@@ -420,9 +420,10 @@ export class GizmoHudDomRenderer {
     }
     public operationCancel():void {
         if(!this.operationGesture)return;
+        const held=this.operationGesture;
         this.operationGesture=null;
+        if(held.drag)this.cancelPanelDrag(held.drag);
         if(this.commands.editing)this.commands.finish(true);
-        if(this.operationGesture?.drag)this.cancelPanelDrag(this.operationGesture.drag);
         this.signature='';
     }
     public canRender(): boolean {
@@ -452,8 +453,9 @@ export class GizmoHudDomRenderer {
         this.attach(doc,host);
         if (!this.root) return false;
         this.root.style.display='flex';
-        if (this.gesture || this.operationGesture) {
-            // Never replace a live slider while browser or Scene capture owns
+        this.clampMovedPanels();
+        if (this.gesture || this.operationGesture || this.domPanelDrag) {
+            // Never replace a live slider or panel during an active drag.
             // it. Cocos can redraw on every Component value update.
             return true;
         }
@@ -492,10 +494,16 @@ export class GizmoHudDomRenderer {
                 [left?'left':'right']: '12px',
                 pointerEvents:'auto',
             });
+            const moved=this.panelPositions.get(this.panelKey(panel));
+            if(moved)Object.assign(panel.style,{
+                left:moved.left+'px',top:moved.top+'px',
+                right:'auto',bottom:'auto',
+            });
             offsets[corner]=previous+(item.definition.root.height||150)+8;
             fragment.appendChild(panel);
         }
         this.root.replaceChildren(fragment);
+        this.clampMovedPanels();
         for(const panel of Array.from(this.root.children) as HTMLElement[]) {
             const key=panel.getAttribute?.('data-gizmo-hud-id') ||
                 (panel as any).attributes?.['data-gizmo-hud-id'];
@@ -561,6 +569,107 @@ export class GizmoHudDomRenderer {
         event?.stopPropagation?.();
     }
 
+    private makeDragHandle(doc:Document,panel:HTMLElement):HTMLElement {
+        const handle=doc.createElement('div');
+        handle.setAttribute('data-gizmo-hud-drag-handle','true');
+        handle.textContent='⠿  Drag HUD';
+        Object.assign(handle.style,{
+            position:'sticky',top:'0',zIndex:'3',
+            display:'flex',justifyContent:'flex-end',
+            alignItems:'center',flexShrink:'0',height:'22px',
+            minHeight:'22px',boxSizing:'border-box',
+            padding:'0 8px',margin:'0 0 2px',
+            color:'inherit',opacity:'0.72',
+            fontSize:'11px',fontWeight:'600',
+            letterSpacing:'0.35px',
+            cursor:'grab',userSelect:'none',touchAction:'none',
+            background:'rgba(88,111,131,.16)',borderRadius:'5px',
+            pointerEvents:'auto',
+        });
+        handle.addEventListener('pointerdown',(event:any)=>{
+            this.beginDomPanelDrag(doc,panel,handle,event,true);
+        });
+        handle.addEventListener('mousedown',(event:any)=>{
+            if(typeof (doc.defaultView as any)?.PointerEvent!=='function')
+                this.beginDomPanelDrag(doc,panel,handle,event,false);
+        });
+        handle.addEventListener('click',(event:any)=>this.stop(event));
+        return handle;
+    }
+    private beginDomPanelDrag(doc:Document,panel:HTMLElement,
+        handle:HTMLElement,event:any,usesPointer:boolean):void {
+        // The 3D Editor WebView is input-disabled. Its drag comes from
+        // cce.Operation; 2D keeps the native DOM input path.
+        if(this.usesSceneOperationInput() || this.domPanelDrag ||
+            this.gesture || this.operationGesture ||
+            event?.button!==0 ||
+            !Number.isFinite(event.clientX) ||
+            !Number.isFinite(event.clientY))return;
+        const data=this.beginPanelDrag(panel,event.clientX,event.clientY);
+        if(!data)return;
+        const view:any=doc.defaultView?.addEventListener?doc.defaultView:doc;
+        const pointerId=Number.isInteger(event.pointerId)?event.pointerId:null;
+        this.domPanelDrag={data,view,handle,pointerId,usesPointer};
+        const prefix=usesPointer?'pointer':'mouse';
+        view.addEventListener(prefix+'move',this.onDomPanelMove,true);
+        view.addEventListener(prefix+'up',this.onDomPanelEnd,true);
+        view.addEventListener(usesPointer?'pointercancel':'mouseleave',
+            this.onDomPanelCancel,true);
+        view.addEventListener('keydown',this.onDomPanelKeyDown,true);
+        try{if(usesPointer)handle.setPointerCapture?.(event.pointerId);}
+        catch { /* Global listener remains active */ }
+        this.stop(event);
+        event.preventDefault?.();
+    }
+    private readonly onDomPanelMove=(event:any):void=>{
+        const held=this.domPanelDrag;
+        if(!held || held.pointerId!==null &&
+            event?.pointerId!==undefined &&
+            event.pointerId!==held.pointerId)return;
+        if(Number.isFinite(event.clientX) && Number.isFinite(event.clientY))
+            this.movePanelDrag(held.data,event.clientX,event.clientY);
+        this.stop(event);
+        event.preventDefault?.();
+    };
+    private readonly onDomPanelEnd=(event:any):void=>{
+        const held=this.domPanelDrag;
+        if(!held || held.pointerId!==null &&
+            event?.pointerId!==undefined &&
+            event.pointerId!==held.pointerId)return;
+        if(Number.isFinite(event.clientX) && Number.isFinite(event.clientY))
+            this.movePanelDrag(held.data,event.clientX,event.clientY);
+        this.stop(event);
+        this.endDomPanelDrag(false);
+    };
+    private readonly onDomPanelCancel=(event:any):void=>{
+        if(!this.domPanelDrag)return;
+        this.stop(event);
+        this.endDomPanelDrag(true);
+    };
+    private readonly onDomPanelKeyDown=(event:any):void=>{
+        if(!this.domPanelDrag ||
+            event?.key!=='Escape' && event?.keyCode!==27)return;
+        this.stop(event);
+        this.endDomPanelDrag(true);
+    };
+    private endDomPanelDrag(cancelled:boolean):void {
+        const held=this.domPanelDrag;
+        if(!held)return;
+        this.domPanelDrag=null;
+        const view:any=held.view;
+        const prefix=held.usesPointer?'pointer':'mouse';
+        view.removeEventListener(prefix+'move',this.onDomPanelMove,true);
+        view.removeEventListener(prefix+'up',this.onDomPanelEnd,true);
+        view.removeEventListener(held.usesPointer?'pointercancel':'mouseleave',
+            this.onDomPanelCancel,true);
+        view.removeEventListener('keydown',this.onDomPanelKeyDown,true);
+        try{if(held.usesPointer)held.handle.releasePointerCapture?.(
+            held.pointerId);}
+        catch { /* The panel may have been removed by Scene teardown */ }
+        if(cancelled)this.cancelPanelDrag(held.data);
+        this.signature='';
+    }
+
     private addPanelEvents(panel: HTMLElement): void {
         // The entire *visible* panel, including labels and padding, belongs
         // to the HUD. Only the transparent full-screen host passes Scene input.
@@ -618,7 +727,7 @@ export class GizmoHudDomRenderer {
             if(isRoot) {
                 const light=item.definition.theme==='light';
                 Object.assign(element.style,{
-                    maxWidth:'min(420px, 40vw)',
+                    maxWidth:'min(420px, calc(100% - 24px))',
                     maxHeight:'min(70vh, calc(100% - 24px))',
                     minHeight:'0', overflowY:'auto',overflowX:'hidden',
                     overscrollBehavior:'contain',
@@ -633,6 +742,7 @@ export class GizmoHudDomRenderer {
                 // The panel is opaque to picking; the full-screen host is not.
                 element.style.pointerEvents='auto';
                 this.addPanelEvents(element);
+                element.appendChild(this.makeDragHandle(doc,element));
             }
             for(const child of node.children)
                 element.appendChild(this.drawNode(doc,item,child,scope+'/'+node.id));
@@ -860,12 +970,14 @@ export class GizmoHudDomRenderer {
     }
 
     public hide(): void {
-        if(this.root && !this.gesture && !this.operationGesture)
+        if(this.root && !this.gesture && !this.operationGesture &&
+            !this.domPanelDrag)
             this.root.style.display='none';
     }
 
     public dispose(): void {
         this.operationCancel();
+        this.endDomPanelDrag(true);
         this.releaseGesture(true);
         this.commands.cancel();
         this.root?.remove();
@@ -879,6 +991,7 @@ export class GizmoHudDomRenderer {
         this.renderedOwners=[];
         this.liveInputs.clear();
         this.operationControls.length=0;
+        this.panelPositions.clear();
         this.items.length=0;
     }
 }
