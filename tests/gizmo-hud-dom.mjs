@@ -168,7 +168,8 @@ assert.equal(row.style.flexDirection,'row');
 assert.equal(row.style.gap,'12px');
 const slider=row.find(x=>x.tag==='input'&&x.type==='range');
 const checkbox=row.find(x=>x.tag==='input'&&x.type==='checkbox');
-const button=panel.find(x=>x.tag==='button');
+const button=panel.find(x=>x.tag==='button' &&
+    x.attributes?.['data-gizmo-hud-collapse']!=='true');
 assert.equal(slider.value,'1');
 assert.equal(checkbox.checked,true);
 assert.equal(button.textContent,'Reset');
@@ -200,7 +201,8 @@ latestCheck.checked=false;
 latestCheck.emit('change');
 assert.equal(owner.wireframe,false);
 assert.equal(owner.events.at(-1)[1],'end');
-const latestButton=latestPanel.find(x=>x.tag==='button');
+const latestButton=latestPanel.find(x=>x.tag==='button' &&
+    x.attributes?.['data-gizmo-hud-collapse']!=='true');
 latestButton.emit('click');
 assert.equal(owner.lastEvent,'reset',
     'stopPropagation must not suppress same-target Button command click');
@@ -229,7 +231,8 @@ const replacement={
     onGizmoHudChanged:owner.onGizmoHudChanged,
 };
 renderer.beginFrame();renderer.queue(replacement,hud());renderer.finishFrame();
-const rebound=root.find(x=>x.tag==='button');
+const rebound=root.find(x=>x.tag==='button' &&
+    x.attributes?.['data-gizmo-hud-collapse']!=='true');
 rebound.emit('click');
 assert.equal(replacement.lastEvent,'reset');
 assert.equal(root.children.length,1);
@@ -248,7 +251,8 @@ const persistent=GizmoHUD.createHud('persist')
     .mount(replacement);
 renderer.beginFrame();
 assert.equal(renderer.finishFrame(),true);
-const persistentButton=root.find(x=>x.tag==='button');
+const persistentButton=root.find(x=>x.tag==='button' &&
+    x.attributes?.['data-gizmo-hud-collapse']!=='true');
 persistentButton.emit('click');
 assert.equal(replacement.lastEvent,'persistent');
 assert.equal(root.children[0].style.bottom,'12px');
@@ -299,7 +303,8 @@ const box=(left,top,right,bottom)=>({
     left,top,right,bottom,width:right-left,height:bottom-top,
 });
 opPanel.getBoundingClientRect=()=>box(400,70,720,340);
-const opButton=opPanel.find(x=>x.tag==='button');
+const opButton=opPanel.find(x=>x.tag==='button' &&
+    x.attributes?.['data-gizmo-hud-collapse']!=='true');
 const opToggle=opPanel.find(x=>x.tag==='input'&&x.type==='checkbox');
 const opRange=opPanel.find(x=>x.tag==='input'&&x.type==='range');
 opButton.getBoundingClientRect=()=>box(420,90,520,120);
