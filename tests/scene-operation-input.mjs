@@ -91,6 +91,8 @@ assert.equal(input.status().active,true);
 assert.equal(input.status().priority,100);
 assert.equal(op.listeners.get('mousedown').length,3,
     'Repeated updates cannot install duplicate Scene listeners');
+assert.equal(op.listeners.get('mousewheel').length,1,
+    'Use Creator Scene Operation mousewheel exactly once');
 op.emit('mousemove',{...point});
 assert.deepEqual(events.at(-1),['hover',120,80]);
 // Real Editor Operation x/y may differ from canvas-local pixels. Match the
@@ -200,6 +202,8 @@ assert.equal(op.listeners.get('mousedown').length,2,
     'Unmount removes all extension listeners but leaves Editor listeners');
 assert.equal(op.listeners.get('mousemove').length,0);
 assert.equal(op.listeners.get('mouseup').length,0);
+assert.equal(op.listeners.get('mousewheel').length,0,
+    'Detach must release the wheel listener');
 assert.equal(input.status().active,false);
 
 // Cocos Creator 3D WebView ignores native pointer events. The Scene
@@ -209,15 +213,35 @@ const hudEvents=[];
 const op3D=new MockOperation();
 let selected3D=0;
 op3D.on('mousedown',()=>selected3D++,99);
+let cameraWheel3D=0;
+op3D.on('mousewheel',()=>cameraWheel3D++,98);
 const hudPort={
     usesSceneOperationInput:()=>true,
     operationDown(p){hudEvents.push(['down',p.x,p.y]);return p.x>300&&p.x<500;},
     operationMove(p){hudEvents.push(['move',p.x,p.y]);return true;},
     operationUp(p){hudEvents.push(['up',p?.x,p?.y]);return true;},
     operationCancel(){hudEvents.push(['cancel']);},
+    operationWheel(p,_viewport,delta){
+        hudEvents.push(['wheel',p.x,p.y,delta]);
+        return p.x>300&&p.x<500;
+    },
 };
 const bridge3D=new SceneOperationInput(ports,()=>op3D,()=>hudPort);
 bridge3D.refresh();
+assert.equal(op3D.emit('mousewheel',{...point,x:360,deltaY:100}),false);
+assert.equal(bridge3D.status().builderHudWheel,1);
+assert.equal(cameraWheel3D,0,'Wheel inside HUD must not zoom 3D camera');
+assert.deepEqual(hudEvents.at(-1),['wheel',360,80,100]);
+assert.equal(op3D.emit('mousewheel',{...point,x:370,
+    wheelDeltaY:-120}),false);
+assert.deepEqual(hudEvents.at(-1),['wheel',370,80,120],
+    'Legacy wheelDeltaY must be converted to positive downward scroll');
+assert.equal(op3D.emit('mousewheel',{...point,x:370,
+    deltaY:2,deltaMode:1}),false);
+assert.deepEqual(hudEvents.at(-1),['wheel',370,80,32],
+    'Line-based wheel events use CSS pixel equivalents');
+assert.equal(op3D.emit('mousewheel',{...point,x:650,deltaY:120}),undefined);
+assert.equal(cameraWheel3D,1,'Wheel outside HUD still zooms Scene camera');
 assert.equal(op3D.emit('mousedown',{...point,x:360}),false);
 assert.equal(selected3D,0,'3D HUD click must never unselect Node');
 assert.equal(bridge3D.status().builderHudGesture,true);
@@ -234,6 +258,8 @@ assert.deepEqual(hudEvents.at(-1),['cancel']);
 assert.equal(op3D.emit('mousedown',{...point,x:600}),undefined);
 assert.equal(selected3D,1,'Outside 3D HUD remains selectable');
 bridge3D.detach();
+assert.equal(op3D.listeners.get('mousewheel').length,1,
+    'Only Editor Camera wheel handler remains after detach');
 
 const absent=new SceneOperationInput(ports,()=>null);
 absent.refresh();

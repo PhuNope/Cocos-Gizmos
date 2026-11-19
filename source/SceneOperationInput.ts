@@ -22,6 +22,8 @@ export interface BuilderHudOperationPort {
     operationUp(pointer: ViewportPointer|null,
         viewport:{width:number;height:number}|null):boolean;
     operationCancel():void;
+    operationWheel(pointer:ViewportPointer,
+        viewport:{width:number;height:number}|null,deltaY:number):boolean;
 }
 
 interface OperationPort {
@@ -36,6 +38,7 @@ export class SceneOperationInput {
     private hudOwned = false;
     private builderHudGesture = false;
     private builderHudDown = 0;
+    private builderHudWheel = 0;
     private events = 0;
     private intercepted = 0;
     private hoverEvents = 0;
@@ -77,6 +80,9 @@ export class SceneOperationInput {
         operation.on('mousedown',this.onDown,SCENE_GIZMO_INPUT_PRIORITY);
         operation.on('mousemove',this.onMove,SCENE_GIZMO_INPUT_PRIORITY);
         operation.on('mouseup',this.onUp,SCENE_GIZMO_INPUT_PRIORITY);
+        // Verified in the bundled Creator 3.8.8 Editor types:
+        // SceneMouseEvent explicitly includes 'mousewheel'.
+        operation.on('mousewheel',this.onWheel,SCENE_GIZMO_INPUT_PRIORITY);
         operation.on('keydown',this.onKeyDown,SCENE_GIZMO_INPUT_PRIORITY);
         this.reason='scene-operation-priority-100';
     }
@@ -198,6 +204,41 @@ export class SceneOperationInput {
         return false;
     };
 
+    private wheelDelta(event:any):number {
+        const wrapped=[event,event?.event,event?.detail?.event,
+            event?.nativeEvent,event?.data?.event,event?.detail,event?.data];
+        for(const value of wrapped){
+            if(!value)continue;
+            if(Number.isFinite(value.deltaY) && value.deltaY!==0){
+                const mode=value.deltaMode===1?16:
+                    value.deltaMode===2?Math.max(120,this.ports.viewport()?.height||0):1;
+                return value.deltaY*mode;
+            }
+            if(Number.isFinite(value.wheelDeltaY) && value.wheelDeltaY!==0)
+                return -value.wheelDeltaY;
+            if(typeof value.getScrollY==='function'){
+                try{
+                    const amount=value.getScrollY();
+                    if(Number.isFinite(amount)&&amount!==0)return -amount;
+                }catch { /* Some Creator events do not expose native wheel data */ }
+            }
+        }
+        return 0;
+    }
+
+    private readonly onWheel=(event:any):boolean|void=>{
+        const hud=this.builderHud();
+        if(!hud?.usesSceneOperationInput())return;
+        const point=this.point(event);
+        if(!point)return;
+        if(hud.operationWheel(point,this.ports.viewport(),this.wheelDelta(event))){
+            this.builderHudWheel++;
+            consumeOwnedSceneEvent(event);
+            return false;
+        }
+        // Outside the HUD preserve Editor's normal camera wheel zoom.
+    };
+
     private readonly onKeyDown=(event:any):boolean|void=>{
         if(this.builderHudGesture &&
             (event?.key==='Escape'||event?.keyCode===27)){
@@ -223,7 +264,8 @@ export class SceneOperationInput {
             const remove=this.operation.removeListener || this.operation.off;
             for(const [name,callback] of [
                 ['mousedown',this.onDown],['mousemove',this.onMove],
-                ['mouseup',this.onUp],['keydown',this.onKeyDown],
+                ['mouseup',this.onUp],['mousewheel',this.onWheel],
+                ['keydown',this.onKeyDown],
             ] as const){
                 try{remove?.call(this.operation,name,callback);}
                 catch(error){console.warn(
@@ -248,6 +290,7 @@ export class SceneOperationInput {
             active:!!this.operation,reason:this.reason,
             captured:this.capturing,hudOwned:this.hudOwned,
             builderHudGesture:this.builderHudGesture,builderHudDown:this.builderHudDown,
+            builderHudWheel:this.builderHudWheel,
             observed:this.events,
             intercepted:this.intercepted,hover:this.hoverEvents,
             cancelled:this.cancellations,priority:SCENE_GIZMO_INPUT_PRIORITY,

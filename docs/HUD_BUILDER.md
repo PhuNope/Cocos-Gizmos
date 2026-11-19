@@ -202,3 +202,36 @@ supports only the original serialized-property commands. The persistent
 mount workflow does not provide guaranteed Scene Undo, automatic keyboard
 bindings or standalone Cocos game runtime UI. It must be exercised in an
 actual Editor Scene WebView to validate focus and Scene selection.
+
+
+## Draggable HUD inside Scene viewport
+
+Builder HUDs have a small **Drag HUD** grip at their top edge.
+Hold the left mouse button on this grip to reposition the panel. The panel
+is clamped to the visible Scene viewport, re-clamped on viewport resize,
+and its position survives normal HUD rerenders. The grip does not execute
+commands or select Scene Nodes. Press **Escape** while dragging to restore
+the previous position.
+
+The header also has a **− Collapse HUD** button. Click it to hide every
+content control while keeping a compact **⠿ HUD** grip visible and draggable.
+Click the **▢ Expand HUD** button to restore the controls and previous scroll
+position. The collapsed/expanded state belongs to the HUD ID and survives
+normal Scene redraws and re-selection while the renderer is alive. In 3D,
+the collapse button uses Scene Operation hit-testing; in 2D it uses the
+native DOM click. It never executes a user command or unselects the Node.
+
+- In 2D the grip uses native pointer events.
+- In 3D the Editor's Scene WebView is pointer-disabled; the grip uses the
+  existing `cce.Operation` bridge and the same viewport coordinate mapping
+  as HUD buttons/sliders.
+- Long panels keep their scrollbar and wheel interactions. Use the scrollbar
+  or wheel to reveal controls before dragging individual sliders.
+
+**Scene toolbar limitation:** the 2D/3D, Select, Move, Rotate and Scale
+buttons are in the *outer Scene Panel* DOM, not inside the engine WebView.
+The current HUD renderer cannot paint on top of that toolbar, regardless
+of `z-index`. Covering it would require a separate Scene-Panel-level HUD
+host with its own input/IPC bridge. This change deliberately does **not**
+patch Creator's built-in toolbar or break its native interactions.
+

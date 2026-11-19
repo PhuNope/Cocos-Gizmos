@@ -4,6 +4,16 @@ All notable changes to Cocos-Gizmos are documented here.
 
 ## [Unreleased]
 
+## [3.0.3] - 2026-11-19
+
+### Added
+- Draggable Scene HUD panels in both 2D and 3D, with a compact **Drag HUD** grip, viewport-bound movement and retained positions when the Scene resizes or HUD contents update.
+- **Collapse / Expand HUD** button: hide the content into a small draggable header, then restore controls and prior scrolling position without losing the HUD placement.
+
+### Fixed
+- Long 3D HUDs now scroll with the mouse wheel, including while the WebView does not receive native pointer events, without zooming the Scene camera when the pointer is over the HUD.
+- Allow dragging the scrollbar of long HUDs, preserve scroll offsets across HUD rerenders, and keep controls accessible within the Scene viewport.
+
 ## [3.0.2] - 2026-11-18
 
 ### Added
