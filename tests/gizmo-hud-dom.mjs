@@ -352,6 +352,29 @@ assert.equal(opOwner.size,3,'Escape cancels Operation slider edit');
 assert.equal(opRenderer.operationStatus().captured,false);
 assert.equal(opRenderer.operationStatus().commit,4);
 
+// In 3D, the visible grab strip is picked by Scene Operation coordinates.
+const beforeDragCommits=opRenderer.operationStatus().commit;
+assert.equal(opRenderer.operationDown(toPointer(660,76),viewport),true);
+assert.equal(opRenderer.operationStatus().lastHit,'drag-handle');
+opRenderer.beginFrame();opRenderer.queue(opOwner,opHud);
+opRenderer.finishFrame();
+assert.equal(opRoot.children[0],opPanel,
+    'HUD must not be rebuilt during a Scene Operation panel drag');
+assert.equal(opRenderer.operationMove(toPointer(400,120),viewport),true);
+assert.equal(opPanel.style.left,'120px');
+assert.equal(opPanel.style.top,'78px');
+assert.equal(opRenderer.operationUp(toPointer(400,120),viewport),true);
+assert.equal(opRenderer.operationStatus().panelDrag,1);
+assert.equal(opRenderer.operationStatus().commit,beforeDragCommits,
+    'Moving HUD must never execute a button/checkbox command');
+assert.equal(opRenderer.operationStatus().captured,false);
+// Escape cancels a subsequent panel drag and restores the previous position.
+assert.equal(opRenderer.operationDown(toPointer(660,76),viewport),true);
+opRenderer.operationMove(toPointer(1000,500),viewport);
+opRenderer.operationCancel();
+assert.equal(opPanel.style.left,'120px');
+assert.equal(opPanel.style.top,'78px');
+
 // A 3D Scene WebView cannot receive native DOM mousewheel or scrollbar
 // pointer events; Scene Operation must update the *real* panel.scrollTop.
 opPanel.clientHeight=260;
@@ -399,6 +422,54 @@ sceneIs3D=false;
 const only2D=new GizmoHudDomRenderer(()=>doc);
 assert.equal(only2D.usesSceneOperationInput(),false,
     'Working 2D HUD must remain on native DOM pointer path');
+only2D.beginFrame();only2D.queue(owner,hud());only2D.finishFrame();
+const nativePanel=body.children[1].children[0];
+const handle=nativePanel.find(el=>el.attributes?.['data-gizmo-hud-drag-handle']==='true');
+assert.ok(handle,'Builder HUD shows its own draggable grip');
+nativePanel.getBoundingClientRect=()=>{
+    const left=nativePanel.style.right==='auto'?
+        viewportRect.left+parseFloat(nativePanel.style.left):488;
+    const top=nativePanel.style.bottom==='auto'?
+        viewportRect.top+parseFloat(nativePanel.style.top):48;
+    return box(left,top,left+320,top+180);
+};
+const starting=handle.emit('pointerdown',{
+    clientX:540,clientY:59,pointerId:7,button:0,
+});
+assert.equal(starting.prevented,true);
+assert.equal(only2D.operationStatus().domDragging,true);
+fakeWindow.emit('pointermove',{clientX:300,clientY:240,pointerId:7});
+assert.equal(nativePanel.style.left,'228px');
+assert.equal(nativePanel.style.top,'193px');
+only2D.beginFrame();only2D.queue(owner,hud());only2D.finishFrame();
+assert.equal(body.children[1].children[0],nativePanel,
+    'Native drag maintains the same panel DOM across update frames');
+fakeWindow.emit('pointerup',{clientX:300,clientY:240,pointerId:7});
+assert.equal(only2D.operationStatus().domDragging,false);
+assert.equal(fakeWindow.listeners.get('pointermove').length,0,
+    'Finished drag must clean up window pointer listeners');
+assert.equal(owner.lastEvent,'none','Drag cannot trigger HUD commands');
+// Escape restores prior saved coordinates in 2D just as in 3D.
+handle.emit('pointerdown',{clientX:300,clientY:240,pointerId:7,button:0});
+fakeWindow.emit('pointermove',{clientX:500,clientY:320,pointerId:7});
+fakeWindow.emit('keydown',{key:'Escape',keyCode:27});
+assert.equal(nativePanel.style.left,'228px');
+assert.equal(nativePanel.style.top,'193px');
+assert.equal(only2D.operationStatus().domDragging,false);
+// If the viewport shrinks, floating HUD is clamped back into view.
+viewportRect={left:20,top:36,width:500,height:340};
+only2D.beginFrame();only2D.queue(owner,hud());only2D.finishFrame();
+assert.equal(nativePanel.style.left,'180px');
+assert.equal(nativePanel.style.top,'160px');
+owner.size=1.5;
+only2D.beginFrame();only2D.queue(owner,hud());only2D.finishFrame();
+const replacementPanel=body.children[1].children[0];
+assert.notEqual(replacementPanel,nativePanel,
+    'Changed property creates a new panel after drag ends');
+assert.equal(replacementPanel.style.left,'180px');
+assert.equal(replacementPanel.style.top,'160px',
+    'Dragged position survives a HUD DOM rebuild');
 only2D.dispose();
+viewportRect={left:20,top:36,width:800,height:500};
 
 console.log('[gizmo-hud-dom] native DOM, 3D Editor Operation click/checkbox/slider drag/rollback, padding, selection passthrough and cleanup OK');
