@@ -351,6 +351,49 @@ opRenderer.operationCancel();
 assert.equal(opOwner.size,3,'Escape cancels Operation slider edit');
 assert.equal(opRenderer.operationStatus().captured,false);
 assert.equal(opRenderer.operationStatus().commit,4);
+
+// A 3D Scene WebView cannot receive native DOM mousewheel or scrollbar
+// pointer events; Scene Operation must update the *real* panel.scrollTop.
+opPanel.clientHeight=260;
+opPanel.scrollHeight=1040;
+opPanel.scrollTop=0;
+assert.equal(opPanel.style.overflowY,'auto');
+assert.match(opPanel.style.maxHeight,/100% - 24px/,
+    'HUD height must be limited by the Scene viewport, not the editor window');
+assert.equal(opRenderer.operationWheel(toPointer(100,100),viewport,120),false,
+    'Wheel outside HUD must continue to zoom the Scene camera');
+assert.equal(opRenderer.operationWheel(toPointer(470,180),viewport,120),true);
+assert.equal(opPanel.scrollTop,120);
+assert.equal(opRenderer.operationWheel(toPointer(470,180),viewport,-35),true);
+assert.equal(opPanel.scrollTop,85);
+assert.equal(opRenderer.operationWheel(toPointer(470,180),viewport,2000),true);
+assert.equal(opPanel.scrollTop,780,'Wheel scroll clamps to content height');
+assert.equal(opRenderer.operationWheel(toPointer(470,180),viewport,120),true,
+    'Wheel over HUD is consumed even at end of scroll');
+assert.equal(opPanel.scrollTop,780);
+opPanel.scrollTop=85;
+// Native scrollbar track occupies the far right of the clipped HUD.
+assert.equal(opRenderer.operationDown(toPointer(715,115),viewport),true);
+assert.equal(opRenderer.operationStatus().lastHit,'scrollbar');
+const beforeScrollbar=opPanel.scrollTop;
+assert.equal(opRenderer.operationMove(toPointer(715,220),viewport),true);
+assert.ok(opPanel.scrollTop>beforeScrollbar,
+    'Operation pointer drag must move the scrollbar thumb');
+assert.equal(opRenderer.operationUp(toPointer(715,220),viewport),true);
+assert.equal(opRenderer.operationStatus().captured,false);
+assert.equal(opOwner.lastEvent,'reset',
+    'Scrollbar drag must never trigger the button behind it');
+assert.equal(opRenderer.operationStatus().scrollDrag,1);
+assert.equal(opRenderer.operationStatus().wheel,4);
+// A definition/value change re-renders the panel. Preserve scroll offset.
+const priorScroll=opPanel.scrollTop;
+opOwner.lastEvent='changed';
+opRenderer.beginFrame();opRenderer.queue(opOwner,opHud);
+opRenderer.finishFrame();
+assert.notEqual(opRoot.children[0],opPanel,
+    'Model change rebuilds HTML but must preserve previous scroll position');
+assert.equal(opRoot.children[0].scrollTop,priorScroll,
+    'Visible lower HUD elements must remain in view after Scene repaint');
 opRenderer.dispose();
 sceneIs3D=false;
 const only2D=new GizmoHudDomRenderer(()=>doc);
