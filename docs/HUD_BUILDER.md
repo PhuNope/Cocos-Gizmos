@@ -213,6 +213,14 @@ and its position survives normal HUD rerenders. The grip does not execute
 commands or select Scene Nodes. Press **Escape** while dragging to restore
 the previous position.
 
+The header also has a **− Collapse HUD** button. Click it to hide every
+content control while keeping a compact **⠿ HUD** grip visible and draggable.
+Click the **▢ Expand HUD** button to restore the controls and previous scroll
+position. The collapsed/expanded state belongs to the HUD ID and survives
+normal Scene redraws and re-selection while the renderer is alive. In 3D,
+the collapse button uses Scene Operation hit-testing; in 2D it uses the
+native DOM click. It never executes a user command or unselects the Node.
+
 - In 2D the grip uses native pointer events.
 - In 3D the Editor's Scene WebView is pointer-disabled; the grip uses the
   existing `cce.Operation` bridge and the same viewport coordinate mapping
