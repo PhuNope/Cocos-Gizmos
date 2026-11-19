@@ -433,6 +433,7 @@ nativePanel.getBoundingClientRect=()=>{
         viewportRect.top+parseFloat(nativePanel.style.top):48;
     return box(left,top,left+320,top+180);
 };
+const nativeLastEvent=owner.lastEvent;
 const starting=handle.emit('pointerdown',{
     clientX:540,clientY:59,pointerId:7,button:0,
 });
@@ -448,7 +449,8 @@ fakeWindow.emit('pointerup',{clientX:300,clientY:240,pointerId:7});
 assert.equal(only2D.operationStatus().domDragging,false);
 assert.equal(fakeWindow.listeners.get('pointermove').length,0,
     'Finished drag must clean up window pointer listeners');
-assert.equal(owner.lastEvent,'none','Drag cannot trigger HUD commands');
+assert.equal(owner.lastEvent,nativeLastEvent,
+    'Drag cannot trigger HUD commands');
 // Escape restores prior saved coordinates in 2D just as in 3D.
 handle.emit('pointerdown',{clientX:300,clientY:240,pointerId:7,button:0});
 fakeWindow.emit('pointermove',{clientX:500,clientY:320,pointerId:7});
