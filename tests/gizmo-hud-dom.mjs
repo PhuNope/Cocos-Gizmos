@@ -462,7 +462,8 @@ assert.equal(opRenderer.operationDown(toPointer(710,80),viewport),true);
 opRenderer.operationUp(toPointer(710,80),viewport);
 assert.equal(opRenderer.operationStatus().collapsed,0);
 assert.equal(foldButton3D.attributes['aria-expanded'],'true');
-assert.equal(foldPanel3D.style.height,'');
+assert.ok(!foldPanel3D.style.height,
+    'Expand restores its original automatically sized height');
 assert.equal(foldPanel3D.style.overflowY,'auto');
 assert.equal(foldPanel3D.scrollTop,priorScroll,
     'Expanded HUD restores scroll to reveal previous content');
@@ -555,7 +556,8 @@ assert.equal(replacementPanel.style.top,'170px');
 assert.equal(replacementPanel.style.height,'28px');
 fold2D.emit('click');
 assert.equal(only2D.operationStatus().collapsed,0);
-assert.equal(replacementPanel.style.height,'');
+assert.ok(!replacementPanel.style.height,
+    'Expand restores its original automatically sized height');
 assert.equal(fold2D.attributes['aria-expanded'],'true');
 assert.equal(replacementPanel.style.left,'180px',
     'Expanding near Scene edge re-clamps the larger panel into the viewport');
