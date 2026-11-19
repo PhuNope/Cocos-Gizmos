@@ -418,6 +418,54 @@ assert.notEqual(opRoot.children[0],opPanel,
     'Model change rebuilds HTML but must preserve previous scroll position');
 assert.equal(opRoot.children[0].scrollTop,priorScroll,
     'Visible lower HUD elements must remain in view after Scene repaint');
+// 3D collapse/expand is routed via Scene Operation (not native button click).
+const foldPanel3D=opRoot.children[0];
+foldPanel3D.getBoundingClientRect=()=>box(400,70,720,340);
+const foldButton3D=foldPanel3D.find(x=>
+    x.attributes?.['data-gizmo-hud-collapse']==='true');
+assert.ok(foldButton3D,'3D HUD has an always-present fold button');
+const commitBeforeFold=opRenderer.operationStatus().commit;
+assert.equal(opRenderer.operationDown(toPointer(710,80),viewport),true);
+assert.equal(opRenderer.operationStatus().lastHit,'collapse-button');
+assert.equal(opRenderer.operationUp(toPointer(710,80),viewport),true);
+assert.equal(foldPanel3D.style.height,'28px');
+assert.equal(foldPanel3D.style.padding,'3px',
+    'Collapsed header must fit without clipping its collapse control');
+assert.equal(foldButton3D.attributes['aria-expanded'],'false');
+assert.equal(foldButton3D.textContent,'▢');
+assert.equal(opRenderer.operationStatus().collapsed,1);
+assert.equal(opRenderer.operationStatus().collapseClicks,1);
+assert.equal(opRenderer.operationStatus().commit,commitBeforeFold,
+    'Collapse cannot run a Component Gizmo command');
+const foldBody3D=foldPanel3D.find(x=>
+    x.attributes?.['data-gizmo-hud-id']==='operation-3d/operation-3d/reset');
+assert.ok(foldBody3D);
+assert.equal(foldBody3D.style.display,'none');
+assert.equal(opRenderer.operationWheel(toPointer(450,82),viewport,120),true);
+assert.equal(foldPanel3D.scrollTop,priorScroll,
+    'Collapsed HUD cannot change stored scroll while wheel-over-UI is consumed');
+// The mini-header remains draggable in the 3D Operation path.
+const beforeFoldDrag=opRenderer.operationStatus().panelDrag;
+assert.equal(opRenderer.operationDown(toPointer(650,76),viewport),true);
+assert.equal(opRenderer.operationStatus().lastHit,'drag-handle');
+opRenderer.operationMove(toPointer(600,90),viewport);
+opRenderer.operationUp(toPointer(600,90),viewport);
+assert.equal(opRenderer.operationStatus().panelDrag,beforeFoldDrag+1);
+assert.equal(opRenderer.operationStatus().collapsed,1);
+assert.equal(foldPanel3D.style.height,'28px');
+assert.equal(opRenderer.operationDown(toPointer(710,80),viewport),true);
+opRenderer.operationUp(toPointer(710,80),viewport);
+assert.equal(opRenderer.operationStatus().collapsed,0);
+assert.equal(foldButton3D.attributes['aria-expanded'],'true');
+assert.equal(foldPanel3D.style.height,'');
+assert.equal(foldPanel3D.style.overflowY,'auto');
+assert.equal(foldPanel3D.scrollTop,priorScroll,
+    'Expanded HUD restores scroll to reveal previous content');
+const lastExpandedX=foldPanel3D.style.left;
+opOwner.lastEvent='rebuild-after-collapse';
+opRenderer.beginFrame();opRenderer.queue(opOwner,opHud);opRenderer.finishFrame();
+assert.equal(opRoot.children[0].style.left,lastExpandedX,
+    'Expanded HUD keeps its dragged placement after rebuild');
 opRenderer.dispose();
 sceneIs3D=false;
 const only2D=new GizmoHudDomRenderer(()=>doc);
@@ -472,6 +520,49 @@ assert.notEqual(replacementPanel,nativePanel,
 assert.equal(replacementPanel.style.left,'180px');
 assert.equal(replacementPanel.style.top,'160px',
     'Dragged position survives a HUD DOM rebuild');
+// Native 2D button collapses, and the compact mini-HUD is still draggable.
+const fold2D=replacementPanel.find(x=>
+    x.attributes?.['data-gizmo-hud-collapse']==='true');
+assert.ok(fold2D,'2D HUD includes a collapse button beside the drag label');
+replacementPanel.getBoundingClientRect=()=>{
+    const left=viewportRect.left+parseFloat(replacementPanel.style.left);
+    const top=viewportRect.top+parseFloat(replacementPanel.style.top);
+    const width=replacementPanel.style.height==='28px'?190:320;
+    const height=replacementPanel.style.height==='28px'?28:180;
+    return box(left,top,left+width,top+height);
+};
+const beforeFoldState=owner.lastEvent;
+fold2D.emit('click');
+assert.equal(only2D.operationStatus().collapsed,1);
+assert.equal(replacementPanel.style.height,'28px');
+assert.equal(fold2D.attributes['aria-expanded'],'false');
+assert.equal(owner.lastEvent,beforeFoldState,
+    'Collapse is a UI-only action and never invokes Component commands');
+// Drag the collapsed 2D title bar, not a hidden slider/control.
+const foldedGrip=replacementPanel.find(x=>
+    x.attributes?.['data-gizmo-hud-drag-handle']==='true');
+foldedGrip.emit('pointerdown',{clientX:250,clientY:205,pointerId:7,button:0});
+assert.equal(only2D.operationStatus().domDragging,true);
+fakeWindow.emit('pointermove',{clientX:270,clientY:215,pointerId:7});
+fakeWindow.emit('pointerup',{clientX:270,clientY:215,pointerId:7});
+assert.equal(replacementPanel.style.left,'200px');
+assert.equal(replacementPanel.style.top,'170px');
+assert.equal(replacementPanel.style.height,'28px');
+fold2D.emit('click');
+assert.equal(only2D.operationStatus().collapsed,0);
+assert.equal(replacementPanel.style.height,'');
+assert.equal(fold2D.attributes['aria-expanded'],'true');
+assert.equal(replacementPanel.style.left,'180px',
+    'Expanding near Scene edge re-clamps the larger panel into the viewport');
+assert.equal(replacementPanel.style.top,'160px');
+fold2D.emit('click');
+owner.size=1.75;
+only2D.beginFrame();only2D.queue(owner,hud());only2D.finishFrame();
+const foldedRebuild=body.children[1].children[0];
+assert.notEqual(foldedRebuild,replacementPanel);
+assert.equal(foldedRebuild.style.height,'28px',
+    'Collapsed state is stable across builder rerenders');
+assert.equal(only2D.operationStatus().collapsed,1);
 only2D.dispose();
 viewportRect={left:20,top:36,width:800,height:500};
 
