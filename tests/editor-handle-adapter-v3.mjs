@@ -344,7 +344,7 @@ assert.ok(events.some(e=>e[0]==='builder'&&e[1]==='move'),
 component.gizmo.onNotGizmoMouseDown({x:90,y:80});
 component.gizmo.onNotGizmoMouseMove({x:120,y:80});
 component.gizmo.onKeyDown({key:'Escape'});
-assert.equal(component.position.x,90,'Escape rolls back the edit command');
+assert.equal(component.position.x,100,'Escape restores the value committed by the external gesture');
 const hudDown={x:240,y:80,
     stopPropagation(){events.push(['stop','hud-down']);},
     preventDefault(){events.push(['prevent','hud-down']);}};
