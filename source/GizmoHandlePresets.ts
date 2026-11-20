@@ -112,6 +112,7 @@ export function makeRotateGizmo(
         .map(([axis, color]): GizmoHandleDescriptor => ({
             property: name, id: 'rotation-' + axis, visual: 'rotation',
             axis, plane: 'view', space: options.space ?? 'local',
+            history: options.history,
             snap: options.snap, ringSize, pickSize, color,
             pivotProperty: options.pivotProperty, pivotSpace: options.pivotSpace,
             hoverColor: options.hoverColor ?? '#ffff65',
