@@ -40,6 +40,7 @@ export function makeMoveGizmo(
     const shared = {
         property: name,
         space: options.space ?? 'local',
+        frameNode: options.frameNode,
         snap: options.snap,
         bounds: options.bounds,
         pickSize,

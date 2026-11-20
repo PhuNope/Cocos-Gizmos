@@ -789,6 +789,8 @@ export interface GizmosMoveHandleOptions {
     boxSize?: number;
     /** Node local or absolute world coordinates (default local). */
     space?: GizmoHandleSpace;
+    /** Optional Node defining the local frame for this Move handle. */
+    frameNode?: Node;
     /** Shared snap value for all axis and plane handles. */
     snap?: number;
     /** Approximate length of each colored axis arrow in Scene pixels. */
@@ -812,6 +814,8 @@ export interface GizmosMoveHandleOptions {
 export class Gizmos3D {
     /** Feature probe for movable rotation pivots. */
     public static readonly supportsRotationPivot = true;
+    /** Feature probe for Move handles bound to a reference Node frame. */
+    public static readonly supportsMoveFrameNode = true;
     /** One call creates the complete XYZ + XY/XZ/YZ Move Gizmo.
      * This façade only builds descriptors; Editor adapters own interactions.
      */

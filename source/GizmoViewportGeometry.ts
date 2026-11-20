@@ -49,15 +49,23 @@ export function spaceFor(component: Component, field: Field): {
             toWorld: (point) => ({ ...point }),
         };
     }
+    // Opt-in local frame: an ancestor can own the handle coordinate system
+    // even when the editable port belongs to a selected child Component.
+    // This frame is used by rendering, native picking and Move commands.
+    const frame = field.frameNode || component.node;
+    const valid = !field.frameNode || frame?.isValid !== false;
+    const invalid = () => ({ x: NaN, y: NaN, z: NaN });
     return {
         toLocal: (point) => {
+            if (!valid || !frame?.inverseTransformPoint) return invalid();
             const result = new Vec3();
-            component.node.inverseTransformPoint(result, new Vec3(point.x, point.y, point.z));
+            frame.inverseTransformPoint(result, new Vec3(point.x, point.y, point.z));
             return { x: result.x, y: result.y, z: result.z };
         },
         toWorld: (point) => {
+            if (!valid || !frame?.worldMatrix) return invalid();
             const result = new Vec3();
-            Vec3.transformMat4(result, new Vec3(point.x, point.y, point.z), component.node.worldMatrix);
+            Vec3.transformMat4(result, new Vec3(point.x, point.y, point.z), frame.worldMatrix);
             return { x: result.x, y: result.y, z: result.z };
         },
     };

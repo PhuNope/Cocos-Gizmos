@@ -20,6 +20,12 @@ declare global {
         plane?: GizmoHandlePlane;
         /** Local (default) or world-space point coordinates. */
         space?: GizmoHandleSpace;
+        /** Optional reference Node for local-space Move axes, plane and Vec3
+         * values. Defaults to this Component's own Node. Useful when a
+         * child handle edits coordinates in an ancestor's local frame.
+         * Ignored when space==='world'; the Node must be valid in the Scene.
+         */
+        frameNode?: import('cc').Node;
         /** Lock movement to one axis in the selected coordinate space. */
         axis?: GizmoHandleAxis;
         /** Optional snap interval; omit for continuous, unsnapped dragging. */
@@ -72,6 +78,9 @@ declare global {
         /** Optional 3D selectable object box, e.g. 0.7 in the example. */
         boxSize?: number;
         space?: GizmoHandleSpace;
+        /** Resolve local Move coordinates relative to this Node, not the
+         * selected Component's Node. Ignored in world space. */
+        frameNode?: import('cc').Node;
         snap?: number;
         axisSize?: number;
         pickSize?: number;
