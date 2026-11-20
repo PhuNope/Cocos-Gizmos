@@ -36,3 +36,7 @@ Active development takes place on **`v3`**. Development builds are distributed a
 Release-specific features, fixes and breaking changes belong in [CHANGELOG.md](CHANGELOG.md) and the GitHub Release notes, rather than the README.
 
 Run `npm ci && npm test` to check the source. Run `npm run pack` for a minimal installable ZIP; the packaging script uses a strict file allowlist and checks the built output.
+
+### Development: reference-frame Move Gizmos
+
+New v3 development builds support `Gizmos3D.move(property,{space:'local',frameNode:parentNode})` and the analogous 2D preset. Rendering, picking and drag calculations share the referenced Node's local axes; existing Move handles remain unchanged. Consumers can feature-detect `Gizmos3D.supportsMoveFrameNode`. This functionality is not present in the original v3.0.3 package. See [Move Gizmo docs](docs/MOVE_GIZMO.md). Development builds only; no tag/release.

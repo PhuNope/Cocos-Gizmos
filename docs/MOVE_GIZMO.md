@@ -139,3 +139,10 @@ Phiên bản editable trong gói ZIP: `examples/Gizmos3DApiTest.ts`. Nếu dùng
 Phím giữa để pan camera và phím phải để orbit vẫn thuộc Editor, không được bắt đầu drag Gizmos. Nếu trạng thái editor bị lỗi, dùng menu **Gizmos → Reset Gizmos**.
 
 > Chạy type-check/test tự động không xác minh hoàn toàn việc raycast của native Scene trên từng góc camera. Hãy thử click cả thân tia và các ô XY/XZ/YZ trong Cocos Creator 3.8.8.
+
+
+## Move Gizmo with an optional reference frame (development build)
+
+Use `Gizmos3D.move('editorGroupLocalPosition', {space:'local', frameNode:spline.node})` for a child Component that stores its Vec3 in the SplineContainer's local coordinates. The Node reference controls gizmo origin, visible axis/plane directions and picking/drag basis. It does not modify Node transforms or serialize the reference. When omitted, the selected Component Node is the frame as before. `space:'world'` ignores `frameNode`. This option also works in `Gizmos2D.move`.
+
+This feature requires a development build newer than the original v3.0.3, which did not provide `frameNode`. Check `Gizmos3D.supportsMoveFrameNode` at runtime. No tag or GitHub Release was created for this feature.

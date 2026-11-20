@@ -1,140 +1,140 @@
 {
-    "$schema": "./@types/schema/package/index.json",
-    "package_version": 2,
-    "name": "cocos-gizmos",
-    "version": "3.0.3",
-    "author": "Nope",
-    "editor": ">=3.8.2",
-    "scripts": {
-        "build": "tsc -p tsconfig.json --noEmit && node scripts/build.mjs && tsc -p tsconfig.assets.json --noEmit",
-        "type": "npm run build && node scripts/type.mjs",
-        "prepublishOnly": "npm run type",
-        "test": "npm run type && node scripts/verify-output.mjs && node tests/version-branch.mjs && node tests/extension-types.mjs && node tests/mounted-examples.mjs && node tests/example-asset-health.mjs && node tests/example-class-diagnostics.mjs && node tests/scene-example-classes.mjs && node tests/optional-extension.mjs && node tests/scene-scheduler.mjs && node tests/scene-discovery.mjs && node tests/selection-reentry.mjs && node tests/reset-menu.mjs && node tests/presentation.mjs && node tests/hud-layout.mjs && node tests/scene-hud-element.mjs && node tests/hud-overlay.mjs && node tests/screen-hud-mesh.mjs && node tests/scene-camera-bridge.mjs && node tests/hud-projection.mjs && node tests/hud-controls.mjs && node tests/gizmo-hud-builder.mjs && node tests/gizmo-hud-command-builder.mjs && node tests/gizmo-hud-dom.mjs && node tests/panel-settings.mjs && node tests/full-size-panels.mjs && node tests/panel-docs.mjs && node tests/gizmo-diagnostics.mjs && node tests/gizmo-edit-session.mjs && node tests/command-architecture.mjs && node tests/command-builder.mjs && node tests/position-drag.mjs && node tests/plane-handles.mjs && node tests/move-picking.mjs && node tests/rotation-gizmo.mjs && node tests/move-2d.mjs && node tests/move-visuals.mjs && node tests/scene-gizmo-input.mjs && node tests/scene-selection-lease.mjs && node tests/scene-pointer-coordinates.mjs && node tests/scene-operation-input.mjs && node tests/scene-viewport-input.mjs && node tests/scene-engine-input.mjs && node tests/editor-handle-adapter-v3.mjs && node tests/gizmo-hit-test-v3.mjs && node tests/position-adapter.mjs && node tests/register-decorator.mjs && node tests/hud-picking-plane.mjs && node tests/draw-commands-2d.mjs && node tests/renderer-3d.mjs && node tests/editor-only.mjs && node tests/mesh-positions.mjs",
-        "pack": "npm run test && node scripts/pack.mjs && node tests/packaged-selection.mjs",
-        "stage:dev": "node scripts/stage-dev-artifact.mjs && node tests/staged-artifact.mjs"
+  "$schema": "./@types/schema/package/index.json",
+  "package_version": 2,
+  "name": "cocos-gizmos",
+  "version": "3.0.3",
+  "author": "Nope",
+  "editor": ">=3.8.2",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit && node scripts/build.mjs && tsc -p tsconfig.assets.json --noEmit",
+    "type": "npm run build && node scripts/type.mjs",
+    "prepublishOnly": "npm run type",
+    "test": "npm run type && node scripts/verify-output.mjs && node tests/version-branch.mjs && node tests/extension-types.mjs && node tests/mounted-examples.mjs && node tests/example-asset-health.mjs && node tests/example-class-diagnostics.mjs && node tests/scene-example-classes.mjs && node tests/optional-extension.mjs && node tests/scene-scheduler.mjs && node tests/scene-discovery.mjs && node tests/selection-reentry.mjs && node tests/reset-menu.mjs && node tests/presentation.mjs && node tests/hud-layout.mjs && node tests/scene-hud-element.mjs && node tests/hud-overlay.mjs && node tests/screen-hud-mesh.mjs && node tests/scene-camera-bridge.mjs && node tests/hud-projection.mjs && node tests/hud-controls.mjs && node tests/gizmo-hud-builder.mjs && node tests/gizmo-hud-command-builder.mjs && node tests/gizmo-hud-dom.mjs && node tests/panel-settings.mjs && node tests/full-size-panels.mjs && node tests/panel-docs.mjs && node tests/gizmo-diagnostics.mjs && node tests/gizmo-edit-session.mjs && node tests/command-architecture.mjs && node tests/command-builder.mjs && node tests/position-drag.mjs && node tests/plane-handles.mjs && node tests/move-picking.mjs && node tests/rotation-gizmo.mjs && node tests/move-2d.mjs && node tests/move-visuals.mjs && node tests/scene-gizmo-input.mjs && node tests/scene-selection-lease.mjs && node tests/scene-pointer-coordinates.mjs && node tests/scene-operation-input.mjs && node tests/scene-viewport-input.mjs && node tests/scene-engine-input.mjs && node tests/editor-handle-adapter-v3.mjs && node tests/gizmo-hit-test-v3.mjs && node tests/position-adapter.mjs && node tests/register-decorator.mjs && node tests/hud-picking-plane.mjs && node tests/draw-commands-2d.mjs && node tests/renderer-3d.mjs && node tests/editor-only.mjs && node tests/mesh-positions.mjs && node tests/move-frame-node.mjs",
+    "pack": "npm run test && node scripts/pack.mjs && node tests/packaged-selection.mjs",
+    "stage:dev": "node scripts/stage-dev-artifact.mjs && node tests/staged-artifact.mjs"
+  },
+  "types": "dist/Gizmos.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@cocos/creator-types": "^3.8.2",
+    "@types/fs-extra": "^9.0.5",
+    "@types/node": "^18.17.1",
+    "fs-extra": "^10.0.0",
+    "typescript": "^6.0.3",
+    "vue": "^3.1.4"
+  },
+  "contributions": {
+    "scene": {
+      "script": "./scene.js"
     },
-    "types": "dist/Gizmos.d.ts",
-    "files": [
-        "dist"
+    "builder": "./builder.js",
+    "asset-db": {
+      "mount": {
+        "path": "./editor-assets",
+        "readonly": true
+      }
+    },
+    "menu": [
+      {
+        "path": "Gizmos",
+        "label": "Reset Gizmos",
+        "message": "reset-gizmos"
+      },
+      {
+        "path": "Gizmos",
+        "label": "Open Document",
+        "message": "open-doc"
+      },
+      {
+        "path": "Gizmos",
+        "label": "Gizmos Settings",
+        "message": "open-settings"
+      }
     ],
-    "publishConfig": {
-        "access": "public"
-    },
-    "devDependencies": {
-        "@cocos/creator-types": "^3.8.2",
-        "@types/fs-extra": "^9.0.5",
-        "@types/node": "^18.17.1",
-        "fs-extra": "^10.0.0",
-        "typescript": "^6.0.3",
-        "vue": "^3.1.4"
-    },
-    "contributions": {
-        "scene": {
-            "script": "./scene.js"
-        },
-        "builder": "./builder.js",
-        "asset-db": {
-            "mount": {
-                "path": "./editor-assets",
-                "readonly": true
-            }
-        },
-        "menu": [
-            {
-                "path": "Gizmos",
-                "label": "Reset Gizmos",
-                "message": "reset-gizmos"
-            },
-            {
-                "path": "Gizmos",
-                "label": "Open Document",
-                "message": "open-doc"
-            },
-            {
-                "path": "Gizmos",
-                "label": "Gizmos Settings",
-                "message": "open-settings"
-            }
-        ],
-        "messages": {
-            "open-settings": {
-                "methods": [
-                    "openSettings"
-                ]
-            },
-            "get-settings": {
-                "methods": [
-                    "getSettings"
-                ]
-            },
-            "set-settings": {
-                "methods": [
-                    "setSettings"
-                ]
-            },
-            "get-diagnostics": {
-                "methods": [
-                    "getDiagnostics"
-                ]
-            },
-            "get-example-assets": {
-                "methods": [
-                    "getExampleAssets"
-                ]
-            },
-            "selection:select": {
-                "methods": [
-                    "onSelectionSelect"
-                ]
-            },
-            "selection:unselect": {
-                "methods": [
-                    "onSelectionUnselect"
-                ]
-            },
-            "reset-gizmos": {
-                "methods": [
-                    "resetGizmos"
-                ]
-            },
-            "open-doc": {
-                "methods": [
-                    "openDoc"
-                ]
-            }
-        }
-    },
-    "main": "./main.js",
-    "panels": {
-        "settings": {
-            "title": "Gizmos Settings",
-            "type": "simple",
-            "main": "./panels/settings/index.js",
-            "flags": {
-                "resizable": true,
-                "save": false
-            },
-            "size": {
-                "width": 1600,
-                "height": 920,
-                "min-width": 660,
-                "min-height": 480
-            }
-        },
-        "docs": {
-            "title": "Gizmos Open Document",
-            "type": "simple",
-            "main": "./panels/docs/index.js",
-            "flags": {
-                "resizable": true,
-                "save": false
-            },
-            "size": {
-                "width": 1600,
-                "height": 920,
-                "min-width": 660,
-                "min-height": 480
-            }
-        }
+    "messages": {
+      "open-settings": {
+        "methods": [
+          "openSettings"
+        ]
+      },
+      "get-settings": {
+        "methods": [
+          "getSettings"
+        ]
+      },
+      "set-settings": {
+        "methods": [
+          "setSettings"
+        ]
+      },
+      "get-diagnostics": {
+        "methods": [
+          "getDiagnostics"
+        ]
+      },
+      "get-example-assets": {
+        "methods": [
+          "getExampleAssets"
+        ]
+      },
+      "selection:select": {
+        "methods": [
+          "onSelectionSelect"
+        ]
+      },
+      "selection:unselect": {
+        "methods": [
+          "onSelectionUnselect"
+        ]
+      },
+      "reset-gizmos": {
+        "methods": [
+          "resetGizmos"
+        ]
+      },
+      "open-doc": {
+        "methods": [
+          "openDoc"
+        ]
+      }
     }
+  },
+  "main": "./main.js",
+  "panels": {
+    "settings": {
+      "title": "Gizmos Settings",
+      "type": "simple",
+      "main": "./panels/settings/index.js",
+      "flags": {
+        "resizable": true,
+        "save": false
+      },
+      "size": {
+        "width": 1600,
+        "height": 920,
+        "min-width": 660,
+        "min-height": 480
+      }
+    },
+    "docs": {
+      "title": "Gizmos Open Document",
+      "type": "simple",
+      "main": "./panels/docs/index.js",
+      "flags": {
+        "resizable": true,
+        "save": false
+      },
+      "size": {
+        "width": 1600,
+        "height": 920,
+        "min-width": 660,
+        "min-height": 480
+      }
+    }
+  }
 }
