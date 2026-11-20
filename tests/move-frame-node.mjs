@@ -83,9 +83,13 @@ assert.equal(untouched.toWorld(property).x,101,'Without a frame, retain node-loc
 const global=viewport.spaceFor(component,{...field,space:'world'});
 assert.equal(global.toWorld(property).x,1,'World handles ignore reference frame');
 ref.isValid=false;
+assert(Number.isNaN(actual.toWorld(property).x),
+ 'An already captured Move command must reject an invalidated frame.');
+assert(Number.isNaN(actual.toLocal(world).x));
 assert(Number.isNaN(viewport.spaceFor(component,field).toWorld(property).x),
  'Invalid reference frame must not produce draggable geometry');
 ref.isValid=true;
+eq(actual.toLocal(world).x,property.x);
 const preset=load('GizmoHandlePresets');
 const handles=preset.makeMoveGizmo('position',{frameNode:ref,space:'local'});
 assert.equal(handles.length,6);
