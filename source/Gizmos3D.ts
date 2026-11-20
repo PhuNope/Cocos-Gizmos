@@ -817,6 +817,8 @@ export class Gizmos3D {
     public static readonly supportsRotationPivot = true;
     /** Feature probe for Move handles bound to a reference Node frame. */
     public static readonly supportsMoveFrameNode = true;
+    /** Feature probe for computed handles with domain-owned Scene history. */
+    public static readonly supportsExternalHistory = true;
     /** One call creates the complete XYZ + XY/XZ/YZ Move Gizmo.
      * This façade only builds descriptors; Editor adapters own interactions.
      */
