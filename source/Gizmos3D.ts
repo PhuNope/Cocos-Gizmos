@@ -791,6 +791,7 @@ export interface GizmosMoveHandleOptions {
     space?: GizmoHandleSpace;
     /** Optional Node defining the local frame for this Move handle. */
     frameNode?: Node;
+    history?: 'native' | 'external';
     /** Shared snap value for all axis and plane handles. */
     snap?: number;
     /** Approximate length of each colored axis arrow in Scene pixels. */

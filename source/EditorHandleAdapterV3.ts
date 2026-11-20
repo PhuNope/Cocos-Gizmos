@@ -322,6 +322,7 @@ function createSelectHandleGizmo(
                     view?.node?.forward||ray.d));
             if(!normal)return;
             const property=entry.field.property, index=entry.field.index;
+            const externalHistory=entry.field.history==='external';
             const port={
                 read:()=>readField(component,entry.field) as Point,
                 write:(value:Point)=>{
@@ -331,19 +332,28 @@ function createSelectHandleGizmo(
             };
             const hooks={
                 begin:()=>{
-                    this.beginEdit(property);
+                    if(!externalHistory)this.beginEdit(property);
                     try { component.onGizmoChanged?.(property,'begin',index); }
-                    catch(error){this.endEdit(property,true);throw error;}
+                    catch(error){
+                        if(!externalHistory)this.endEdit(property,true);
+                        throw error;
+                    }
                 },
                 update:()=>{
                     component.onGizmoChanged?.(property,'update',index);
-                    this.changed(property);
+                    if(externalHistory)requestSceneRepaint();
+                    else this.changed(property);
                 },
-                rollback:()=>this.changed(property),
+                rollback:()=>{
+                    if(externalHistory)requestSceneRepaint();
+                    else this.changed(property);
+                },
                 end:(_value:Point,cancelled:boolean,changed:boolean)=>{
                     try { component.onGizmoChanged?.(
                         property,cancelled?'cancel':'end',index); }
-                    finally {this.endEdit(property,cancelled||!changed);}
+                    finally {
+                        if(!externalHistory)this.endEdit(property,cancelled||!changed);
+                    }
                 },
             };
             try {

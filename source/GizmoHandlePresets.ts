@@ -41,6 +41,7 @@ export function makeMoveGizmo(
         property: name,
         space: options.space ?? 'local',
         frameNode: options.frameNode,
+        history: options.history,
         snap: options.snap,
         bounds: options.bounds,
         pickSize,

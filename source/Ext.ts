@@ -26,6 +26,9 @@ declare global {
          * Ignored when space==='world'; the Node must be valid in the Scene.
          */
         frameNode?: import('cc').Node;
+        /** Default native Editor Undo hooks; 'external' delegates history to
+         * the component drawer for a REAL serialized property transaction. */
+        history?: 'native' | 'external';
         /** Lock movement to one axis in the selected coordinate space. */
         axis?: GizmoHandleAxis;
         /** Optional snap interval; omit for continuous, unsnapped dragging. */
@@ -81,6 +84,7 @@ declare global {
         /** Resolve local Move coordinates relative to this Node, not the
          * selected Component's Node. Ignored in world space. */
         frameNode?: import('cc').Node;
+        history?: 'native' | 'external';
         snap?: number;
         axisSize?: number;
         pickSize?: number;
@@ -100,6 +104,7 @@ declare global {
      */
     interface GizmosRotateHandleOptions {
         space?: GizmoHandleSpace;
+        history?: 'native' | 'external';
         /** Snapping in angular degrees, e.g. 15; omitted = smooth rotation. */
         snap?: number;
         /** Vec3 position property on this Component used as the ring pivot. */
