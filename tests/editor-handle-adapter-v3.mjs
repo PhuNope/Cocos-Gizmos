@@ -322,6 +322,25 @@ assert.ok(events.some(e=>e[0]==='end'&&e[1]==='serialized.position'),
     'Native Undo hooks receive the SelectGizmo serialized Component path');
 assert.ok(events.some(e=>e[0]==='builder'&&e[1]==='move'),
     'The v3 adapter constructs domain commands through the fluent Builder');
+ // A computed/derived property may be committed by a domain-specific
+ // serialized transaction. Its declared external history must never trigger
+ // native SelectGizmo history hooks (otherwise it generates an extra Undo).
+ const oldFields=component.onGizmoHandles;
+ component.onGizmoHandles=()=>[{property:'position',plane:'xy',visual:'point',
+     history:'external'}];
+ adapter.refresh([component],new Set(['v3-target']),510);
+ const hooksBefore=events.filter(e=>['begin','update','end','node'].includes(e[0])).length;
+ const phasesBefore=events.filter(e=>e[0]==='handle').length;
+ component.gizmo.onNotGizmoMouseDown({x:90,y:80});
+ component.gizmo.onNotGizmoMouseMove({x:100,y:80});
+ component.gizmo.onNotGizmoMouseUp({x:100,y:80});
+ assert.equal(events.filter(e=>['begin','update','end','node'].includes(e[0])).length,
+     hooksBefore,'External history must suppress all native SelectGizmo hooks');
+ assert(events.slice().filter(e=>e[0]==='handle').length>=phasesBefore+3,
+     'External history must still dispatch begin/update/end to the drawer');
+ component.onGizmoHandles=oldFields;
+ adapter.refresh([component],new Set(['v3-target']),520);
+
 component.gizmo.onNotGizmoMouseDown({x:90,y:80});
 component.gizmo.onNotGizmoMouseMove({x:120,y:80});
 component.gizmo.onKeyDown({key:'Escape'});

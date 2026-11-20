@@ -146,3 +146,8 @@ Phím giữa để pan camera và phím phải để orbit vẫn thuộc Editor,
 Use `Gizmos3D.move('editorGroupLocalPosition', {space:'local', frameNode:spline.node})` for a child Component that stores its Vec3 in the SplineContainer's local coordinates. The Node reference controls gizmo origin, visible axis/plane directions and picking/drag basis. It does not modify Node transforms or serialize the reference. When omitted, the selected Component Node is the frame as before. `space:'world'` ignores `frameNode`. This option also works in `Gizmos2D.move`.
 
 This feature requires a development build newer than the original v3.0.3, which did not provide `frameNode`. Check `Gizmos3D.supportsMoveFrameNode` at runtime. No tag or GitHub Release was created for this feature.
+
+
+## External Undo history owner for computed handles (v3 preview)
+
+When a Move/Rotate handle's editable property is a computed getter/setter instead of a real serialized CCClass field, opt in to `history:'external'`: `Gizmos3D.move('groupPosition',{history:'external'})`. The adapter still invokes `onGizmoChanged(property, 'begin'/'update'/'end'/'cancel')` and repaints the Scene, but skips its native `SelectGizmo.onControlBegin/Update/End/Cancel` hooks. The owning extension must write the actual serialized property via Editor Scene messages and request exactly one `scene/snapshot` on successful End; Cancel must restore its baseline. Defaults stay `history:'native'` so existing users are unchanged. Use this option only when a real domain transaction owns history — otherwise Undo will be lost. Tested in CI but not yet certified against native Editor Undo/Redo in Creator 3.8.8.

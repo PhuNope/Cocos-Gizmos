@@ -40,3 +40,7 @@ Run `npm ci && npm test` to check the source. Run `npm run pack` for a minimal i
 ### Development: reference-frame Move Gizmos
 
 New v3 development builds support `Gizmos3D.move(property,{space:'local',frameNode:parentNode})` and the analogous 2D preset. Rendering, picking and drag calculations share the referenced Node's local axes; existing Move handles remain unchanged. Consumers can feature-detect `Gizmos3D.supportsMoveFrameNode`. This functionality is not present in the original v3.0.3 package. See [Move Gizmo docs](docs/MOVE_GIZMO.md). Development builds only; no tag/release.
+
+### External history for computed Gizmos (v3 development)
+
+Move/Rotate handle descriptors support `history:'external'` to delegate native undo grouping to a domain extension. When enabled, Cocos-Gizmos still sends drag callbacks but does not call native SelectGizmo history hooks for that handle. It is suitable only when the consumer commits real serialized properties and creates a single Scene snapshot; ordinary handles continue using native hooks by default.
