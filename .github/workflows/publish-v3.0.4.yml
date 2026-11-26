@@ -1,0 +1,63 @@
+name: Publish v3.0.4 (one-time release)
+on:
+  push:
+    branches: [publish-v3.0.4]
+permissions:
+  contents: write
+jobs:
+  publish:
+    if: github.repository == 'PhuNope/Cocos-Gizmos'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Confirm exact v3 release source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch origin v3
+          base="$(git rev-parse HEAD^)"
+          target="$(git rev-parse origin/v3)"
+          test "$base" = "$target" || { echo "::error::v3 has moved; release source mismatch"; exit 1; }
+          test "$target" = "ee8dfce87dd2061cc42b0a5cfea76ba08294242d" || { echo "::error::Unexpected release commit"; exit 1; }
+          test "$(node -p "require('./package.json').version")" = "3.0.4"
+          if gh release view v3.0.4 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::v3.0.4 already published"; exit 1
+          fi
+          if git ls-remote --exit-code --tags origin refs/tags/v3.0.4 >/dev/null 2>&1; then
+            echo "::error::v3.0.4 tag already exists"; exit 1
+          fi
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify and build installable release ZIP
+        run: npm run pack
+      - name: Extract only v3.0.4 release notes
+        run: |
+          node scripts/release-notes.mjs v3.0.4
+          grep -q '^### Added' release-notes.md
+          grep -q '^### Fixed' release-notes.md
+          test "$(grep -c '^### ' release-notes.md)" -eq 2
+          test -s release/Cocos-Gizmos-v3.0.4.zip
+          test -s dist/Gizmos.d.ts
+          test -s dist/Gizmos.js
+      - name: Create tag and publish v3.0.4 with three assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create v3.0.4 \
+            release/Cocos-Gizmos-v3.0.4.zip \
+            dist/Gizmos.d.ts \
+            dist/Gizmos.js \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "ee8dfce87dd2061cc42b0a5cfea76ba08294242d" \
+            --title "v3.0.4" \
+            --notes-file release-notes.md
