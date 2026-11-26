@@ -50,11 +50,13 @@ const manifest = {
     'asset-db': { mount: { path: './editor-assets', readonly: true } },
     menu: [
       { path: 'Gizmos', label: 'Reset Gizmos', message: 'reset-gizmos' },
+      { path: 'Gizmos', label: 'Install Example', message: 'install-example' },
       { path: 'Gizmos', label: 'Open Document', message: 'open-doc' },
       { path: 'Gizmos', label: 'Gizmos Settings', message: 'open-settings' },
     ],
     messages: {
       'reset-gizmos': { methods: ['resetGizmos'] },
+      'install-example': { methods: ['installExample'] },
       'open-doc': { methods: ['openDoc'] },
       'open-settings': { methods: ['openSettings'] },
       'get-settings': { methods: ['getSettings'] },
@@ -68,7 +70,7 @@ const manifest = {
     },
   },
 };
-const usage = `# Cocos-Gizmos v${pkg.version}\n\nCocos Creator extension providing global Gizmos2D and Gizmos3D.\n\n## Install\n\n1. In Cocos Creator 3.8.2+, open Extensions > Extension Manager.\n2. Select the Project or Global tab, choose Import Extension (+), and select this ZIP.\n3. Enable the Cocos-Gizmos extension and allow the Asset Database to finish importing.\n\nEditor-only Scene Script runs Gizmos outside the game Asset Database, so runtime JS is not imported into game builds. The build hook removes only onDrawGizmos and onDrawGizmosSelected from compiled game JS. Other calls are not checked or modified. The JavaScript module must be evaluated before using the runtime globals. Use Gizmos2D and Gizmos3D inside lifecycle callbacks after startup; don't reference them in top-level initializers.\n\n## Drag-and-drop demo Components\n\nAfter enabling the extension, open the Cocos Assets panel > cocos-gizmos > Examples. Select a Scene Node, then drag CocosGizmos2DDemo.ts, CocosGizmos3DDemo.ts or CocosGizmosSmokeDemo.ts onto the Node's Inspector. If the files do not appear, use Extensions > Gizmos Settings > Check example assets to inspect both Asset Database import status and Scene Component class registration. Both should show imported/registered before manual drag-and-drop testing. Re-selecting a 2D Node should restore all drag points. The HUD uses an interactive floating DOM dock in the Scene WebView when available; each control captures its own mouse input and uses existing EditSession commands, independently from 2D/3D Gizmo raycasting. If DOM is inaccessible, the textured HUD falls back to native Scene Operation picking. Label and control descriptors accept bounded size and safe CSS-like style options. 2D Move/Rotate hover colors update immediately on pointer enter/leave. Scene selection:select/unselect events restore drag handles when selection goes empty then returns to the same Node. Use the new top-level Gizmos > Reset Gizmos menu to rebuild editor-only controllers and HUD after a Scene failure, without touching Scene assets. Use Gizmos > Open Document for API examples and diagrams, or Gizmos > Gizmos Settings for diagnostics if the Scene camera or Gizmo bridge is unavailable. These demo scripts are mounted read-only and use stable UUIDs. For editable copies, use the separate examples/ folder. Remove test Components before shipping; disabling the extension makes Scenes referencing them lose those scripts.\n\nTypes are in dist/Gizmos.d.ts. Cocos Creator's engine provides cc and cc/env.\n\nSource: https://github.com/PhuNope/Cocos-Gizmos\n`;
+const usage = `# Cocos-Gizmos v${pkg.version}\n\nCocos Creator extension providing global Gizmos2D and Gizmos3D.\n\n## Install\n\n1. In Cocos Creator 3.8.2+, open Extensions > Extension Manager.\n2. Select the Project or Global tab, choose Import Extension (+), and select this ZIP.\n3. Enable the Cocos-Gizmos extension and allow the Asset Database to finish importing.\n\nEditor-only Scene Script runs Gizmos outside the game Asset Database, so runtime JS is not imported into game builds. The build hook removes only onDrawGizmos and onDrawGizmosSelected from compiled game JS. Other calls are not checked or modified. The JavaScript module must be evaluated before using the runtime globals. Use Gizmos2D and Gizmos3D inside lifecycle callbacks after startup; don't reference them in top-level initializers.\n\n## Optional example Components\n\nExamples are not installed automatically. Choose **Gizmos > Install Example** to add **assets/Example** to your open project, containing editable 2D, 3D, Smoke, Decorator demo Components, a local RegisterGizmos.ts helper, and their .meta files. Then drag a sample script from Assets > Example onto a Scene Node in the Inspector. Run Gizmos Settings > Check example assets after AssetDB finishes importing. The installer does not overwrite an existing assets/Example folder. You can edit the installed scripts directly and keep them when disabling the extension. The extension still mounts only its global Gizmos types and its generic RegisterGizmos helper, not its Example folder.\n\nTypes are in dist/Gizmos.d.ts. Cocos Creator's engine provides cc and cc/env.\n\nSource: https://github.com/PhuNope/Cocos-Gizmos\n`;
 
 // Standards-compliant ZIP using only Node built-ins; no extra zip executable
 // and no dependency required on Windows, macOS or Linux.
@@ -137,26 +139,22 @@ const entries = [
   ['editor-assets/GizmosGlobal.ts', readFileSync(globalTypesAsset)],
   ['editor-assets/RegisterGizmos.ts', readFileSync(path.join(ROOT, 'editor-assets', 'RegisterGizmos.ts'))],
   ['editor-assets/RegisterGizmos.ts.meta', readFileSync(path.join(ROOT, 'editor-assets', 'RegisterGizmos.ts.meta'))],
-  // These example Components belong to the mounted read-only Asset DB so the
-  // user can drag a script straight from Assets > cocos-gizmos > Examples into
-  // the Inspector. Checked-in .meta files give them stable UUIDs across builds.
+  // Opt-in templates are shipped outside editor-assets (AssetDB mount).
+  ['example-installer.js', readFileSync(path.join(ROOT, 'example-installer.js'))],
   ...[
-    'Examples.meta',
-    'Examples/CocosGizmos2DDemo.ts',
-    'Examples/CocosGizmos2DDemo.ts.meta',
-    'Examples/CocosGizmos3DDemo.ts',
-    'Examples/CocosGizmos3DDemo.ts.meta',
-    'Examples/CocosGizmosSmokeDemo.ts',
-    'Examples/CocosGizmosSmokeDemo.ts.meta',
-    'Examples/CocosGizmosDecoratorDemo.ts',
-    'Examples/CocosGizmosDecoratorDemo.ts.meta',
-  ].map(relative => ['editor-assets/' + relative,
-    readFileSync(path.join(ROOT, 'editor-assets', relative))]),
-  // Keep editable copies for users who prefer their own project assets.
-  ['examples/GizmoSmokeProbe.ts', readFileSync(path.join(ROOT, 'assets', 'GizmoSmokeProbe.ts'))],
-  ['examples/Gizmos2DApiTest.ts', readFileSync(path.join(ROOT, 'assets', 'Gizmos2DApiTest.ts'))],
-  ['examples/Gizmos3DApiTest.ts', readFileSync(path.join(ROOT, 'assets', 'Gizmos3DApiTest.ts'))],
-  ['examples/GizmosDecoratorTest.ts', readFileSync(path.join(ROOT, 'assets', 'GizmosDecoratorTest.ts'))],
+    'Example.meta',
+    'Example/CocosGizmos2DDemo.ts',
+    'Example/CocosGizmos2DDemo.ts.meta',
+    'Example/CocosGizmos3DDemo.ts',
+    'Example/CocosGizmos3DDemo.ts.meta',
+    'Example/CocosGizmosSmokeDemo.ts',
+    'Example/CocosGizmosSmokeDemo.ts.meta',
+    'Example/CocosGizmosDecoratorDemo.ts',
+    'Example/CocosGizmosDecoratorDemo.ts.meta',
+    'Example/RegisterGizmos.ts',
+    'Example/RegisterGizmos.ts.meta',
+  ].map(relative => ['example-templates/' + relative,
+    readFileSync(path.join(ROOT, 'example-templates', relative))]),
   // docs/ lives in the repository only. Installed users browse APIs through Open Document.
   ['main.js', readFileSync(path.join(ROOT, 'main.js'))],
   ['scene.js', readFileSync(path.join(ROOT, 'scene.js'))],
