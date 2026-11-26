@@ -1,5 +1,5 @@
 import { _decorator, Component, Color, Vec3 } from 'cc';
-import { registerGizmos, type IDrawGizmos } from '../RegisterGizmos';
+import { registerGizmos, type IDrawGizmos } from './RegisterGizmos';
 
 const { ccclass, property } = _decorator;
 
