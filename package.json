@@ -47,6 +47,11 @@
       },
       {
         "path": "Gizmos",
+        "label": "Install Example",
+        "message": "install-example"
+      },
+      {
+        "path": "Gizmos",
         "label": "Open Document",
         "message": "open-doc"
       },
@@ -100,6 +105,11 @@
       "open-doc": {
         "methods": [
           "openDoc"
+        ]
+      },
+      "install-example": {
+        "methods": [
+          "installExample"
         ]
       }
     }
