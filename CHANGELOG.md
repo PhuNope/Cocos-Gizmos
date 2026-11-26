@@ -4,6 +4,18 @@ All notable changes to Cocos-Gizmos are documented here.
 
 ## [Unreleased]
 
+## [3.0.4] - 2026-11-26
+
+### Added
+- **Gizmos → Install Example** installs editable 2D, 3D, Smoke and Decorator demo Components into the active project's `assets/Example` directory, including their Cocos `.meta` files and a local `RegisterGizmos.ts` helper.
+- `Gizmos2D.move()` and `Gizmos3D.move()` accept a `frameNode` reference for local-axis Move handles relative to a different Node.
+- Optional `history: 'external'` ownership for Move and Rotate handles lets extensions manage Undo/history while retaining Gizmo drag callbacks.
+
+### Fixed
+- Installing or enabling the extension no longer auto-mounts demo scripts in the extension Asset Database; examples are installed only when requested.
+- Re-running **Install Example** preserves an existing project Example folder, and the project-local Decorator helper uses a separate UUID from the extension-mounted helper.
+- Move drags now stop safely when their `frameNode` reference becomes invalid.
+
 ## [3.0.3] - 2026-11-19
 
 ### Added

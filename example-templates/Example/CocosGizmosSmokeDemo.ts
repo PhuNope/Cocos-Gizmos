@@ -1,4 +1,4 @@
-/** Read-only Cocos-Gizmos extension demo. Drag from db://cocos-gizmos/Examples. */
+/** Editable project example. Install with Gizmos > Install Example; attach from Assets > Example. */
 import { _decorator, Component, Vec3 } from 'cc';
 
 const { ccclass, property } = _decorator;

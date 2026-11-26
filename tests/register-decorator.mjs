@@ -73,9 +73,9 @@ assert.throws(() => register(null), /constructor/);
 
 const editable = readFileSync(path.join(root, 'assets/GizmosDecoratorTest.ts'), 'utf8');
 const mounted = readFileSync(path.join(root,
-    'editor-assets/Examples/CocosGizmosDecoratorDemo.ts'), 'utf8');
+    'example-templates/Example/CocosGizmosDecoratorDemo.ts'), 'utf8');
 assert.match(editable, /@registerGizmos\(CustomDrawer\)/);
 assert.match(editable, /implements IDrawGizmos/);
-assert.match(mounted, /from '\.\.\/RegisterGizmos'/);
+assert.match(mounted, /from '\.\/RegisterGizmos'/);
 assert.match(editable, /onGizmoHUD\(\)/);
 console.log('[register-decorator] cached Editor callbacks, HUD and game/Preview no-op OK');

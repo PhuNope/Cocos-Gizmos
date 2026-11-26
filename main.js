@@ -2,6 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { installExample } = require('./example-installer');
 
 // URLs are relative to the read-only mount defined in package.json.
 // Keep the UUIDs in sync with editor-assets/Examples/*.ts.meta.
@@ -31,14 +32,14 @@ async function queryExampleAssets(editor) {
             databaseReady,
             examples: EXAMPLE_ASSETS.map(({ name, uuid }) => ({
                 name, expectedUuid: uuid,
-                url: 'db://cocos-gizmos/Examples/' + name + '.ts',
+                url: 'db://assets/Example/' + name + '.ts',
                 status: 'database-not-ready',
             })),
-            guidance: 'Asset Database is still starting. Check again after the import completes.',
+            guidance: 'Install examples from Gizmos > Install Example, then check after AssetDB finishes importing.',
         };
     }
     const examples = await Promise.all(EXAMPLE_ASSETS.map(async ({ name, uuid }) => {
-        const url = 'db://cocos-gizmos/Examples/' + name + '.ts';
+        const url = 'db://assets/Example/' + name + '.ts';
         const entry = { name, url, expectedUuid: uuid };
         try {
             const info = await request('query-asset-info', url);
@@ -62,8 +63,8 @@ async function queryExampleAssets(editor) {
         databaseReady,
         examples,
         guidance: allImported ?
-            'Scripts are imported in Asset DB. Try dragging from Assets > cocos-gizmos > Examples to a Node Inspector; this check does not validate Scene compilation or drag-and-drop.' :
-            'Check extension enablement, Cocos Console errors and the Assets > cocos-gizmos > Examples mount; restart the Editor if importing is stalled.',
+            'Project examples are imported at db://assets/Example. Drag a demo Component onto a Node Inspector and confirm Scene compilation.' :
+            'Choose Gizmos > Install Example, then look in Assets > Example; the extension no longer mounts Example scripts automatically.',
     };
 }
 
@@ -257,6 +258,7 @@ function openFullSizePanel(id) {
 
 exports.methods = {
     resetGizmos,
+    installExample() { return installExample(globalThis.Editor, __dirname); },
     onSelectionSelect,
     onSelectionUnselect,
     openSettings() {

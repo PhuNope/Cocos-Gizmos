@@ -133,9 +133,18 @@ assert.match(entries.get('dist/RegisterGizmos.js') || '', /EDITOR_NOT_IN_PREVIEW
     'Installed module must be gated to Editor only');
 assert.match(entries.get('dist/RegisterGizmos.d.ts') || '', /IDrawGizmos/);
 assert.match(entries.get('editor-assets/RegisterGizmos.ts') || '', /registerGizmos/);
-assert.match(entries.get('editor-assets/Examples/CocosGizmosDecoratorDemo.ts') || '',
+assert.ok([...entries.keys()].every(name=>!name.startsWith('editor-assets/Examples')),
+    'Installed plugin must not mount or ship a read-only Examples folder');
+assert.match(entries.get('example-templates/Example/CocosGizmosDecoratorDemo.ts') || '',
     /@registerGizmos\(CustomDrawer\)/);
-assert.match(entries.get('examples/GizmosDecoratorTest.ts') || '',
-    /@registerGizmos\(CustomDrawer\)/);
+assert.match(entries.get('example-templates/Example/CocosGizmosDecoratorDemo.ts') || '',
+    /from '\.\/RegisterGizmos'/);
+assert.match(entries.get('example-templates/Example/RegisterGizmos.ts') || '',/registerGizmos/);
+assert.match(entries.get('example-installer.js') || '',/installExample/);
+assert.ok(installed.contributions.menu.some(item=>
+    item.path==='Gizmos' && item.label==='Install Example' &&
+    item.message==='install-example'));
+assert.deepEqual(installed.contributions.messages['install-example'].methods,['installExample']);
+
 assert.ok(!installed.contributions.messages['selection:select'].methods.includes('onSelectionUnselect'));
 console.log('[packaged-selection] versioned ZIP root, manifest, Scene event bridge, fullscreen HUD & native reentry OK');

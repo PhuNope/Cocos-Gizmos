@@ -43,7 +43,7 @@ for(const [index, expected] of [
 
 const source2D = readFileSync(path.join(root, 'source/Gizmos2D.ts'), 'utf8');
 const renderer = readFileSync(path.join(root, 'source/PositionHandles.ts'), 'utf8');
-const sample = readFileSync(path.join(root, 'editor-assets/Examples/CocosGizmos2DDemo.ts'), 'utf8');
+const sample = readFileSync(path.join(root, 'example-templates/Example/CocosGizmos2DDemo.ts'), 'utf8');
 assert.match(source2D, /public static move\(/);
 assert.match(source2D, /return makeMoveGizmo2D\(property, options\)/);
 assert.match(renderer, /if \(ray\) \{[\s\S]*drawMoveStroke\(node, a, b, color, onCanvas, pixel, canvasPoint\)/);

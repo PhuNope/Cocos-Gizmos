@@ -1,4 +1,4 @@
-/** Read-only Cocos-Gizmos extension demo. Drag from db://cocos-gizmos/Examples. */
+/** Editable project example. Install with Gizmos > Install Example; attach from Assets > Example. */
 import {
     _decorator, Color, Component, Enum, Mesh, Node, SpriteFrame, Vec2, Vec3,
 } from 'cc';

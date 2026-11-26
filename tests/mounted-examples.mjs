@@ -12,9 +12,9 @@ const config = read('tsconfig.assets.json');
 
 assert.equal(manifest.contributions['asset-db'].mount.path, './editor-assets');
 assert.equal(manifest.contributions['asset-db'].mount.readonly, true,
-    'Extension examples should be read-only and must not modify project assets');
-assert.match(config, /editor-assets\/Examples\/\*\*\/\*\.ts/,
-    'Mounted demo Components must be compiled by the sample type check');
+    'Only generic extension helpers are mounted read-only');
+assert.match(config, /example-templates\/Example\/\*\*\/\*\.ts/,
+    'Installed project demo templates must be compiled by the sample type check');
 
 const samples = [
     {
@@ -43,20 +43,20 @@ const samples = [
     },
 ];
 const seenUuids = new Set();
-const directory = JSON.parse(read('editor-assets/Examples.meta'));
+const directory = JSON.parse(read('example-templates/Example.meta'));
 assert.equal(directory.importer, 'directory');
 assert.equal(directory.uuid, '63279dc1-4860-421a-9514-8f7a056f8c2c');
 seenUuids.add(directory.uuid);
-assert.match(packer, /'Examples\.meta'/);
+assert.match(packer, /'Example\.meta'/);
 
 for (const { src, oldName, name, uuid } of samples) {
-    const relative = 'editor-assets/Examples/' + name + '.ts';
+    const relative = 'example-templates/Example/' + name + '.ts';
     const mounted = read(relative);
     const original = read(src);
     let expected = original.replace("@ccclass('" + oldName + "')",
         "@ccclass('" + name + "')").replace('class ' + oldName + ' extends Component',
         'class ' + name + ' extends Component')
-        .replace("from '../dist/RegisterGizmos'", "from '../RegisterGizmos'");
+        .replace("from '../dist/RegisterGizmos'", "from './RegisterGizmos'");
     // New builder actions capture their Component type, not just the class declaration.
     expected = expected.replaceAll(oldName, name);
     assert.equal(mounted.endsWith(expected), true,
@@ -72,7 +72,7 @@ for (const { src, oldName, name, uuid } of samples) {
             'Installed example must expose the interactive rotation ring');
     }
     assert.doesNotMatch(mounted, new RegExp("@ccclass\\('" + oldName + "'\\)"),
-        'Mounted Component needs a distinct class name if project already copied examples');
+        'Installed Component needs a distinct class name if project already copied examples');
 
     const ast = ts.createSourceFile(relative, mounted, ts.ScriptTarget.ES2017, true, ts.ScriptKind.TS);
     assert.equal(ast.parseDiagnostics.length, 0, name + ' must parse as TypeScript');
@@ -91,11 +91,18 @@ for (const { src, oldName, name, uuid } of samples) {
     assert.equal(seenUuids.has(meta.uuid), false, 'Meta UUIDs must not collide');
     seenUuids.add(meta.uuid);
 
-    assert.ok(packer.includes("'" + 'Examples/' + name + '.ts' + "'"),
-        'Script must ship inside the mounted editor-assets directory');
-    assert.ok(packer.includes("'" + 'Examples/' + name + '.ts.meta' + "'"),
-        'Mounted script metadata must ship in the extension ZIP');
+    assert.ok(packer.includes("'" + 'Example/' + name + '.ts' + "'"),
+        'Script must ship inside the opt-in installation templates');
+    assert.ok(packer.includes("'" + 'Example/' + name + '.ts.meta' + "'"),
+        'Template metadata must ship in the extension ZIP');
 }
+const helperMeta=JSON.parse(read('example-templates/Example/RegisterGizmos.ts.meta'));
+const mountedMeta=JSON.parse(read('editor-assets/RegisterGizmos.ts.meta'));
+assert.notEqual(helperMeta.uuid,mountedMeta.uuid,
+    'Project helper UUID cannot collide with the still-mounted generic decorator');
+assert.ok(!seenUuids.has(helperMeta.uuid));
 assert.equal(seenUuids.size, 5);
-
-console.log('[mounted-examples] 4 drag-and-drop Components, distinct classes and stable Cocos UUIDs OK');
+assert.match(read('example-templates/Example/CocosGizmosDecoratorDemo.ts'),
+    /from '\.\/RegisterGizmos'/);
+assert.doesNotMatch(packer,/\['editor-assets\/Examples/);
+console.log('[example-templates] 4 opt-in Components and local decorator with stable UUIDs OK');

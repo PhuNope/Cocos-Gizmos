@@ -62,7 +62,7 @@ const rotated = {
 const localXY = planeHandleGeometry(origin, rotated, 'xy', 0.01);
 assert.ok(Math.abs(localXY.normal.z - 1) < 1e-8,
     'Local rotated Node plane remains orthogonal to rotated basis');
-const sample = readFileSync(path.join(root, 'editor-assets/Examples/CocosGizmos3DDemo.ts'), 'utf8');
+const sample = readFileSync(path.join(root, 'example-templates/Example/CocosGizmos3DDemo.ts'), 'utf8');
 assert.ok(sample.includes("Gizmos3D.move('moveObject'"),
     '3D demo uses the public Move Gizmo preset');
 for (const option of ['pickSize: 24', 'axisSize: 66', 'planeSize: 18', 'planeOffset: 14',
