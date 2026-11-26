@@ -16,6 +16,10 @@ Cocos Creator Editor extension for drawing and interacting with Gizmos in Scene 
 
 Download a development artifact from the [v3 Actions workflow](https://github.com/PhuNope/Cocos-Gizmos/actions/workflows/release.yml), or an explicitly approved package from [Releases](https://github.com/PhuNope/Cocos-Gizmos/releases). In Cocos Creator open **Extensions → Extension Manager → Import Extension**, import the ZIP, then enable the extension.
 
+## Install optional examples
+
+Examples are **not mounted automatically** when enabling the extension. Choose **Gizmos → Install Example** to copy the four demo Components, a local `RegisterGizmos.ts` helper, and matching `.meta` files to the current project's `assets/Example` folder. You can edit the files. Running the command again will never overwrite an existing folder. If assets do not appear immediately, refresh the Assets panel.
+
 ## Usage
 
 Editor-only Component drawers can be registered with `registerGizmos`. The `Gizmos2D` and `Gizmos3D` globals provide Scene View drawing operations; interactive Move/Rotate handles support editing component values.
