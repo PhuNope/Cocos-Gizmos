@@ -30,9 +30,10 @@ exports.template = `
         <pre id="gizmo-diagnostics-result" role="status" aria-live="polite"></pre>
     </section>
     <section class="diagnostics">
-        <h3>Mounted example scripts</h3>
-        <p>Check whether the 2D, 3D and Smoke Test scripts are imported
-        in the extension Asset Database. This does not modify the project.</p>
+        <h3>Project example scripts</h3>
+        <p>Use Gizmos &gt; Install Example to copy sample scripts into
+        assets/Example, then check the project Asset Database imports. This check
+        does not modify the project.</p>
         <button id="gizmo-examples-run" type="button">Check example assets</button>
         <pre id="gizmo-examples-result" role="status" aria-live="polite"></pre>
     </section>
@@ -132,7 +133,7 @@ exports.ready = async function ready() {
         const button = this.$.examplesRun;
         const output = this.$.examplesResult;
         button.disabled = true;
-        output.textContent = 'Checking extension Asset Database...';
+        output.textContent = 'Checking project Example assets...';
         try {
             const report = await editor.Message.request('cocos-gizmos', 'get-example-assets');
             const details = (report?.examples || []).map((entry) =>
@@ -148,7 +149,7 @@ exports.ready = async function ready() {
                 report?.guidance || 'No Asset Database result was returned.',
             ].join('\n');
         } catch (error) {
-            output.textContent = 'Cannot check mounted scripts: ' +
+            output.textContent = 'Cannot check example assets: ' +
                 String(error?.message || error);
         } finally {
             button.disabled = false;
