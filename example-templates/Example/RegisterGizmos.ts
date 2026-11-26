@@ -1,7 +1,6 @@
 /**
  * Explicit dependency for Components that opt into a separate Editor Gizmos class.
- * Import from the installed Project extension (dist/RegisterGizmos.js) or
- * within the read-only examples from editor-assets/RegisterGizmos.ts.
+ * Local helper installed beside project demos; import from './RegisterGizmos'.
  * Does not install callbacks in Preview or game builds.
  */
 import { EDITOR_NOT_IN_PREVIEW } from 'cc/env';
