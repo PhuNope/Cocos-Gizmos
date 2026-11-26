@@ -76,6 +76,6 @@ const mounted = readFileSync(path.join(root,
     'example-templates/Example/CocosGizmosDecoratorDemo.ts'), 'utf8');
 assert.match(editable, /@registerGizmos\(CustomDrawer\)/);
 assert.match(editable, /implements IDrawGizmos/);
-assert.match(mounted, /from '\.\.\/RegisterGizmos'/);
+assert.match(mounted, /from '\.\/RegisterGizmos'/);
 assert.match(editable, /onGizmoHUD\(\)/);
 console.log('[register-decorator] cached Editor callbacks, HUD and game/Preview no-op OK');
