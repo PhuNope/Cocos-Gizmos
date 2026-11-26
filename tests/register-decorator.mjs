@@ -73,7 +73,7 @@ assert.throws(() => register(null), /constructor/);
 
 const editable = readFileSync(path.join(root, 'assets/GizmosDecoratorTest.ts'), 'utf8');
 const mounted = readFileSync(path.join(root,
-    'editor-assets/Examples/CocosGizmosDecoratorDemo.ts'), 'utf8');
+    'example-templates/Example/CocosGizmosDecoratorDemo.ts'), 'utf8');
 assert.match(editable, /@registerGizmos\(CustomDrawer\)/);
 assert.match(editable, /implements IDrawGizmos/);
 assert.match(mounted, /from '\.\.\/RegisterGizmos'/);
