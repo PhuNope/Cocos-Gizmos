@@ -5,48 +5,36 @@ the automated TypeScript and Node.js regression suite.
 
 ## Prepare
 
-1. Install the development extension ZIP and enable **Cocos-Gizmos**.
-2. In **Extensions → Gizmos Settings**, press **Check Scene integration**.
-3. Wait for the Asset Database to refresh. Expand
-   **Assets → cocos-gizmos → Examples**. Three mounted scripts are available:
-   `CocosGizmos2DDemo.ts`, `CocosGizmos3DDemo.ts`, and
-   `CocosGizmosSmokeDemo.ts`.
-4. Create a test Node in the Hierarchy, select it, and drag
-   **CocosGizmosSmokeDemo.ts from Assets into the Inspector** to attach the
-   component (or use **Add Component**). You can attach the other two demos to
-   separate test Nodes for 2D and 3D rendering. Save the Scene.
-5. Repeat on a Prefab instance. The mounted scripts are read-only; to edit
-   their code, use the optional original sources in the ZIP's `examples/`
-   directory and copy those files into your own project's `assets/`.
-   The extension does not automatically copy any files to your project assets.
+1. Import the extension ZIP and enable **Cocos-Gizmos**. Verify that
+   **Assets > cocos-gizmos** does **not** contain an auto-mounted Examples folder.
+2. Choose **Gizmos > Install Example** from the top-level Editor menu.
+   The extension copies editable sample Components into **Assets > Example**
+   (`db://assets/Example`) in the open project. It also installs the local
+   `RegisterGizmos.ts` dependency and stable `.meta` files.
+3. Once AssetDB finishes importing, open **Gizmos Settings > Check example assets**.
+   The 2D, 3D, Smoke and Decorator components should be **imported** and
+   **registered**. The installer never overwrites `assets/Example` if that
+   folder already exists, so manually rename/remove your own copies if you
+   intentionally want a fresh installation.
+4. Select a test Node and drag a demo Component from **Assets > Example**
+   into the Inspector. Test both 2D and 3D Scenes, then save.
+5. Edit a demo file, click **Gizmos > Install Example** again, and confirm
+   that the local modification is retained. The extension does not remove
+   project examples when disabled or updated.
 
-Before dragging, open **Extensions → Gizmos Settings → Check example assets**.
-Each script should report **Asset DB: `imported`** and
-**Scene class: `registered`**. The two checks diagnose different failures:
+The installer leaves an existing Example folder untouched, including its
+UUID metadata. If AssetDB refresh fails, the copied files remain in
+`assets/Example`; reopen/refresh the Assets panel to trigger import.
 
-- `database-not-ready`, `missing`, `query-failed`, `uuid-mismatch`
-  or `wrong-importer` indicate possible Asset DB mount/import problems.
-- `not-registered` means the name was not found in Cocos' Scene class
-  registry; check script compilation errors, then reopen the Scene.
-- `not-component` means the registered name is not a Component subclass.
-- `scene-unavailable` / `registry-unavailable` mean the Scene class
-  lookup could not run. They **do not** prove the script is broken.
+For diagnostics, `database-not-ready`, `missing`, `query-failed`,
+`uuid-mismatch` or `wrong-importer` indicate incomplete project assets
+or an import problem. `not-registered` or `not-component` indicate a
+Scene class problem; `scene-unavailable` means the Scene class query
+could not be completed.
 
-Restart Cocos Creator after updating the ZIP, check Console errors and capture
-both status fields if problems remain. Even if all examples are imported and
-registered, confirm the Inspector accepts the script without **Missing
-Script**, then test actual Scene handles and native Undo/Redo.
+Use disposable Scenes and Prefabs for tests. Do not ship demo components
+in production unless they are intentionally part of the game.
 
-Do not edit project source or delete a Prefab override automatically as part
-of this test. Use a disposable Scene/Prefab and commit or back up your project
-before testing Undo/Redo.
-
-Mounted demo classes have unique `CocosGizmos*` names and stable `.meta` UUIDs
-so they do not collide with earlier manually copied sample scripts. Removing
-or disabling the extension may leave a Missing Script reference on any
-Scene/Prefab that uses a mounted demo. Remove demo components before shipping
-production builds; mounted examples are regular game-visible script assets,
-unlike the extension's Editor-only Scene runtime.
 
 ## Read-only diagnostics
 
