@@ -43,7 +43,7 @@ function setEditor(query, isReady = true, classState = 'registered') {
                     return isReady;
                 }
                 assert.equal(message, 'query-asset-info');
-                assert.match(url, /^db:\/\/cocos-gizmos\/Examples\/CocosGizmos(?:2DDemo|3DDemo|SmokeDemo|DecoratorDemo)\.ts$/);
+                assert.match(url, /^db:\/\/assets\/Example\/CocosGizmos(?:2DDemo|3DDemo|SmokeDemo|DecoratorDemo)\.ts$/);
                 const name = url.split('/').at(-1).replace(/\.ts$/, '');
                 return query(name);
             },
@@ -61,7 +61,7 @@ try {
     assert.equal(healthy.databaseReady, true);
     assert.deepEqual(healthy.examples.map((e) => e.name), names);
     assert.ok(healthy.examples.every((e) => e.status === 'imported'));
-    assert.ok(healthy.examples.every((e) => e.url.startsWith('db://cocos-gizmos/Examples/')));
+    assert.ok(healthy.examples.every((e) => e.url.startsWith('db://assets/Example/')));
     assert.equal(calls.length, 6,
         'One readiness query, four exact asset lookups, and one Scene registry query');
     assert.equal(healthy.sceneRegistry, 'available');
@@ -139,7 +139,7 @@ try {
     delete globalThis.Editor;
     await assert.rejects(extension.methods.getExampleAssets(), /Editor Message API is unavailable/);
 
-    console.log('[example-asset-health] 4 mounted scripts, DB readiness, import errors, stable UUIDs and privacy OK');
+    console.log('[example-asset-health] 4 opt-in project scripts, DB readiness, import errors, stable UUIDs and privacy OK');
 } finally {
     if (originalEditor === undefined) delete globalThis.Editor;
     else globalThis.Editor = originalEditor;
