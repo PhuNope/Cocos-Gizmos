@@ -190,7 +190,7 @@ function verifyModuleFormats() {
     const tempDist = path.join(tempRoot, 'dist');
     mkdirSync(tempDist);
     for (const [name, data] of entries) {
-      if (name === 'main.js' || name === 'builder.js' || name === 'scene.js' || name === 'package.json' ||
+      if (name === 'main.js' || name === 'example-installer.js' || name === 'builder.js' || name === 'scene.js' || name === 'package.json' ||
           name.startsWith('editor-runtime/') || name.startsWith('panels/') ||
           name.startsWith('dist/') || (name.startsWith('build/') && !name.includes('/vendor/'))) {
         const destination = path.join(tempRoot, name);
@@ -200,7 +200,7 @@ function verifyModuleFormats() {
     }
     const jsEntries = entries.map(([name]) => name).filter(name => name.endsWith('.js') && !name.includes('/vendor/'));
     for (const relative of jsEntries) {
-      const expectedFormat = (relative === 'main.js' || relative === 'builder.js' || relative === 'scene.js' || relative.startsWith('panels/') || relative.startsWith('editor-runtime/') || relative.startsWith('build/')) ? 'commonjs' : 'module';
+      const expectedFormat = (relative === 'main.js' || relative === 'example-installer.js' || relative === 'builder.js' || relative === 'scene.js' || relative.startsWith('panels/') || relative.startsWith('editor-runtime/') || relative.startsWith('build/')) ? 'commonjs' : 'module';
       const target = path.join(tempRoot, relative);
       const result = spawnSync(process.execPath, ['--check', target], { encoding: 'utf8' });
       if (result.error || result.status !== 0) {
